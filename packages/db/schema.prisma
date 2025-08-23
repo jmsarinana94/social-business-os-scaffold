@@ -1,0 +1,143 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Organization {
+  id               String       @id @default(cuid())
+  name             String
+  slug             String       @unique
+  stripeCustomerId String?
+  users            Membership[]
+  products         Product[]
+  channels         Channel[]
+  customers        Customer[]
+  orders           Order[]
+  createdAt        DateTime     @default(now())
+}
+
+model User {
+  id        String       @id @default(cuid())
+  email     String       @unique
+  name      String?
+  members   Membership[]
+  createdAt DateTime     @default(now())
+}
+
+model Membership {
+  orgId  String
+  userId String
+  role   String
+  org    Organization @relation(fields: [orgId], references: [id])
+  user   User         @relation(fields: [userId], references: [id])
+
+  @@id([orgId, userId])
+}
+
+model Product {
+  id           String   @id @default(cuid())
+  orgId        String
+  title        String
+  type         String // "physical" | "digital" | "service"
+  description  String?
+  status       String   @default("active") // active | draft
+  price        Int      @default(0) // store cents
+  sku          String   @unique @default(cuid()) // default so migrate won't fail
+  inventoryQty Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  // existing relations preserved
+  org          Organization     @relation(fields: [orgId], references: [id])
+  variants     ProductVariant[]
+  DigitalAsset DigitalAsset[]
+
+  @@index([orgId, createdAt])
+  @@index([orgId, status])
+  @@index([orgId, sku])
+}
+
+model ProductVariant {
+  id        String  @id @default(cuid())
+  productId String
+  sku       String? @unique
+  price     Int // cents
+  compareAt Int?
+  weightG   Int?
+  inventory Int?
+  product   Product @relation(fields: [productId], references: [id])
+}
+
+model DigitalAsset {
+  id           String  @id @default(cuid())
+  productId    String
+  fileUrl      String
+  filename     String
+  maxDownloads Int?
+  product      Product @relation(fields: [productId], references: [id])
+}
+
+model Customer {
+  id     String       @id @default(cuid())
+  orgId  String
+  email  String?
+  name   String?
+  phone  String?
+  org    Organization @relation(fields: [orgId], references: [id])
+  orders Order[]
+}
+
+model Order {
+  id                String        @id @default(cuid())
+  orgId             String
+  customerId        String?
+  total             Int
+  currency          String
+  status            String // "pending" | "paid" | "refunded"
+  sourceChannel     String?
+  paymentIntent     String?
+  requiresShipping  Boolean       @default(false)
+  fulfillmentStatus String? // "unfulfilled" | "partial" | "fulfilled"
+  utmSource         String?
+  utmMedium         String?
+  utmCampaign       String?
+  createdAt         DateTime      @default(now())
+  org               Organization  @relation(fields: [orgId], references: [id])
+  customer          Customer?     @relation(fields: [customerId], references: [id])
+  items             OrderItem[]
+  fulfillments      Fulfillment[]
+}
+
+model OrderItem {
+  id                  String  @id @default(cuid())
+  orderId             String
+  variantId           String?
+  title               String
+  productType         String // "physical" | "digital" | "service"
+  unitPrice           Int
+  qty                 Int
+  requiresFulfillment Boolean @default(true)
+  order               Order   @relation(fields: [orderId], references: [id])
+}
+
+model Fulfillment {
+  id             String  @id @default(cuid())
+  orderId        String
+  type           String // "shipment" | "digital" | "service"
+  status         String // "pending" | "in_transit" | "delivered" | "available" | "completed"
+  trackingNumber String?
+  downloadUrl    String?
+  appointmentId  String?
+  order          Order   @relation(fields: [orderId], references: [id])
+}
+
+model Channel {
+  id       String       @id @default(cuid())
+  orgId    String
+  type     String // "facebook" | "instagram" | "tiktok" | "whatnot"
+  settings Json?
+  org      Organization @relation(fields: [orgId], references: [id])
+}

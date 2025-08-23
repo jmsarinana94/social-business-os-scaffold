@@ -1,0 +1,5 @@
+
+
+> worker@0.0.0 build /Users/mannysarinana/Downloads/social-business-os-scaffold-v0.2/apps/worker
+> tsc -p tsconfig.json
+

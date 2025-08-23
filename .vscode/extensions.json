@@ -1,0 +1,12 @@
+{
+  "recommendations": [
+    "dbaeumer.vscode-eslint", // ESLint integration
+    "esbenp.prettier-vscode", // Prettier formatter
+    "nestjs.nestjs-files", // NestJS snippets & explorer
+    "Prisma.prisma", // Prisma syntax highlighting & tooling
+    "eamodio.gitlens", // GitLens (nice for monorepos)
+    "ms-azuretools.vscode-docker", // If you use Docker
+    "ms-vscode.vscode-typescript-next" // Latest TS support
+  ],
+  "unwantedRecommendations": []
+}

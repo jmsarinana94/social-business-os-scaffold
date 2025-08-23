@@ -1,0 +1,31 @@
+{
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.codeActionsOnSave": {
+    "source.fixAll": "always",
+    "source.organizeImports": "always"
+  },
+
+  // --- TypeScript-specific settings ---
+  // Let VS Code use the project tsconfigs, including the spec one for tests
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "typescript.tsdk": "node_modules/typescript/lib",
+
+  // Associate test files with the test config
+  "typescript.preferences.useProjectReferences": true,
+  "typescript.tsserver.experimental.enableProjectDiagnostics": true,
+  "typescript.tsserver.experimental.useSpeculativeProjects": false,
+  "typescript.preferences.includePackageJsonAutoImports": "auto",
+
+  // Optional: tell VS Code which tsconfigs to look at
+  "typescript.projectConfigurations": [
+    {
+      "rootPath": "./apps/api",
+      "tsconfig": "tsconfig.json"
+    },
+    {
+      "rootPath": "./apps/api",
+      "tsconfig": "tsconfig.spec.json"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+
+
+> web@ build /Users/mannysarinana/Downloads/social-business-os-scaffold-v0.2/apps/web
+> next build
+
+  [1m[38;2;173;127;168m▲ Next.js 14.2.6[39m[22m
+  - Environments: .env.local, .env
+
+ [37m[1m [22m[39m Creating an optimized production build ...

@@ -1,0 +1,42 @@
+{
+  "compilerOptions": {
+    "target": "ES2021",
+    "module": "commonjs",
+
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "useDefineForClassFields": false,
+
+    "strict": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+
+    "sourceMap": true,
+    "declaration": true,
+    "removeComments": true,
+    "outDir": "dist",
+
+    "baseUrl": ".",
+    "paths": {
+      "@app/*": ["src/*"],
+      "@common/*": ["src/common/*"],
+      "@modules/*": ["src/modules/*"],
+      "@auth/*": ["src/auth/*"]
+      /* IMPORTANT: Do not alias "@prisma/*" — it conflicts with the real @prisma/client package */
+    },
+
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+
+    /* Keep the app build free of Jest globals */
+    "types": ["node"]
+  },
+  "ts-node": {
+    "transpileOnly": true,
+    "require": ["tsconfig-paths/register"]
+  },
+  /* Only compile the application source here */
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "test"]
+}

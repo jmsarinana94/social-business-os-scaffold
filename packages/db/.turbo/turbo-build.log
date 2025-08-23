@@ -1,0 +1,5 @@
+
+
+> @repo/db@0.0.0 build /Users/mannysarinana/Downloads/social-business-os-scaffold-v0.2/packages/db
+> tsc -p tsconfig.build.json
+
