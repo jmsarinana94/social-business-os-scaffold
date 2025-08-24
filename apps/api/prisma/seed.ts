@@ -43,10 +43,10 @@ async function main() {
         },
       ],
     });
-    // eslint-disable-next-line no-console
+     
     console.log('Seeded demo products for org:', orgId);
   } else {
-    // eslint-disable-next-line no-console
+     
     console.log(`Org ${orgId} already has ${existing} product(s); skipping seed.`);
   }
 }

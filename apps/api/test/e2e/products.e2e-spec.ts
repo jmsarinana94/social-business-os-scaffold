@@ -1,4 +1,4 @@
-/* eslint-disable */
+ 
 // @ts-nocheck
 
 import { INestApplication } from '@nestjs/common';
