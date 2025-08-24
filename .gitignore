@@ -4,7 +4,6 @@
 # Node/PNPM
 node_modules/
 .pnpm-store/
-pnpm-lock.yaml
 
 # Build
 dist/
