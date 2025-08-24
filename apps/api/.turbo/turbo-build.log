@@ -1,29 +1,5 @@
 
 
 > api@ build /Users/mannysarinana/Downloads/social-business-os-scaffold-v0.2/apps/api
-> nest build
+> nest build && tsc-alias -p tsconfig.json
 
-[96msrc/modules/products/products.service.ts[0m:[93m64[0m:[93m9[0m - [91merror[0m[90m TS2322: [0mType 'string | null' is not assignable to type 'string | undefined'.
-  Type 'null' is not assignable to type 'string | undefined'.
-
-[7m64[0m         sku: input.sku?.trim() || null,
-[7m  [0m [91m        ~~~[0m
-
-  [96m../../node_modules/.pnpm/@prisma+client@6.14.0_prisma@6.14.0_typescript@5.4.5__typescript@5.4.5/node_modules/.prisma/client/index.d.ts[0m:[93m15543[0m:[93m5[0m
-    [7m15543[0m     sku?: string
-    [7m     [0m [96m    ~~~[0m
-    The expected type comes from property 'sku' which is declared here on type '(Without<ProductCreateInput, ProductUncheckedCreateInput> & ProductUncheckedCreateInput) | (Without<...> & ProductCreateInput)'
-[96msrc/modules/products/products.service.ts[0m:[93m88[0m:[93m9[0m - [91merror[0m[90m TS2322: [0mType 'string | null | undefined' is not assignable to type 'string | StringFieldUpdateOperationsInput | undefined'.
-  Type 'null' is not assignable to type 'string | StringFieldUpdateOperationsInput | undefined'.
-
-[7m88[0m         sku: input.sku !== undefined ? input.sku?.trim() || null : undefined,
-[7m  [0m [91m        ~~~[0m
-
-  [96m../../node_modules/.pnpm/@prisma+client@6.14.0_prisma@6.14.0_typescript@5.4.5__typescript@5.4.5/node_modules/.prisma/client/index.d.ts[0m:[93m15573[0m:[93m5[0m
-    [7m15573[0m     sku?: StringFieldUpdateOperationsInput | string
-    [7m     [0m [96m    ~~~[0m
-    The expected type comes from property 'sku' which is declared here on type '(Without<ProductUpdateInput, ProductUncheckedUpdateInput> & ProductUncheckedUpdateInput) | (Without<...> & ProductUpdateInput)'
-
-Found 2 error(s).
-
-[41m[30m ELIFECYCLE [39m[49m [31mCommand failed with exit code 1.[39m

@@ -1,19 +1,14 @@
-import { GlobalHttpExceptionFilter } from '@common/filters/http-exception.filter';
-import { ResponseInterceptor } from '@common/interceptors/response.interceptor';
-import { RequestIdMiddleware } from '@common/middleware/request-id.middleware';
-import { ProductsModule } from '@modules/products/products.module';
-import { MiddlewareConsumer, Module } from '@nestjs/common';
-import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
+import { Module } from '@nestjs/common';
+import { AuthModule } from './auth/auth.module';
+import { ProductsModule } from './modules/products/products.module';
+import { PrismaModule } from './prisma/prisma.module';
 
+// IMPORTANT: No global guards here. We’ll add them later with @Public().
 @Module({
-  imports: [ProductsModule],
-  providers: [
-    { provide: APP_INTERCEPTOR, useClass: ResponseInterceptor },
-    { provide: APP_FILTER, useClass: GlobalHttpExceptionFilter },
+  imports: [
+    PrismaModule,
+    ProductsModule,
+    AuthModule,
   ],
 })
-export class AppModule {
-  configure(consumer: MiddlewareConsumer) {
-    consumer.apply(RequestIdMiddleware).forRoutes('*');
-  }
-}
+export class AppModule {}

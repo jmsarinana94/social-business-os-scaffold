@@ -1,34 +1,41 @@
 // apps/api/src/main.ts
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import cors from 'cors';
+import { NextFunction, Request, Response } from 'express';
 import helmet from 'helmet';
 
 import { AppModule } from './app.module';
-import { GlobalHttpExceptionFilter } from './common/filters/http-exception.filter';
-import { ResponseInterceptor } from './common/interceptors/response.interceptor';
+
+type RequestWithId = Request & { id?: string };
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
 
+  // Security + CORS
   app.use(helmet());
-  app.enableCors({ origin: true, credentials: true });
+  app.use(cors());
 
-  // Use class-validator/class-transformer based validation globally
+  // Validation
   app.useGlobalPipes(
     new ValidationPipe({
-      transform: true,            // coerce query/body types (e.g., page/limit to numbers)
-      whitelist: true,            // strip unknown fields
-      forbidNonWhitelisted: false // don’t 400 on extra fields (optional)
+      transform: true,
+      whitelist: true,
+      forbidNonWhitelisted: false,
     }),
   );
 
-  // Keep your response wrapper + error filter
-  app.useGlobalInterceptors(new ResponseInterceptor());
-  app.useGlobalFilters(new GlobalHttpExceptionFilter());
+  // Simple request-id passthrough (no 'any' usage)
+  app.use((req: RequestWithId, _res: Response, next: NextFunction) => {
+    const headerId = req.headers['x-request-id'] as string | undefined;
+    if (headerId) req.id = headerId;
+    next();
+  });
 
   const port = Number(process.env.PORT) || 4000;
   await app.listen(port);
-  // eslint-disable-next-line no-console
+
+   
   console.log(`API listening on http://localhost:${port}`);
 }
 

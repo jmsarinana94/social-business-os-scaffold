@@ -7,3 +7,28 @@
   - Environments: .env.local, .env
 
  [37m[1m [22m[39m Creating an optimized production build ...
+ [32m[1m✓[22m[39m Compiled successfully
+[?25l [37m[1m [22m[39m Linting and checking validity of types  [36m.[39m[2K[1G [37m[1m [22m[39m Linting and checking validity of types  [36m..[39m[2K[1G [37m[1m [22m[39m Linting and checking validity of types  [36m...[39m[2K[1G [37m[1m [22m[39m Linting and checking validity of types  [36m.[39m[2K[1G [37m[1m [22m[39m Linting and checking validity of types  [36m..[39m[2K[1G [37m[1m [22m[39m Linting and checking validity of types  [36m...[39m[2K[1G[?25h [37m[1m [22m[39m Linting and checking validity of types     [32m[1m✓[22m[39m Linting and checking validity of types 
+[?25l [37m[1m [22m[39m Collecting page data  [36m.[39m[2K[1G [37m[1m [22m[39m Collecting page data  [36m..[39m[2K[1G[?25h [37m[1m [22m[39m Collecting page data     [32m[1m✓[22m[39m Collecting page data 
+[?25l [37m[1m [22m[39m Generating static pages (0/7)  [36m[    ][39m[2K[1G [37m[1m [22m[39m Generating static pages (0/7)  [36m[=   ][39m[2K[1G[?25h [32m[1m✓[22m[39m Generating static pages (7/7)
+[?25l [37m[1m [22m[39m Finalizing page optimization  [36m.[39m[?25l [37m[1m [22m[39m Collecting build traces  [36m.[39m[2K[1G [37m[1m [22m[39m Finalizing page optimization  [36m..[39m[2K[1G [37m[1m [22m[39m Collecting build traces  [36m..[39m[2K[1G [37m[1m [22m[39m Finalizing page optimization  [36m...[39m[2K[1G [37m[1m [22m[39m Collecting build traces  [36m...[39m[2K[1G [37m[1m [22m[39m Finalizing page optimization  [36m.[39m[2K[1G [37m[1m [22m[39m Collecting build traces  [36m.[39m[2K[1G [37m[1m [22m[39m Finalizing page optimization  [36m..[39m[2K[1G [37m[1m [22m[39m Collecting build traces  [36m..[39m[2K[1G [37m[1m [22m[39m Finalizing page optimization  [36m...[39m[2K[1G [37m[1m [22m[39m Collecting build traces  [36m...[39m[2K[1G [37m[1m [22m[39m Finalizing page optimization  [36m.[39m[2K[1G [37m[1m [22m[39m Collecting build traces  [36m.[39m[2K[1G [37m[1m [22m[39m Finalizing page optimization  [36m..[39m[2K[1G [37m[1m [22m[39m Collecting build traces  [36m..[39m[2K[1G [37m[1m [22m[39m Finalizing page optimization  [36m...[39m[2K[1G [37m[1m [22m[39m Collecting build traces  [36m...[39m[2K[1G [37m[1m [22m[39m Finalizing page optimization  [36m.[39m[2K[1G [37m[1m [22m[39m Collecting build traces  [36m.[39m[2K[1G [37m[1m [22m[39m Finalizing page optimization  [36m..[39m[2K[1G [37m[1m [22m[39m Collecting build traces  [36m..[39m[2K[1G[?25h [37m[1m [22m[39m Collecting build traces     [32m[1m✓[22m[39m Collecting build traces 
+[2K[1G[?25h [37m[1m [22m[39m Finalizing page optimization     [32m[1m✓[22m[39m Finalizing page optimization 
+
+[4mRoute (app)[24m                              [4mSize[24m     [4mFirst Load JS[24m
+┌ ○ /                                    6.96 kB          [37m[1m94 kB[22m[39m
+├ ○ /_not-found                          872 B          [37m[1m87.9 kB[22m[39m
+├ ○ /catalog                             941 B          [37m[1m87.9 kB[22m[39m
+├ ƒ /catalog/[id]                        142 B          [37m[1m87.1 kB[22m[39m
+├ ƒ /catalog/[id]/edit                   1.58 kB        [37m[1m88.6 kB[22m[39m
+├ ○ /catalog/new                         1.5 kB         [37m[1m88.5 kB[22m[39m
+└ ○ /products/new                        1.58 kB        [37m[1m88.6 kB[22m[39m
++ First Load JS shared by all            [37m[1m87 kB[22m[39m
+  ├ chunks/649-75f06b1c4d562a8d.js       31.5 kB
+  ├ chunks/caf67b24-acf173864c6184b9.js  53.6 kB
+  └ other shared chunks (total)          1.84 kB
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+[?25h

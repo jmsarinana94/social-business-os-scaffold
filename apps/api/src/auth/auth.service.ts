@@ -1,46 +1,53 @@
-// apps/api/src/auth/auth.service.ts
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
+import { PrismaService } from '../prisma/prisma.service';
 
-/**
- * TEMP STUB (no Prisma):
- * - Uses a single demo user from env or defaults.
- * - Swap to Prisma once User/Membership models are added.
- *
- * Env (optional):
- *   AUTH_DEMO_EMAIL=founder@example.com
- *   AUTH_DEMO_PASSWORD=password123
- */
 @Injectable()
 export class AuthService {
-  private readonly demoEmail = process.env.AUTH_DEMO_EMAIL ?? 'founder@example.com';
-  private readonly demoPasswordHashPromise = bcrypt.hash(
-    process.env.AUTH_DEMO_PASSWORD ?? 'password123',
-    8,
-  );
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly jwt: JwtService,
+  ) {}
 
-  constructor(private readonly jwt: JwtService) {}
+  async register(email: string, password: string, name?: string) {
+    const hashed = await bcrypt.hash(password, 10);
+    const user = await this.prisma.user.upsert({
+      where: { email },
+      update: {},
+      create: {
+        email,
+        name: name ?? email.split('@')[0],
+        passwordHash: hashed,
+      },
+      select: { id: true, email: true, name: true },
+    });
 
-  private async validateUser(email: string, password: string) {
-    if (email !== this.demoEmail) return null;
-    const hash = await this.demoPasswordHashPromise;
-    const ok = await bcrypt.compare(password, hash);
-    return ok ? { id: 'demo-user', email } : null;
+    return { user };
   }
 
   async login(email: string, password: string) {
-    const user = await this.validateUser(email, password);
-    if (!user) throw new UnauthorizedException('Invalid credentials');
-    const payload = { sub: user.id, email: user.email };
-    return { access_token: await this.jwt.signAsync(payload) };
-  }
+    const found = await this.prisma.user.findUnique({
+      where: { email },
+      select: { id: true, email: true, name: true, passwordHash: true },
+    });
 
-  async register(email: string, password: string, _name?: string) {
-    // For now, “register” just returns a token; replace with Prisma later.
-    const hash = await bcrypt.hash(password, 10);
-    void hash; // placeholder
-    const payload = { sub: 'demo-user', email };
-    return { access_token: await this.jwt.signAsync(payload), note: 'stubbed register' };
+    if (!found) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const ok = await bcrypt.compare(password, found.passwordHash ?? '');
+    if (!ok) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    // No orgId in your User schema yet — default to 'demo' for now
+    const payload = { sub: found.id, email: found.email, orgId: 'demo' };
+    const access_token = await this.jwt.signAsync(payload);
+
+    return {
+      access_token,
+      user: { id: found.id, email: found.email, name: found.name },
+    };
   }
 }
