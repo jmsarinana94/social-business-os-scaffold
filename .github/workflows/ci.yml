@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  api:
+    runs-on: ubuntu-latest
+
+    env:
+      DATABASE_URL: 'file:./prisma/dev.db'
+      NODE_ENV: 'test'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma Client
+        run: pnpm -C apps/api exec prisma generate
+
+      - name: Lint (API)
+        run: pnpm -C apps/api run lint
+
+      - name: Typecheck (API)
+        run: pnpm -C apps/api run typecheck
+
+      - name: Tests (API)
+        run: |
+          pnpm -C apps/api run test:unit
+          pnpm -C apps/api run test:e2e
+
+      - name: Build (API)
+        run: pnpm -C apps/api run build
