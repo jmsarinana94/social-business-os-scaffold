@@ -8,90 +8,65 @@ import {
   Post,
   Put,
   Query,
+  UseGuards,
 } from '@nestjs/common';
-import { ProductCreateDto, ProductUpdateDto } from './dto/product.dto';
+import { $Enums } from '@prisma/client';
+import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
+import { CreateProductDto } from '../../products/dto/create-product.dto';
+import { UpdateProductDto } from '../../products/dto/update-product.dto';
 import { ProductsService } from './products.service';
 
-function getOrgId(headers: Record<string, string | string[] | undefined>) {
-  const raw = headers['x-org'];
-  return (Array.isArray(raw) ? raw[0] : raw) || 'demo';
-}
-
 @Controller('products')
+@UseGuards(JwtAuthGuard)
 export class ProductsController {
   constructor(private readonly products: ProductsService) {}
 
+  @Post()
+  async create(
+    @Headers('x-org') orgId: string,
+    @Body() dto: CreateProductDto,
+  ) {
+    const data = await this.products.create(orgId, dto);
+    return { ok: true, data };
+  }
+
   @Get()
   async list(
-    @Headers() headers: Record<string, string | undefined>,
-    @Query('page') page = '1',
-    @Query('limit') limit = '10',
-    @Query('q') q?: string, // <-- use `q` to match the service type
-    @Query('type') type?: string,
-    @Query('status') status?: 'active' | 'inactive',
+    @Headers('x-org') orgId: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('q') q?: string,
+    @Query('type') type?: $Enums.ProductType,
+    @Query('status') status?: $Enums.ProductStatus,
   ) {
-    const orgId = getOrgId(headers);
-    const p = Math.max(1, parseInt(String(page), 10) || 1);
-    const l = Math.max(1, Math.min(100, parseInt(String(limit), 10) || 10));
-
-    const result = await this.products.list(orgId, {
-      page: p,
-      limit: l,
+    return this.products.findAll(orgId, {
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
       q,
       type,
       status,
     });
-
-    if ('meta' in result) {
-      return { ok: true, ...result };
-    }
-
-    const { data, total } = result as any;
-    return {
-      ok: true,
-      data,
-      meta: { page: p, limit: l, total, pageCount: Math.ceil((total ?? 0) / l) || 0 },
-    };
   }
 
   @Get(':id')
-  async get(
-    @Headers() headers: Record<string, string | undefined>,
-    @Param('id') id: string,
-  ) {
-    const orgId = getOrgId(headers);
-    const data = await this.products.get(orgId, id);
-    return { ok: true, data };
-  }
-
-  @Post()
-  async create(
-    @Headers() headers: Record<string, string | undefined>,
-    @Body() body: ProductCreateDto,
-  ) {
-    const orgId = getOrgId(headers);
-    const data = await this.products.create(orgId, body);
+  async get(@Headers('x-org') orgId: string, @Param('id') id: string) {
+    const data = await this.products.findOne(orgId, id);
     return { ok: true, data };
   }
 
   @Put(':id')
   async update(
-    @Headers() headers: Record<string, string | undefined>,
+    @Headers('x-org') orgId: string,
     @Param('id') id: string,
-    @Body() body: ProductUpdateDto,
+    @Body() dto: UpdateProductDto,
   ) {
-    const orgId = getOrgId(headers);
-    const data = await this.products.update(orgId, id, body);
+    const data = await this.products.update(orgId, id, dto);
     return { ok: true, data };
   }
 
   @Delete(':id')
-  async remove(
-    @Headers() headers: Record<string, string | undefined>,
-    @Param('id') id: string,
-  ) {
-    const orgId = getOrgId(headers);
+  async remove(@Headers('x-org') orgId: string, @Param('id') id: string) {
     const data = await this.products.remove(orgId, id);
-    return { ok: true, data: { id: data.id } };
+    return { ok: true, data };
   }
 }

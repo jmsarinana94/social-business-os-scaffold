@@ -1,12 +1,17 @@
 {
   "name": "api",
   "private": true,
+  "version": "0.0.0",
+  "description": "NestJS API for Social Business OS scaffold",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.17 <21 || >=20.10"
+  },
   "scripts": {
     "dev": "nest start --watch -r tsconfig-paths/register",
-    "start:dev": "nest start --watch -r tsconfig-paths/register",
     "start": "nest start -r tsconfig-paths/register",
     "build": "nest build && tsc-alias -p tsconfig.json",
-    "prestart:prod": "nest build && tsc-alias -p tsconfig.json",
+    "prestart:prod": "pnpm run build",
     "start:prod": "node dist/main.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint .",
@@ -20,22 +25,22 @@
     "test:ci": "NODE_ENV=test jest --config=jest.config.ts --runInBand --coverage",
     "// k6": "─────────────────────────────────────────────",
     "load:products:smoke": "k6 run test/load/products.smoke.k6.js",
-    "load:products:soak": "k6 run test/load/products.soak.k6.js"
+    "load:products:soak": "k6 run test/load/products.soak.k6.js",
+    "smoke": "bash scripts/smoke.sh"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.20",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^10.4.20",
     "@nestjs/jwt": "^10.2.0",
+    "@nestjs/mapped-types": "^2.1.0",
     "@nestjs/passport": "^10.0.3",
     "@nestjs/platform-express": "^10.4.20",
     "@nestjs/swagger": "^11.2.0",
     "@nestjs/throttler": "^5.2.0",
     "@prisma/client": "^6.14.0",
     "@repo/db": "workspace:*",
-    "@types/bcryptjs": "^3.0.0",
     "bcrypt": "^5.1.1",
-    "bcryptjs": "^3.0.2",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
     "cors": "^2.8.5",

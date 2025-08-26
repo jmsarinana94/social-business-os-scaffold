@@ -1,6 +1,6 @@
-// apps/api/prisma/schema.prisma
 generator client {
   provider = "prisma-client-js"
+  output   = "../../node_modules/.prisma/client"
 }
 
 datasource db {
@@ -8,64 +8,156 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/* ========== RBAC & Multi-tenancy core ========== */
-
-model User {
-  id           String       @id @default(cuid())
-  email        String       @unique
-  passwordHash String
-  name         String?
-  memberships  Membership[]
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+model Organization {
+  id               String       @id
+  name             String
+  slug             String       @unique
+  stripeCustomerId String?
+  createdAt        DateTime     @default(now())
+  Channel          Channel[]
+  Customer         Customer[]
+  users            Membership[]
+  Order            Order[]
+  products         Product[]
 }
 
-model Organization {
-  id          String       @id @default(cuid())
-  name        String
-  memberships Membership[]
-  products    Product[]
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+model User {
+  id           String       @id
+  email        String       @unique
+  name         String?
+  createdAt    DateTime     @default(now())
+  passwordHash String?
+  updatedAt    DateTime     @default(now())
+  orgs         Membership[]
 }
 
 model Membership {
-  id     String @id @default(cuid())
-  userId String
-  orgId  String
-  role   Role
+  orgId     String
+  userId    String
+  role      Role
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @default(now())
+  org       Organization @relation(fields: [orgId], references: [id])
+  user      User         @relation(fields: [userId], references: [id])
 
-  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  @@id([orgId, userId])
+}
 
-  @@unique([userId, orgId])
-  @@index([orgId])
-  @@index([userId])
+model Product {
+  id             String           @id @default(dbgenerated("(gen_random_uuid())::text"))
+  orgId          String
+  title          String
+  type           ProductType
+  description    String?
+  status         ProductStatus    @default(active)
+  createdAt      DateTime         @default(now())
+  inventoryQty   Int              @default(0)
+  price          Int              @default(0)
+  sku            String           @unique @default(dbgenerated("('SKU-'::text || substr(replace((gen_random_uuid())::text, '-'::text, ''::text), 1, 8))"))
+  updatedAt      DateTime         @default(now())
+  DigitalAsset   DigitalAsset[]
+  org            Organization     @relation(fields: [orgId], references: [id])
+  ProductVariant ProductVariant[]
+
+  @@index([orgId, createdAt])
+  @@index([orgId, sku])
+  @@index([orgId, status])
+}
+
+model Channel {
+  id           String       @id
+  orgId        String
+  type         String
+  settings     Json?
+  Organization Organization @relation(fields: [orgId], references: [id])
+}
+
+model Customer {
+  id           String       @id
+  orgId        String
+  email        String?
+  name         String?
+  phone        String?
+  Organization Organization @relation(fields: [orgId], references: [id])
+  Order        Order[]
+}
+
+model DigitalAsset {
+  id           String  @id
+  productId    String
+  fileUrl      String
+  filename     String
+  maxDownloads Int?
+  Product      Product @relation(fields: [productId], references: [id])
+}
+
+model Fulfillment {
+  id             String  @id
+  orderId        String
+  type           String
+  status         String
+  trackingNumber String?
+  downloadUrl    String?
+  appointmentId  String?
+  Order          Order   @relation(fields: [orderId], references: [id])
+}
+
+model Order {
+  id                String        @id
+  orgId             String
+  customerId        String?
+  total             Int
+  currency          String
+  status            String
+  sourceChannel     String?
+  paymentIntent     String?
+  requiresShipping  Boolean       @default(false)
+  fulfillmentStatus String?
+  utmSource         String?
+  utmMedium         String?
+  utmCampaign       String?
+  createdAt         DateTime      @default(now())
+  Fulfillment       Fulfillment[]
+  Customer          Customer?     @relation(fields: [customerId], references: [id])
+  Organization      Organization  @relation(fields: [orgId], references: [id])
+  OrderItem         OrderItem[]
+}
+
+model OrderItem {
+  id                  String  @id
+  orderId             String
+  variantId           String?
+  title               String
+  productType         String
+  unitPrice           Int
+  qty                 Int
+  requiresFulfillment Boolean @default(true)
+  Order               Order   @relation(fields: [orderId], references: [id])
+}
+
+model ProductVariant {
+  id        String  @id
+  productId String
+  sku       String? @unique
+  price     Int
+  compareAt Int?
+  weightG   Int?
+  inventory Int?
+  Product   Product @relation(fields: [productId], references: [id])
 }
 
 enum Role {
   OWNER
   ADMIN
   MEMBER
-  GUEST
 }
 
-/* ========== Your existing Product, now scoped to an org ========== */
+enum ProductType {
+  physical
+  digital
+}
 
-model Product {
-  id    String       @id @default(cuid())
-  orgId String
-  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
-
-  title        String   @db.Text
-  type         String   @db.Text // 'physical' | 'digital' | 'service'
-  description  String?  @db.Text
-  price        Int      @default(0) // cents
-  sku          String?  @db.Text
-  inventoryQty Int      @default(0)
-  status       String   @default("active")
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  @@index([orgId])
+enum ProductStatus {
+  active
+  archived
 }

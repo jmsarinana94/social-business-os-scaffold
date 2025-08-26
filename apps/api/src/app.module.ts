@@ -1,14 +1,17 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './auth/auth.module';
-import { ProductsModule } from './modules/products/products.module';
+import { HealthController } from './health.controller';
 import { PrismaModule } from './prisma/prisma.module';
+import { ProductsModule } from './products/products.module';
 
-// IMPORTANT: No global guards here. We’ll add them later with @Public().
 @Module({
   imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
-    ProductsModule,
     AuthModule,
+    ProductsModule,
   ],
+  controllers: [HealthController],
 })
 export class AppModule {}

@@ -6,14 +6,14 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor() {
     super({
+      secretOrKey: process.env.JWT_SECRET || 'dev_secret_change_me',
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: process.env.JWT_SECRET ?? 'test-secret',
     });
   }
 
-  // Whatever you return here becomes req.user
-  async validate(payload: { sub: string; email: string; orgId?: string }) {
-    return { userId: payload.sub, email: payload.email, orgId: payload.orgId ?? 'demo' };
+  async validate(payload: { sub: string; orgId: string; email?: string }) {
+    // whatever you attach here becomes req.user
+    return payload;
   }
 }

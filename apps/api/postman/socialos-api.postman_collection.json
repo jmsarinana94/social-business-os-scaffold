@@ -1,0 +1,139 @@
+{
+  "info": {
+    "name": "SocialOS API",
+    "_postman_id": "b1c9d8ee-1f67-4b80-9d78-0f0f0f0f0f0f",
+    "description": "Auth + Products CRUD",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:4000" },
+    { "key": "org", "value": "demo" },
+    { "key": "token", "value": "" },
+    { "key": "productId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "request": { "method": "GET", "url": "{{baseUrl}}/health" }
+    },
+    {
+      "name": "Register",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "x-org", "value": "{{org}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"pm+{{timestamp}}@example.com\",\n  \"password\": \"password\",\n  \"name\": \"Tester\"\n}"
+        },
+        "url": "{{baseUrl}}/auth/register"
+      }
+    },
+    {
+      "name": "Login",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const token = pm.response.json().access_token;",
+              "if (token) pm.collectionVariables.set('token', token);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "x-org", "value": "{{org}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"pm+{{timestamp}}@example.com\",\n  \"password\": \"password\"\n}"
+        },
+        "url": "{{baseUrl}}/auth/login"
+      }
+    },
+    {
+      "name": "Products - Create",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const id = pm.response.json().data?.id;",
+              "if (id) pm.collectionVariables.set('productId', id);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "x-org", "value": "{{org}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\":\"Widget\",\n  \"sku\":\"SKU-{{timestamp}}\",\n  \"type\":\"physical\",\n  \"status\":\"active\",\n  \"price\":10,\n  \"inventoryQty\":5,\n  \"description\":\"Postman\"\n}"
+        },
+        "url": "{{baseUrl}}/products"
+      }
+    },
+    {
+      "name": "Products - Get",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "x-org", "value": "{{org}}" }
+        ],
+        "url": "{{baseUrl}}/products/{{productId}}"
+      }
+    },
+    {
+      "name": "Products - Update",
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "x-org", "value": "{{org}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\":\"Widget (updated)\",\n  \"price\":12,\n  \"inventoryQty\":9\n}"
+        },
+        "url": "{{baseUrl}}/products/{{productId}}"
+      }
+    },
+    {
+      "name": "Products - List",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "x-org", "value": "{{org}}" }
+        ],
+        "url": "{{baseUrl}}/products?page=1&limit=5"
+      }
+    },
+    {
+      "name": "Products - Delete",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "x-org", "value": "{{org}}" }
+        ],
+        "url": "{{baseUrl}}/products/{{productId}}"
+      }
+    }
+  ]
+}
