@@ -1,42 +1,58 @@
-import { Type } from 'class-transformer';
-import { IsIn, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { PartialType } from '@nestjs/mapped-types';
+import { Transform, Type } from 'class-transformer';
+import {
+    IsIn,
+    IsNumber,
+    IsOptional,
+    IsPositive,
+    IsString,
+    MaxLength,
+} from 'class-validator';
+import { CreateProductDto } from './create-product.dto';
 
-export class ProductQueryDto {
-  @Type(() => Number)
-  @IsNumber()
-  @Min(1)
-  page = 1;
+const PRODUCT_TYPES = ['physical', 'digital'] as const;
+const PRODUCT_STATUSES = ['active', 'inactive'] as const;
 
-  @Type(() => Number)
-  @IsNumber()
-  @Min(1)
-  limit = 10;
+export class UpdateProductDto extends PartialType(CreateProductDto) {
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  title?: string;
 
   @IsOptional()
   @IsString()
-  q?: string;
-
-  @IsOptional()
-  @IsIn(['active', 'inactive'])
-  status?: 'active' | 'inactive';
+  @MaxLength(1000)
+  description?: string;
 
   @IsOptional()
   @IsString()
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.toLowerCase().trim() : value,
+  )
+  @IsIn(PRODUCT_TYPES as unknown as string[], {
+    message: `type must be one of the following values: ${PRODUCT_TYPES.join(', ')}`,
+  })
   type?: string;
-}
 
-export class ProductCreateDto {
-  @IsString() title!: string;
-  @IsOptional() @IsString() description?: string | null;
-  @IsIn(['active', 'inactive']) status!: 'active' | 'inactive';
-  @IsString() type!: string;          // required by Prisma schema
-  @IsOptional() @Type(() => Number) @IsNumber() price?: number;
-}
+  @IsOptional()
+  @IsString()
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.toLowerCase().trim() : value,
+  )
+  @IsIn(PRODUCT_STATUSES as unknown as string[], {
+    message: `status must be one of the following values: ${PRODUCT_STATUSES.join(', ')}`,
+  })
+  status?: string;
 
-export class ProductUpdateDto {
-  @IsOptional() @IsString() title?: string;
-  @IsOptional() @IsString() description?: string | null;
-  @IsOptional() @IsIn(['active', 'inactive']) status?: 'active' | 'inactive';
-  @IsOptional() @IsString() type?: string;
-  @IsOptional() @Type(() => Number) @IsNumber() price?: number;
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @IsPositive()
+  price?: number;
+
+  @IsOptional()
+  @IsString()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @MaxLength(64)
+  sku?: string;
 }

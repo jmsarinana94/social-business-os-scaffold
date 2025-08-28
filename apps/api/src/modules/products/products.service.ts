@@ -1,48 +1,44 @@
-import { Injectable } from '@nestjs/common';
-import { randomUUID } from 'crypto';
-import { PrismaService } from '../../prisma/prisma.service';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma, PrismaClient } from '@prisma/client';
+import { CreateProductDto } from './dto/create-product.dto';
+import { UpdateProductDto } from './dto/update-product.dto';
 
-type CreateBody = {
-  title: string;
-  description?: string;
-  price?: number;
-  type?: string;   // 'physical' | 'digital'
-  status?: string; // 'active' | 'inactive'
-  sku?: string;    // optional in request; we will generate if missing
-};
+// If you already have a dedicated PrismaService, replace `new PrismaClient()` with that service.
+const prisma = new PrismaClient();
 
-type UpdateBody = Partial<CreateBody>;
-
-const asEnum = (v: string | undefined) =>
-  typeof v === 'string' ? v.trim().toLowerCase() : undefined;
-
-const genSku = () => `SKU-${randomUUID().replace(/-/g, '').slice(0, 8)}`;
+function genSku() {
+  return `SKU-${Math.random().toString(16).slice(2, 10)}`;
+}
 
 @Injectable()
 export class ProductsService {
-  constructor(private readonly prisma: PrismaService) {}
+  private toEnum(v?: string) {
+    return typeof v === 'string' ? v.toLowerCase().trim() : v;
+  }
 
-  private async ensureOrg(orgSlug: string) {
-    const org = await this.prisma.organization.upsert({
-      where: { slug: orgSlug },
+  private async getOrCreateOrgBySlug(slug: string) {
+    if (!slug || typeof slug !== 'string') {
+      throw new Error('Missing x-org header');
+    }
+    return prisma.organization.upsert({
+      where: { slug },
       update: {},
-      create: { slug: orgSlug, name: orgSlug },
+      create: { name: slug, slug },
     });
-    return org.id;
   }
 
   async list(orgSlug: string, page = 1, limit = 10) {
-    const orgId = await this.ensureOrg(orgSlug);
-    const skip = (page - 1) * limit;
+    const org = await this.getOrCreateOrgBySlug(orgSlug);
+    const skip = Math.max(0, (page - 1) * limit);
 
     const [data, total] = await Promise.all([
-      this.prisma.product.findMany({
-        where: { orgId },
+      prisma.product.findMany({
+        where: { orgId: org.id },
         orderBy: { createdAt: 'desc' },
         skip,
         take: limit,
       }),
-      this.prisma.product.count({ where: { orgId } }),
+      prisma.product.count({ where: { orgId: org.id } }),
     ]);
 
     return {
@@ -51,87 +47,78 @@ export class ProductsService {
         page,
         limit,
         total,
-        pages: Math.ceil(total / limit),
+        pages: Math.ceil(total / limit) || 0,
       },
     };
   }
 
-  async findById(orgSlug: string, id: string) {
-    const orgId = await this.ensureOrg(orgSlug);
-    return this.prisma.product.findFirst({
-      where: { id, orgId },
+  async get(orgSlug: string, id: string) {
+    const org = await this.getOrCreateOrgBySlug(orgSlug);
+    const product = await prisma.product.findFirst({
+      where: { id, orgId: org.id },
     });
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+    return product;
   }
 
-  async create(orgSlug: string, dto: CreateBody) {
-    const orgId = await this.ensureOrg(orgSlug);
-
-    const type = asEnum(dto.type) ?? 'physical';
-    const status = asEnum(dto.status) ?? 'active';
-
-    if (!['physical', 'digital'].includes(type)) {
-      throw new Error(`Invalid type: ${dto.type}`);
-    }
-    if (!['active', 'inactive'].includes(status)) {
-      throw new Error(`Invalid status: ${dto.status}`);
-    }
+  async create(orgSlug: string, dto: CreateProductDto) {
+    const org = await this.getOrCreateOrgBySlug(orgSlug);
 
     const sku = (dto.sku ?? genSku()).trim();
 
-    return this.prisma.product.create({
+    // Prisma Decimal column accepts string or Prisma.Decimal
+    const priceStr = String(dto.price);
+
+    return prisma.product.create({
       data: {
-        orgId,
-        sku, // REQUIRED by your schema
+        orgId: org.id,
         title: dto.title,
-        description: dto.description ?? '',
-        price: dto.price ?? 0,
-        type,
-        status,
+        description: dto.description,
+        price: priceStr,
+        type: this.toEnum(dto.type)!,
+        status: this.toEnum(dto.status)!,
+        sku,
       },
     });
   }
 
-  async update(orgSlug: string, id: string, dto: UpdateBody) {
-    const orgId = await this.ensureOrg(orgSlug);
+  async update(orgSlug: string, id: string, dto: UpdateProductDto) {
+    const org = await this.getOrCreateOrgBySlug(orgSlug);
 
-    const existing = await this.prisma.product.findFirst({
-      where: { id, orgId },
-      select: { id: true },
+    // ensure exists + belongs to org
+    const existing = await prisma.product.findFirst({
+      where: { id, orgId: org.id },
     });
-    if (!existing) return null;
-
-    const type = asEnum(dto.type);
-    const status = asEnum(dto.status);
-
-    if (type && !['physical', 'digital'].includes(type)) {
-      throw new Error(`Invalid type: ${dto.type}`);
-    }
-    if (status && !['active', 'inactive'].includes(status)) {
-      throw new Error(`Invalid status: ${dto.status}`);
+    if (!existing) {
+      throw new NotFoundException('Product not found');
     }
 
-    // NOTE: we do NOT allow updating sku here (common practice)
-    return this.prisma.product.update({
+    const data: Prisma.ProductUpdateInput = {};
+    if (dto.title !== undefined) data.title = dto.title;
+    if (dto.description !== undefined) data.description = dto.description;
+    if (dto.type !== undefined) data.type = this.toEnum(dto.type)!;
+    if (dto.status !== undefined) data.status = this.toEnum(dto.status)!;
+    if (dto.price !== undefined) data.price = String(dto.price);
+    if (dto.sku !== undefined) data.sku = dto.sku.trim();
+
+    return prisma.product.update({
       where: { id },
-      data: {
-        title: dto.title,
-        description: dto.description,
-        price: dto.price,
-        ...(type ? { type } : {}),
-        ...(status ? { status } : {}),
-      },
+      data,
     });
   }
 
   async remove(orgSlug: string, id: string) {
-    const orgId = await this.ensureOrg(orgSlug);
+    const org = await this.getOrCreateOrgBySlug(orgSlug);
 
-    const existing = await this.prisma.product.findFirst({
-      where: { id, orgId },
-      select: { id: true },
+    const existing = await prisma.product.findFirst({
+      where: { id, orgId: org.id },
     });
-    if (!existing) return null;
+    if (!existing) {
+      throw new NotFoundException('Product not found');
+    }
 
-    return this.prisma.product.delete({ where: { id } });
+    return prisma.product.delete({ where: { id } });
   }
 }

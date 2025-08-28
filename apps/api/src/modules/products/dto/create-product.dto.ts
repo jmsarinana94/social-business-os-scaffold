@@ -1,32 +1,56 @@
-import { IsEnum, IsNumber, IsOptional, IsString } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import {
+    IsIn,
+    IsNotEmpty,
+    IsNumber,
+    IsOptional,
+    IsPositive,
+    IsString,
+    MaxLength,
+} from 'class-validator';
 
-export enum ProductTypeDto {
-  physical = 'physical',
-  digital = 'digital',
-}
-export enum ProductStatusDto {
-  active = 'active',
-  inactive = 'inactive',
-}
+const PRODUCT_TYPES = ['physical', 'digital'] as const;
+const PRODUCT_STATUSES = ['active', 'inactive'] as const;
 
 export class CreateProductDto {
   @IsString()
+  @IsNotEmpty()
+  @MaxLength(200)
   title!: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(1000)
   description?: string;
 
-  @IsEnum(ProductTypeDto)
-  type!: ProductTypeDto;
+  @IsString()
+  @IsNotEmpty()
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.toLowerCase().trim() : value,
+  )
+  @IsIn(PRODUCT_TYPES as unknown as string[], {
+    message: `type must be one of the following values: ${PRODUCT_TYPES.join(', ')}`,
+  })
+  type!: string;
 
-  @IsEnum(ProductStatusDto)
-  status!: ProductStatusDto;
+  @IsString()
+  @IsNotEmpty()
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.toLowerCase().trim() : value,
+  )
+  @IsIn(PRODUCT_STATUSES as unknown as string[], {
+    message: `status must be one of the following values: ${PRODUCT_STATUSES.join(', ')}`,
+  })
+  status!: string;
 
+  @Type(() => Number)
   @IsNumber()
+  @IsPositive()
   price!: number;
 
   @IsOptional()
   @IsString()
-  sku?: string; // optional; we will auto-generate if missing
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @MaxLength(64)
+  sku?: string;
 }

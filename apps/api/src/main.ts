@@ -1,58 +1,30 @@
-// apps/api/src/main.ts
 import { ValidationPipe } from '@nestjs/common';
-import { NestFactory } from '@nestjs/core';
+import { HttpAdapterHost, NestFactory } from '@nestjs/core';
 import helmet from 'helmet';
-import 'reflect-metadata';
-
 import { AppModule } from './app.module';
+import { PrismaExceptionFilter } from './prisma-exception.filter';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
-    bufferLogs: true,
-  });
+  const app = await NestFactory.create(AppModule);
 
-  // Security middleware
   app.use(helmet());
+  app.enableCors({ origin: true, credentials: true });
 
-  // CORS (wide-open by default; tighten for prod as needed)
-  app.enableCors({
-    origin: true,
-    credentials: true,
-  });
-
-  // Validation + transformation for DTOs
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: true,                   // strips unknown properties
-      transform: true,                   // enables class-transformer
+      whitelist: true,
+      transform: true,
       forbidUnknownValues: false,
-      transformOptions: { enableImplicitConversion: true },
     }),
   );
 
-  // Optional: Swagger (only if @nestjs/swagger is installed)
-  try {
-    // Dynamically import so the app still boots without the package
-    const { DocumentBuilder, SwaggerModule } = await import('@nestjs/swagger');
-    const config = new DocumentBuilder()
-      .setTitle('API')
-      .setDescription('Service API documentation')
-      .setVersion('1.0.0')
-      .addBearerAuth()
-      .build();
-    const document = SwaggerModule.createDocument(app, config);
-    SwaggerModule.setup('docs', app, document);
-  } catch {
-    // Swagger not installed; skip without failing
-  }
+  // ✅ Pass the HttpAdapterHost (not the raw adapter)
+  const adapterHost = app.get(HttpAdapterHost);
+  app.useGlobalFilters(new PrismaExceptionFilter(adapterHost));
 
-  const host = process.env.HOST ?? '0.0.0.0';
-  const port = Number(process.env.PORT ?? 4000);
-
-  await app.listen(port, host);
-  const url = await app.getUrl();
+  const port = Number(process.env.PORT || 4000);
+  await app.listen(port, '0.0.0.0');
    
-  console.log(`🚀 API listening at ${url}`);
+  console.log(`🚀 API listening at http://127.0.0.1:${port}`);
 }
-
 bootstrap();
