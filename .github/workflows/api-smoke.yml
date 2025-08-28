@@ -2,59 +2,70 @@ name: API Smoke
 
 on:
   push:
+    paths:
+      - 'apps/api/**'
+      - '.github/workflows/api-smoke.yml'
   pull_request:
+    paths:
+      - 'apps/api/**'
 
 jobs:
   smoke:
     runs-on: ubuntu-latest
-
-    permissions:
-      contents: read
+    defaults:
+      run:
+        working-directory: apps/api
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Node (for the API container build cache, not required locally)
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: 20
+          cache: 'pnpm'
+          cache-dependency-path: 'apps/api/pnpm-lock.yaml'
 
-      - name: Install system deps (jq, curl, direnv)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y jq curl direnv
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
 
-      - name: Create .envrc.local for apps/api
+      - name: Start Postgres
         run: |
-          cat > apps/api/.envrc.local <<'EOF'
-          export BASE="http://localhost:4000"
-          export ORG="demo"
-          # These credentials are used by smoke.sh to log in
-          export API_EMAIL="tester@example.com"
-          export API_PASS="password"
-          EOF
+          sudo systemctl start postgresql || true
+          psql --version
+          sudo -u postgres psql -c "CREATE USER runner WITH SUPERUSER PASSWORD 'runner';" || true
+          sudo -u postgres psql -c "CREATE DATABASE socialos OWNER runner;" || true
 
-      - name: Boot Postgres + API (Docker Compose)
+      - name: Prepare Prisma
+        env:
+          DATABASE_URL: postgresql://runner:runner@localhost:5432/socialos
         run: |
-          docker compose -f docker-compose.yml up -d --build
-          echo "Waiting for API to become healthy..."
-          for i in {1..60}; do
-            if curl -sSf http://localhost:4000/health >/dev/null 2>&1; then
-              echo "API is healthy."
-              break
-            fi
-            sleep 2
+          pnpm prisma generate
+          pnpm prisma migrate dev --name ci_init --create-only || true
+          pnpm prisma migrate deploy
+
+      - name: Build & start API (background)
+        env:
+          DATABASE_URL: postgresql://runner:runner@localhost:5432/socialos
+        run: |
+          pnpm build
+          nohup pnpm start >/tmp/api.log 2>&1 &
+          for i in {1..30}; do
+            curl -fsS http://127.0.0.1:4000/health && break
+            sleep 1
           done
+          curl -fsS http://127.0.0.1:4000/health
 
-      - name: Show env sanity
-        run: make api.env
+      - name: Smoke
+        env:
+          BASE: http://127.0.0.1:4000
+          ORG: demo
+        run: pnpm smoke
 
-      - name: Run smoke test
-        run: make api.smoke
-
-      - name: Docker logs (if failing)
+      - name: Show API logs on failure
         if: failure()
-        run: |
-          docker compose -f docker-compose.yml ps
-          docker compose -f docker-compose.yml logs --no-color --tail=300 api db
+        run: cat /tmp/api.log || true
