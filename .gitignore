@@ -1,13 +1,15 @@
 # macOS
 .DS_Store
 
-# Node/PNPM
+# Node / PNPM
 node_modules/
 .pnpm-store/
 
-# Build
+# Build artifacts
 dist/
 coverage/
+.turbo/
+.next/
 
 # Env / Prisma
 .env
