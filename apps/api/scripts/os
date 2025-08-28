@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$0")/../apps/api"
+source scripts/api-helpers.sh
+
+usage(){ echo "Usage: os products [list|create|get|update|delete] ..."; }
+
+case "${1:-}" in
+  products)
+    sub="${2:-list}"; shift 2 || true
+    case "$sub" in
+      list)   aget "$BASE/products" -d page=1 -d limit=10 | jq . ;;
+      create) title="${1:-Widget}"; sku="SKU-$(date +%s)"
+              apost "$BASE/products" -H "Content-Type: application/json" \
+                -d '{"title":"'"$title"'","sku":"'"$sku"'","type":"physical","status":"active","price":10,"inventoryQty":5}' | jq . ;;
+      get)    id="${1:?product id}"; aget "$BASE/products/$id" | jq . ;;
+      update) id="${1:?product id}"
+              aput "$BASE/products/$id" -H "Content-Type: application/json" -d "${2:?json body}" | jq . ;;
+      delete) id="${1:?product id}"; adel "$BASE/products/$id" | jq . ;;
+      *) usage; exit 1 ;;
+    esac
+    ;;
+  *) usage; exit 1 ;;
+esac

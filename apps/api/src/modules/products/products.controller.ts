@@ -1,72 +1,77 @@
 import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Headers,
-  Param,
-  Post,
-  Put,
-  Query,
-  UseGuards,
+    BadRequestException,
+    Body,
+    Controller,
+    Delete,
+    Get,
+    Headers,
+    NotFoundException,
+    Param,
+    Post,
+    Put,
+    Query,
 } from '@nestjs/common';
-import { $Enums } from '@prisma/client';
-import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
-import { CreateProductDto } from '../../products/dto/create-product.dto';
-import { UpdateProductDto } from '../../products/dto/update-product.dto';
 import { ProductsService } from './products.service';
 
+type CreateBody = {
+  title: string;
+  description?: string;
+  price?: number;
+  type?: 'physical' | 'digital';
+  status?: 'active' | 'inactive';
+  sku?: string; // NEW: allow caller to send a SKU (optional)
+};
+
+type UpdateBody = Partial<CreateBody>;
+
 @Controller('products')
-@UseGuards(JwtAuthGuard)
 export class ProductsController {
   constructor(private readonly products: ProductsService) {}
 
-  @Post()
-  async create(
-    @Headers('x-org') orgId: string,
-    @Body() dto: CreateProductDto,
-  ) {
-    const data = await this.products.create(orgId, dto);
-    return { ok: true, data };
-  }
-
   @Get()
   async list(
-    @Headers('x-org') orgId: string,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-    @Query('q') q?: string,
-    @Query('type') type?: $Enums.ProductType,
-    @Query('status') status?: $Enums.ProductStatus,
+    @Headers('x-org') org: string,
+    @Query('page') page = '1',
+    @Query('limit') limit = '10',
   ) {
-    return this.products.findAll(orgId, {
-      page: page ? Number(page) : undefined,
-      limit: limit ? Number(limit) : undefined,
-      q,
-      type,
-      status,
-    });
+    if (!org) throw new BadRequestException('Missing x-org header');
+    const p = Math.max(1, Number(page) || 1);
+    const l = Math.min(100, Math.max(1, Number(limit) || 10));
+    return this.products.list(org, p, l);
+  }
+
+  @Post()
+  async create(@Headers('x-org') org: string, @Body() body: CreateBody) {
+    if (!org) throw new BadRequestException('Missing x-org header');
+    if (!body?.title) throw new BadRequestException('title is required');
+    return this.products.create(org, body);
   }
 
   @Get(':id')
-  async get(@Headers('x-org') orgId: string, @Param('id') id: string) {
-    const data = await this.products.findOne(orgId, id);
-    return { ok: true, data };
+  async get(@Headers('x-org') org: string, @Param('id') id: string) {
+    if (!org) throw new BadRequestException('Missing x-org header');
+    const product = await this.products.findById(org, id);
+    if (!product) throw new NotFoundException('Product not found');
+    return product;
   }
 
   @Put(':id')
   async update(
-    @Headers('x-org') orgId: string,
+    @Headers('x-org') org: string,
     @Param('id') id: string,
-    @Body() dto: UpdateProductDto,
+    @Body() body: UpdateBody,
   ) {
-    const data = await this.products.update(orgId, id, dto);
-    return { ok: true, data };
+    if (!org) throw new BadRequestException('Missing x-org header');
+    const updated = await this.products.update(org, id, body);
+    if (!updated) throw new NotFoundException('Product not found');
+    return updated;
   }
 
   @Delete(':id')
-  async remove(@Headers('x-org') orgId: string, @Param('id') id: string) {
-    const data = await this.products.remove(orgId, id);
-    return { ok: true, data };
+  async remove(@Headers('x-org') org: string, @Param('id') id: string) {
+    if (!org) throw new BadRequestException('Missing x-org header');
+    const deleted = await this.products.remove(org, id);
+    if (!deleted) throw new NotFoundException('Product not found');
+    return deleted;
   }
 }

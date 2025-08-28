@@ -1,9 +1,9 @@
 {
   "/_not-found/page": "app/_not-found/page.js",
-  "/catalog/new/page": "app/catalog/new/page.js",
-  "/catalog/page": "app/catalog/page.js",
   "/page": "app/page.js",
+  "/catalog/new/page": "app/catalog/new/page.js",
   "/products/new/page": "app/products/new/page.js",
-  "/catalog/[id]/edit/page": "app/catalog/[id]/edit/page.js",
-  "/catalog/[id]/page": "app/catalog/[id]/page.js"
+  "/catalog/page": "app/catalog/page.js",
+  "/catalog/[id]/page": "app/catalog/[id]/page.js",
+  "/catalog/[id]/edit/page": "app/catalog/[id]/edit/page.js"
 }

@@ -1,4 +1,3 @@
-// apps/api/src/modules/products/dto/product.dto.ts
 import { Type } from 'class-transformer';
 import { IsIn, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 

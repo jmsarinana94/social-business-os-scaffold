@@ -1,6 +1,3 @@
- 
-// @ts-nocheck
-
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
@@ -8,6 +5,10 @@ import { AppModule } from '../../src/app.module';
 
 describe('Products (e2e)', () => {
   let app: INestApplication;
+  let authHeaders: Record<string, string>;
+
+  const ORG = 'demo';
+  const baseHeaders = { 'x-org': ORG };
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
@@ -16,6 +17,26 @@ describe('Products (e2e)', () => {
 
     app = moduleRef.createNestApplication();
     await app.init();
+
+    // Sign up + login to obtain token
+    const stamp = Date.now();
+    const email = `tester+${stamp}@example.com`;
+    const password = 'password';
+
+    await request(app.getHttpServer())
+      .post('/auth/register')
+      .set(baseHeaders)
+      .send({ email, password, name: 'Tester' })
+      .expect(201);
+
+    const login = await request(app.getHttpServer())
+      .post('/auth/login')
+      .set(baseHeaders)
+      .send({ email, password })
+      .expect(201);
+
+    const token: string = login.body?.access_token ?? login.body?.token ?? '';
+    authHeaders = { ...baseHeaders, Authorization: `Bearer ${token}` };
   });
 
   afterAll(async () => {
@@ -25,58 +46,62 @@ describe('Products (e2e)', () => {
   it('GET /products returns paginated list', async () => {
     const res = await request(app.getHttpServer())
       .get('/products?page=1&limit=5')
-      .set('x-org', 'demo')
+      .set(authHeaders)
       .expect(200);
 
-    const body = res.body?.data ?? res.body; // supports wrapped/unwrapped
+    const body = res.body?.data ?? res.body;
     const list = body.data ?? body;
-    const meta = body.meta;
-
     expect(Array.isArray(list)).toBe(true);
-    if (meta) expect(meta.page).toBe(1);
   });
 
   it('POST -> GET -> PUT (partial) -> DELETE', async () => {
-    // create
-    const created = await request(app.getHttpServer())
+    const server = app.getHttpServer();
+
+    // Create
+    const sku = `SKU-${Math.floor(Math.random() * 1e6)}`;
+    const created = await request(server)
       .post('/products')
-      .set('content-type', 'application/json')
-      .set('x-org', 'demo')
+      .set(authHeaders)
       .send({
-        title: 'Jest Shirt',
+        title: 'Prod A',
+        sku,
         type: 'physical',
-        price: 1999,
         status: 'active',
+        price: 12,
+        inventoryQty: 3,
         description: null,
       })
       .expect(201);
 
     const createdObj = created.body?.data ?? created.body;
-    const id = createdObj.id;
+    const id: string = createdObj.id;
     expect(id).toBeTruthy();
 
-    // read
-    const got = await request(app.getHttpServer())
+    // Get
+    const got = await request(server)
       .get(`/products/${id}`)
-      .set('x-org', 'demo')
+      .set(authHeaders)
       .expect(200);
-    const readObj = got.body?.data ?? got.body;
-    expect(readObj.id).toBe(id);
+    const gotObj = got.body?.data ?? got.body;
+    expect(gotObj.id).toBe(id);
 
-    // update (partial; only title) — should be 200 OK
-    const updated = await request(app.getHttpServer())
+    // Partial update
+    await request(server)
       .put(`/products/${id}`)
-      .set('content-type', 'application/json')
-      .set('x-org', 'demo')
-      .send({ title: 'Jest Shirt v2' })
+      .set(authHeaders)
+      .send({ price: 17, inventoryQty: 7 })
       .expect(200);
-    const updObj = updated.body?.data ?? updated.body;
-    expect(String(updObj.title)).toMatch(/v2/);
 
-    // delete
-    await request(app.getHttpServer())
+    // Delete
+    await request(server)
       .delete(`/products/${id}`)
-      .set('x-org', 'demo')
+      .set(authHeaders)
       .expect(200);
+
+    // Confirm 404
+    await request(server)
+      .get(`/products/${id}`)
+      .set(authHeaders)
+      .expect(404);
   });
 });

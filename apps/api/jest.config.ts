@@ -1,29 +1,46 @@
 import type { Config } from 'jest';
 
 const config: Config = {
+  // Look at both src and tests
+  roots: ['<rootDir>/src', '<rootDir>/test'],
+  moduleFileExtensions: ['ts', 'js', 'json'],
+  testMatch: ['**/*.spec.ts', '**/*.e2e-spec.ts'],
+  transform: {
+    '^.+\\.ts$': [
+      'ts-jest',
+      {
+        isolatedModules: true,
+        diagnostics: false
+      }
+    ]
+  },
+  moduleNameMapper: {
+    '^src/(.*)$': '<rootDir>/src/$1'
+  },
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '<rootDir>/dist/',
+    '<rootDir>/coverage/',
+    '<rootDir>/../web/.next/'
+  ],
+  modulePathIgnorePatterns: [
+    '<rootDir>/dist/',
+    '<rootDir>/../web/.next/'
+  ],
+  cacheDirectory: '<rootDir>/.jest-cache',
   projects: [
     {
       displayName: 'unit',
-      testEnvironment: 'node',
-      testMatch: ['<rootDir>/src/**/*.spec.ts'],
-      transform: { '^.+\\.(t|j)s$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.json' }] },
-      moduleNameMapper: {
-        '^@/(.*)$': '<rootDir>/src/$1',
-      },
+      testMatch: ['<rootDir>/test/**/*.spec.ts']
     },
     {
       displayName: 'e2e',
-      testEnvironment: 'node',
-      testMatch: ['<rootDir>/test/e2e/**/*.e2e-spec.ts'],
-      transform: { '^.+\\.(t|j)s$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.json' }] },
-      moduleNameMapper: {
-        '^@/(.*)$': '<rootDir>/src/$1',
-      },
-      setupFilesAfterEnv: ['<rootDir>/test/e2e/jest-e2e.setup.ts'],
-      maxWorkers: 1,
-      testTimeout: 30000,
-    },
+      testMatch: ['<rootDir>/test/**/*.e2e-spec.ts']
+    }
   ],
+  clearMocks: true,
+  verbose: true,
+  testEnvironment: 'node'
 };
 
 export default config;

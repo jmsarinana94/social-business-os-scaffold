@@ -5,19 +5,17 @@ import { AppModule } from '../../src/app.module';
 
 describe('Products Auth (e2e)', () => {
   let app: INestApplication;
-  let server: any;
+
+  const ORG = 'demo';
+  const baseHeaders = { 'x-org': ORG };
 
   beforeAll(async () => {
-    // Make sure JwtModule has a secret during tests
-    process.env.JWT_SECRET = process.env.JWT_SECRET ?? 'test-secret';
-
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
 
     app = moduleRef.createNestApplication();
     await app.init();
-    server = app.getHttpServer();
   });
 
   afterAll(async () => {
@@ -25,60 +23,72 @@ describe('Products Auth (e2e)', () => {
   });
 
   it('signup/login then CRUD with Bearer token', async () => {
-    const email = `user${Date.now()}@ex.com`;
-    const password = 'Passw0rd!';
+    const server = app.getHttpServer();
 
-    // sign up
+    const stamp = Date.now();
+    const email = `tester+${stamp}@example.com`;
+    const password = 'password';
+
+    // Register (your API uses /auth/register)
     await request(server)
-      .post('/auth/signup')
+      .post('/auth/register')
+      .set(baseHeaders)
       .send({ email, password, name: 'Test User' })
       .expect(201);
 
-    // login
+    // Login (your API uses /auth/login)
     const login = await request(server)
       .post('/auth/login')
+      .set(baseHeaders)
       .send({ email, password })
       .expect(201);
 
-    const token =
-      login.body?.access_token ?? login.body?.data?.access_token;
+    const token: string = login.body?.access_token ?? login.body?.token ?? '';
+    expect(token).toBeTruthy();
 
-    // create
+    const authHeaders = {
+      ...baseHeaders,
+      Authorization: `Bearer ${token}`,
+    };
+
+    // Create -> Get -> Update -> Delete
+    const sku = `SKU-${Math.floor(Math.random() * 100000)}`;
     const created = await request(server)
       .post('/products')
-      .set('Authorization', `Bearer ${token}`)
-      .set('x-org', 'demo')
+      .set(authHeaders)
       .send({
-        title: 'Auth Product',
+        title: 'AuthProd',
+        sku,
         type: 'physical',
         status: 'active',
-        description: null,
+        price: 11,
+        inventoryQty: 2,
       })
       .expect(201);
 
     const createdObj = created.body?.data ?? created.body;
-    const id = createdObj.id;
+    const id: string = createdObj.id;
+    expect(id).toBeTruthy();
 
-    // get one
     await request(server)
       .get(`/products/${id}`)
-      .set('Authorization', `Bearer ${token}`)
-      .set('x-org', 'demo')
+      .set(authHeaders)
       .expect(200);
 
-    // update
     await request(server)
       .put(`/products/${id}`)
-      .set('Authorization', `Bearer ${token}`)
-      .set('x-org', 'demo')
-      .send({ title: 'Updated' })
+      .set(authHeaders)
+      .send({ title: 'AuthProd (updated)', price: 14 })
       .expect(200);
 
-    // delete
     await request(server)
       .delete(`/products/${id}`)
-      .set('Authorization', `Bearer ${token}`)
-      .set('x-org', 'demo')
+      .set(authHeaders)
       .expect(200);
+
+    await request(server)
+      .get(`/products/${id}`)
+      .set(authHeaders)
+      .expect(404);
   });
 });

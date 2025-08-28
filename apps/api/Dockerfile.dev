@@ -1,0 +1,13 @@
+# apps/api/Dockerfile.dev
+FROM node:20-slim
+
+# Helpful system tools
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    bash ca-certificates curl jq git \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /work/apps/api
+
+# We mount the repo as a bind volume in compose, so no COPY here.
+# The start command is provided by docker-compose.yml
+EXPOSE 4000

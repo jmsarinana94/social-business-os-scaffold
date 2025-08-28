@@ -1,125 +1,137 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, ProductStatus, ProductType } from '@prisma/client';
+import { Injectable } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
-import { CreateProductDto } from '../../products/dto/create-product.dto';
-import { UpdateProductDto } from '../../products/dto/update-product.dto';
+
+type CreateBody = {
+  title: string;
+  description?: string;
+  price?: number;
+  type?: string;   // 'physical' | 'digital'
+  status?: string; // 'active' | 'inactive'
+  sku?: string;    // optional in request; we will generate if missing
+};
+
+type UpdateBody = Partial<CreateBody>;
+
+const asEnum = (v: string | undefined) =>
+  typeof v === 'string' ? v.trim().toLowerCase() : undefined;
+
+const genSku = () => `SKU-${randomUUID().replace(/-/g, '').slice(0, 8)}`;
 
 @Injectable()
 export class ProductsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll(
-    orgId: string,
-    params: {
-      page?: number;
-      limit?: number;
-      q?: string;
-      type?: ProductType | 'physical' | 'digital';
-      status?: ProductStatus | 'active' | 'inactive';
-    } = {},
-  ) {
-    const page = Math.max(1, params.page ?? 1);
-    const limit = Math.min(100, Math.max(1, params.limit ?? 10));
+  private async ensureOrg(orgSlug: string) {
+    const org = await this.prisma.organization.upsert({
+      where: { slug: orgSlug },
+      update: {},
+      create: { slug: orgSlug, name: orgSlug },
+    });
+    return org.id;
+  }
+
+  async list(orgSlug: string, page = 1, limit = 10) {
+    const orgId = await this.ensureOrg(orgSlug);
     const skip = (page - 1) * limit;
 
-    const where: Prisma.ProductWhereInput = {
-      orgId,
-      ...(params.q ? { title: { contains: params.q, mode: 'insensitive' } } : {}),
-      ...(params.type ? { type: params.type as ProductType } : {}),
-      ...(params.status ? { status: params.status as ProductStatus } : {}),
-    };
-
-    const [data, total] = await this.prisma.$transaction([
+    const [data, total] = await Promise.all([
       this.prisma.product.findMany({
-        where,
+        where: { orgId },
         orderBy: { createdAt: 'desc' },
         skip,
         take: limit,
-        select: {
-          id: true,
-          sku: true,
-          title: true,
-          type: true,
-          status: true,
-          price: true,
-          inventoryQty: true,
-          createdAt: true,
-          updatedAt: true,
-          description: true,
-        },
       }),
-      this.prisma.product.count({ where }),
+      this.prisma.product.count({ where: { orgId } }),
     ]);
 
     return {
-      ok: true,
       data,
       meta: {
         page,
         limit,
         total,
-        pageCount: Math.ceil(total / limit),
+        pages: Math.ceil(total / limit),
       },
     };
   }
 
-  async create(orgId: string, dto: CreateProductDto) {
-    await this.prisma.organization.upsert({
-      where: { id: orgId },
-      create: { id: orgId, name: orgId, slug: orgId },
-      update: {},
+  async findById(orgSlug: string, id: string) {
+    const orgId = await this.ensureOrg(orgSlug);
+    return this.prisma.product.findFirst({
+      where: { id, orgId },
     });
+  }
 
-    const created = await this.prisma.product.create({
+  async create(orgSlug: string, dto: CreateBody) {
+    const orgId = await this.ensureOrg(orgSlug);
+
+    const type = asEnum(dto.type) ?? 'physical';
+    const status = asEnum(dto.status) ?? 'active';
+
+    if (!['physical', 'digital'].includes(type)) {
+      throw new Error(`Invalid type: ${dto.type}`);
+    }
+    if (!['active', 'inactive'].includes(status)) {
+      throw new Error(`Invalid status: ${dto.status}`);
+    }
+
+    const sku = (dto.sku ?? genSku()).trim();
+
+    return this.prisma.product.create({
       data: {
         orgId,
-        sku: dto.sku,
+        sku, // REQUIRED by your schema
         title: dto.title,
-        type: dto.type as ProductType,
-        status: dto.status as ProductStatus,
+        description: dto.description ?? '',
         price: dto.price ?? 0,
-        inventoryQty: dto.inventoryQty ?? 0,
-        description: dto.description ?? null,
+        type,
+        status,
       },
+    });
+  }
+
+  async update(orgSlug: string, id: string, dto: UpdateBody) {
+    const orgId = await this.ensureOrg(orgSlug);
+
+    const existing = await this.prisma.product.findFirst({
+      where: { id, orgId },
       select: { id: true },
     });
+    if (!existing) return null;
 
-    return { ok: true, data: created };
-  }
+    const type = asEnum(dto.type);
+    const status = asEnum(dto.status);
 
-  async findOne(orgId: string, id: string) {
-    const product = await this.prisma.product.findFirst({
-      where: { id, orgId },
-    });
-    if (!product) throw new NotFoundException('Product not found');
-    return { ok: true, data: product };
-  }
+    if (type && !['physical', 'digital'].includes(type)) {
+      throw new Error(`Invalid type: ${dto.type}`);
+    }
+    if (status && !['active', 'inactive'].includes(status)) {
+      throw new Error(`Invalid status: ${dto.status}`);
+    }
 
-  async update(orgId: string, id: string, dto: UpdateProductDto) {
-    const existing = await this.prisma.product.findFirst({ where: { id, orgId } });
-    if (!existing) throw new NotFoundException('Product not found');
-
-    const updated = await this.prisma.product.update({
+    // NOTE: we do NOT allow updating sku here (common practice)
+    return this.prisma.product.update({
       where: { id },
       data: {
-        ...(dto.title !== undefined ? { title: dto.title } : {}),
-        ...(dto.sku !== undefined ? { sku: dto.sku } : {}),
-        ...(dto.type !== undefined ? { type: dto.type as ProductType } : {}),
-        ...(dto.status !== undefined ? { status: dto.status as ProductStatus } : {}),
-        ...(dto.price !== undefined ? { price: dto.price } : {}),
-        ...(dto.inventoryQty !== undefined ? { inventoryQty: dto.inventoryQty } : {}),
-        ...(dto.description !== undefined ? { description: dto.description } : {}),
+        title: dto.title,
+        description: dto.description,
+        price: dto.price,
+        ...(type ? { type } : {}),
+        ...(status ? { status } : {}),
       },
     });
-
-    return { ok: true, data: { id: updated.id } };
   }
 
-  async remove(orgId: string, id: string) {
-    const result = await this.prisma.product.deleteMany({
+  async remove(orgSlug: string, id: string) {
+    const orgId = await this.ensureOrg(orgSlug);
+
+    const existing = await this.prisma.product.findFirst({
       where: { id, orgId },
+      select: { id: true },
     });
-    if (result.count === 0) throw new NotFoundException('Product not found');
-    return { ok: true };
+    if (!existing) return null;
+
+    return this.prisma.product.delete({ where: { id } });
   }
 }

@@ -1,63 +1,58 @@
 // apps/api/src/main.ts
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
+import 'reflect-metadata';
+
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-
-  // Security hardening
-  app.use(helmet());
-  app.enableCors({
-    origin: true,          // allow all origins (adjust for your needs)
-    credentials: false,
+  const app = await NestFactory.create(AppModule, {
+    bufferLogs: true,
   });
 
-  // Request body validation
+  // Security middleware
+  app.use(helmet());
+
+  // CORS (wide-open by default; tighten for prod as needed)
+  app.enableCors({
+    origin: true,
+    credentials: true,
+  });
+
+  // Validation + transformation for DTOs
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: true,           // strip unknown properties
-      forbidNonWhitelisted: false,
-      transform: true,           // auto-transform primitives (e.g., strings to numbers)
+      whitelist: true,                   // strips unknown properties
+      transform: true,                   // enables class-transformer
+      forbidUnknownValues: false,
       transformOptions: { enableImplicitConversion: true },
     }),
   );
 
-  // Optional: API prefix (uncomment if you want /api/*)
-  // app.setGlobalPrefix('api');
-
-  // Swagger (disabled in production)
-  if (process.env.NODE_ENV !== 'production') {
+  // Optional: Swagger (only if @nestjs/swagger is installed)
+  try {
+    // Dynamically import so the app still boots without the package
+    const { DocumentBuilder, SwaggerModule } = await import('@nestjs/swagger');
     const config = new DocumentBuilder()
-      .setTitle('Social OS API')
-      .setDescription('Endpoints for auth and products')
+      .setTitle('API')
+      .setDescription('Service API documentation')
       .setVersion('1.0.0')
-      .addBearerAuth(
-        {
-          type: 'http',
-          scheme: 'bearer',
-          bearerFormat: 'JWT',
-          in: 'header',
-          description: 'Paste JWT from /auth/login',
-        },
-        'JWT',
-      )
-      .addApiKey(
-        { type: 'apiKey', name: 'x-org', in: 'header', description: 'Organization ID' },
-        'X-ORG',
-      )
+      .addBearerAuth()
       .build();
-
-    const doc = SwaggerModule.createDocument(app, config);
-    SwaggerModule.setup('docs', app, doc);
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('docs', app, document);
+  } catch {
+    // Swagger not installed; skip without failing
   }
 
+  const host = process.env.HOST ?? '0.0.0.0';
   const port = Number(process.env.PORT ?? 4000);
-  await app.listen(port);
+
+  await app.listen(port, host);
+  const url = await app.getUrl();
    
-  console.log(`API listening on http://localhost:${port}`);
+  console.log(`🚀 API listening at ${url}`);
 }
 
 bootstrap();

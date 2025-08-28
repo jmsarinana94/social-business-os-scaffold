@@ -1,13 +1,13 @@
-import { AppModule } from '@/app.module';
-import { PrismaService } from '@/prisma/prisma.service';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import * as request from 'supertest';
+import request from 'supertest';
+import { AppModule } from '../../src/app.module';
 
 describe('API smoke (e2e)', () => {
   let app: INestApplication;
-  let prisma: PrismaService;
-  const ORG = process.env.ORG || 'demo';
+
+  const ORG = 'demo';
+  const baseHeaders = { 'x-org': ORG };
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
@@ -16,15 +16,6 @@ describe('API smoke (e2e)', () => {
 
     app = moduleRef.createNestApplication();
     await app.init();
-
-    prisma = app.get(PrismaService);
-
-    // Ensure org exists
-    await prisma.organization.upsert({
-      where: { id: ORG },
-      update: {},
-      create: { id: ORG, name: ORG, slug: ORG },
-    });
   });
 
   afterAll(async () => {
@@ -32,78 +23,102 @@ describe('API smoke (e2e)', () => {
   });
 
   it('health', async () => {
-    const res = await request(app.getHttpServer()).get('/health').expect(200);
+    const res = await request(app.getHttpServer())
+      .get('/health')
+      .set(baseHeaders)
+      .expect(200);
+
+    // Supports either { ok: true, ... } or wrapped shape { ok: true, data: ... }
     expect(res.body.ok).toBe(true);
   });
 
   it('auth + products CRUD', async () => {
-    const email = `e2e+${Date.now()}@example.com`;
+    const server = app.getHttpServer();
+
+    // unique email per run
+    const stamp = Date.now();
+    const email = `tester+${stamp}@example.com`;
     const password = 'password';
 
     // Register
-    await request(app.getHttpServer())
+    await request(server)
       .post('/auth/register')
-      .set('x-org', ORG)
+      .set(baseHeaders)
       .send({ email, password, name: 'Tester' })
       .expect(201);
 
     // Login
-    const login = await request(app.getHttpServer())
+    const login = await request(server)
       .post('/auth/login')
-      .set('x-org', ORG)
+      .set(baseHeaders)
       .send({ email, password })
       .expect(201);
-    expect(login.body.access_token).toBeTruthy();
-    const token = login.body.access_token as string;
+
+    const token: string = login.body?.access_token ?? login.body?.token ?? '';
+    expect(token).toBeTruthy();
+
+    const authHeaders = {
+      ...baseHeaders,
+      Authorization: `Bearer ${token}`,
+    };
 
     // Create product
-    const create = await request(app.getHttpServer())
+    const sku = `SKU-${Math.floor(Math.random() * 100000)}`;
+    const createRes = await request(server)
       .post('/products')
-      .set('Authorization', `Bearer ${token}`)
-      .set('x-org', ORG)
+      .set(authHeaders)
       .send({
         title: 'Widget',
-        sku: `SKU-${Math.floor(Math.random() * 100000)}`,
+        sku,
         type: 'physical',
         status: 'active',
         price: 10,
         inventoryQty: 5,
-        description: 'e2e',
+        description: 'Smoke',
       })
       .expect(201);
 
-    const id = create.body.data.id as string;
+    const created = createRes.body?.data ?? createRes.body;
+    const id: string = created.id;
     expect(id).toBeTruthy();
 
-    // Get
-    const get = await request(app.getHttpServer())
+    // Get product
+    const getRes = await request(server)
       .get(`/products/${id}`)
-      .set('Authorization', `Bearer ${token}`)
-      .set('x-org', ORG)
+      .set(authHeaders)
       .expect(200);
-    expect(get.body.data.id).toBe(id);
 
-    // Update
-    await request(app.getHttpServer())
+    const got = getRes.body?.data ?? getRes.body;
+    expect(got.id).toBe(id);
+    expect(got.title).toBe('Widget');
+
+    // Update product
+    await request(server)
       .put(`/products/${id}`)
-      .set('Authorization', `Bearer ${token}`)
-      .set('x-org', ORG)
-      .send({ price: 12, inventoryQty: 9, title: 'Widget (updated)' })
+      .set(authHeaders)
+      .send({ title: 'Widget (updated)', price: 15, inventoryQty: 20 })
       .expect(200);
 
-    // List
-    const list = await request(app.getHttpServer())
-      .get('/products?page=1&limit=5')
-      .set('Authorization', `Bearer ${token}`)
-      .set('x-org', ORG)
+    // List products (paginated)
+    const listRes = await request(server)
+      .get('/products?page=1&limit=10')
+      .set(authHeaders)
       .expect(200);
-    expect(Array.isArray(list.body.data)).toBe(true);
 
-    // Delete
-    await request(app.getHttpServer())
+    const body = listRes.body?.data ?? listRes.body;
+    const list = body.data ?? body; // supports wrapped/unwrapped
+    expect(Array.isArray(list)).toBe(true);
+
+    // Delete product
+    await request(server)
       .delete(`/products/${id}`)
-      .set('Authorization', `Bearer ${token}`)
-      .set('x-org', ORG)
+      .set(authHeaders)
       .expect(200);
+
+    // Confirm 404 after delete
+    await request(server)
+      .get(`/products/${id}`)
+      .set(authHeaders)
+      .expect(404);
   });
 });
