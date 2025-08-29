@@ -1,14 +1,12 @@
 # apps/api/fly.toml
-# Fly.io config for NestJS API
-
-app = "social-business-os-api"         # <-- set your Fly app name
-primary_region = "iad"                 # <-- pick the closest region (e.g., iad, sjc, lax, dfw, etc.)
+app = "social-business-os-api"
+primary_region = "iad"
 
 kill_signal = "SIGINT"
 kill_timeout = "5s"
 
 [build]
-  # Since this fly.toml is already in apps/api/, Dockerfile is here too
+  # Dockerfile is inside apps/api/
   dockerfile = "./Dockerfile"
 
 [env]
@@ -18,7 +16,6 @@ kill_timeout = "5s"
 [experimental]
   auto_rollback = true
 
-# Modern Machines-style service config (replaces [[services]])
 [http_service]
   internal_port = 4000
   force_https = true
@@ -27,13 +24,11 @@ kill_timeout = "5s"
   min_machines_running = 1
   processes = ["app"]
 
-  # Concurrency controls (adjust to taste)
   [http_service.concurrency]
     type = "requests"
     soft_limit = 50
     hard_limit = 100
 
-  # Health check hitting NestJS /health
   [[http_service.checks]]
     interval = "15s"
     timeout = "2s"
@@ -43,7 +38,6 @@ kill_timeout = "5s"
     protocol = "http"
     tls_skip_verify = false
 
-# VM sizing; bump memory/size if needed
 [vm]
   size = "shared-cpu-1x"
   memory = "512mb"
