@@ -1,10 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, PrismaClient } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 
 // If you already have a dedicated PrismaService, replace `new PrismaClient()` with that service.
-const prisma = new PrismaClient();
+type ProductUpdateData = Prisma.ProductUpdateArgs['data'];
+const data: ProductUpdateData = {};
 
 function genSku() {
   return `SKU-${Math.random().toString(16).slice(2, 10)}`;

@@ -20,6 +20,7 @@
     "restart": "pnpm restart:api",
     "smoke": "pnpm smoke:api",
     "port-kill": "pnpm port-kill:api",
+    "postinstall": "pnpm -w exec prisma generate --schema packages/db/prisma/schema.prisma",
     "// no-op so pnpm restart doesn’t complain at root": "----",
     "stop": "echo noop"
   },
