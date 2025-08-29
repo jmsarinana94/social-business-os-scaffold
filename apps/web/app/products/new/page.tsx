@@ -1,8 +1,7 @@
 // apps/web/app/products/new/page.tsx
 'use client';
 
-import type { FormEvent } from 'react';
-import { useState } from 'react';
+import { FormEvent , useState } from 'react';
 
 type ProductType = 'physical' | 'digital' | 'service';
 type ProductStatus = 'active' | 'archived';

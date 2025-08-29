@@ -4,14 +4,26 @@ on:
   push:
     branches: [main]
   pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '20'
+  PNPM_VERSION: '9.6.0'
+  # Defaults for smoke
+  BASE: http://127.0.0.1:4000
+  ORG: demo
 
 jobs:
-  api:
+  checks:
+    name: Lint / Typecheck / Test / Build
     runs-on: ubuntu-latest
-
-    env:
-      DATABASE_URL: 'file:./prisma/dev.db'
-      NODE_ENV: 'test'
 
     steps:
       - name: Checkout
@@ -20,30 +32,135 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 9
+          version: ${{ env.PNPM_VERSION }}
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
 
       - name: Install deps
         run: pnpm install --frozen-lockfile
 
-      - name: Generate Prisma Client
-        run: pnpm -C apps/api exec prisma generate
+      - name: Lint
+        run: pnpm lint
 
-      - name: Lint (API)
-        run: pnpm -C apps/api run lint
+      - name: Typecheck
+        run: pnpm typecheck
 
-      - name: Typecheck (API)
-        run: pnpm -C apps/api run typecheck
+      - name: Unit tests (if present)
+        run: pnpm -r run test --if-present
 
-      - name: Tests (API)
+      - name: Build all
+        run: pnpm build
+
+  api-smoke:
+    name: API Smoke (local)
+    runs-on: ubuntu-latest
+    needs: checks
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        working-directory: apps/api
+        run: pnpm prisma:generate
+
+      - name: Run DB migrations (SQLite/local)
+        working-directory: apps/api
+        run: pnpm prisma:migrate
+
+      - name: Start API (background)
+        working-directory: apps/api
+        run: nohup pnpm start > api.log 2>&1 &
+
+      - name: Wait for health
+        run: npx -y wait-on ${{ env.BASE }}/health
+
+      - name: Smoke test
+        run: pnpm smoke
+
+      - name: Print API logs on failure
+        if: failure()
+        working-directory: apps/api
         run: |
-          pnpm -C apps/api run test:unit
-          pnpm -C apps/api run test:e2e
+          echo "===== apps/api/api.log ====="
+          cat api.log || true
 
-      - name: Build (API)
-        run: pnpm -C apps/api run build
+      - name: Kill API (free port)
+        if: always()
+        run: |
+          PID=$(lsof -ti :4000 || true)
+          if [ -n "$PID" ]; then kill -9 $PID; fi
+
+  deploy-api:
+    name: Deploy API (Fly.io)
+    runs-on: ubuntu-latest
+    needs: [checks, api-smoke]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@v1
+
+      # Assumes your fly.toml lives in apps/api and is configured
+      - name: Deploy
+        working-directory: apps/api
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          flyctl deploy --remote-only --config ./fly.toml --image-label $GITHUB_SHA
+
+  deploy-web:
+    name: Deploy Web (Vercel)
+    runs-on: ubuntu-latest
+    needs: [checks, api-smoke]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node (for Vercel CLI)
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Vercel pull
+        working-directory: apps/web
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: npx vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+
+      - name: Vercel build
+        working-directory: apps/web
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: npx vercel build --prod --token="$VERCEL_TOKEN"
+
+      - name: Vercel deploy (prebuilt)
+        working-directory: apps/web
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: npx vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"

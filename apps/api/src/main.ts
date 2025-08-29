@@ -1,6 +1,7 @@
 import { HttpAdapterHost, NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
+
 import { AppModule } from './app.module';
 import { PrismaExceptionFilter } from './common/filters/prisma-exception.filter';
 
@@ -19,7 +20,7 @@ async function bootstrap() {
   SwaggerModule.setup('docs', app, doc);
 
   const adapterHost = app.get(HttpAdapterHost);
-  app.useGlobalFilters(new PrismaExceptionFilter(adapterHost));
+  app.useGlobalFilters(new PrismaExceptionFilter());
 
   const port = process.env.PORT ? Number(process.env.PORT) : 4000;
   await app.listen(port, '127.0.0.1');

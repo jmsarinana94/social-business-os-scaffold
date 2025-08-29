@@ -1,0 +1,20 @@
+# keep source + configs
+!src/**
+!prisma/**
+!tsconfig*.json
+!nest-cli.json
+!package.json
+!pnpm-lock.yaml
+!Dockerfile
+!fly.toml
+
+# ignore typical junk
+node_modules
+dist
+.git
+.gitignore
+.npmrc
+*.log
+coverage
+.env
+.env.*

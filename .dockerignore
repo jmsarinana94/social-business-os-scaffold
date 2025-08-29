@@ -1,0 +1,12 @@
+# .dockerignore (at repo root)
+.git
+node_modules
+.pnpm-store
+dist
+coverage
+.turbo
+.next
+.env
+.env.*
+apps/**/.env
+apps/**/.env.*

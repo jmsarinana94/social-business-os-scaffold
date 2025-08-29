@@ -1,77 +1,92 @@
-name: API CI
+name: api-ci
 
 on:
   push:
-    branches: [main]
     paths:
       - 'apps/api/**'
-      - 'packages/db/**'
-      - 'prisma/**'
       - '.github/workflows/api-ci.yml'
   pull_request:
-    branches: [main]
     paths:
       - 'apps/api/**'
-      - 'packages/db/**'
-      - 'prisma/**'
       - '.github/workflows/api-ci.yml'
 
 jobs:
-  test:
+  api:
     runs-on: ubuntu-latest
+
     services:
       postgres:
         image: postgres:16-alpine
-        ports:
-          - 5432:5432
+        ports: ['5432:5432']
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: socialos_test
+          POSTGRES_DB: socialos
         options: >-
-          --health-cmd="pg_isready -U postgres -d socialos_test"
+          --health-cmd="pg_isready -U postgres -d socialos"
           --health-interval=5s
           --health-timeout=5s
-          --health-retries=12
+          --health-retries=10
 
     env:
-      # API app env
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/socialos
       NODE_ENV: test
-      PORT: 4000
-      JWT_SECRET: testsecret
-      JWT_EXPIRES: 1d
-      ORG_HEADER: x-org
-      # Prisma / DB
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/socialos_test?schema=public
-      # Jest memory
-      NODE_OPTIONS: --max-old-space-size=4096
+      # used by smoke.sh
+      BASE: http://127.0.0.1:4000
+      ORG: demo
+      # used by e2e
+      TEST_ORG: demo
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup PNPM
-        uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v4
         with:
           version: 9
 
-      - name: Setup Node
+      - name: Use Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: '20'
           cache: 'pnpm'
 
-      - name: Install deps (repo root)
+      - name: Install deps (workspace)
         run: pnpm install --frozen-lockfile
 
       - name: Generate Prisma Client
         working-directory: apps/api
         run: pnpm prisma:generate
 
-      - name: Prepare DB (push schema)
+      - name: Migrate DB
         working-directory: apps/api
-        run: npx prisma db push --skip-generate
+        run: pnpm prisma:migrate --name ci --create-only && pnpm prisma migrate deploy
 
-      - name: Run API e2e tests
+      - name: Lint
+        working-directory: apps/api
+        run: pnpm lint
+
+      - name: Build
+        working-directory: apps/api
+        run: pnpm build
+
+      - name: Start API
+        working-directory: apps/api
+        run: |
+          PORT=4000 pnpm start &
+          echo $! > api.pid
+          npx wait-on -t 60000 http-get://127.0.0.1:4000/health
+
+      - name: E2E tests
         working-directory: apps/api
         run: pnpm test:e2e
+
+      - name: Smoke script (CRUD flow)
+        working-directory: apps/api
+        run: |
+          bash scripts/smoke.sh
+
+      - name: Stop API
+        if: always()
+        working-directory: apps/api
+        run: |
+          if [ -f api.pid ]; then kill -9 $(cat api.pid) || true; fi

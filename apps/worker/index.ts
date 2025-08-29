@@ -1,5 +1,5 @@
 // apps/worker/index.ts
-import type { JobsOptions } from 'bullmq';
+import { JobsOptions } from 'bullmq';
 import { Queue, QueueEvents, Worker } from 'bullmq';
 import * as dotenv from 'dotenv';
 

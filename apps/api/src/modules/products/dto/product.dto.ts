@@ -8,6 +8,7 @@ import {
     IsString,
     MaxLength,
 } from 'class-validator';
+
 import { CreateProductDto } from './create-product.dto';
 
 const PRODUCT_TYPES = ['physical', 'digital'] as const;
