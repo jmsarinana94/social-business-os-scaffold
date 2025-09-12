@@ -1,30 +1,15 @@
-import { HttpAdapterHost, NestFactory } from '@nestjs/core';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import helmet from 'helmet';
-
+import { ValidationPipe } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { PrismaExceptionFilter } from './common/filters/prisma-exception.filter';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { cors: true });
-  app.use(helmet());
+  const app = await NestFactory.create(AppModule, { logger: ['error', 'warn', 'log'] });
 
-  const config = new DocumentBuilder()
-    .setTitle('Social Business OS API')
-    .setDescription('API docs')
-    .setVersion('1.0.0')
-    .addApiKey({ type: 'apiKey', name: 'x-org', in: 'header' }, 'org')
-    .build();
+  // No global prefix (tests hit /auth/* and /products directly)
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidUnknownValues: false, transform: true }));
 
-  const doc = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('docs', app, doc);
-
-  const adapterHost = app.get(HttpAdapterHost);
-  app.useGlobalFilters(new PrismaExceptionFilter());
-
-  const port = process.env.PORT ? Number(process.env.PORT) : 4000;
-  await app.listen(port, '127.0.0.1');
-   
-  console.log(`🚀 API listening at http://127.0.0.1:${port}`);
+  const port = Number(process.env.PORT || 4000);
+  const host = process.env.HOST || '127.0.0.1';
+  await app.listen(port, host);
 }
 bootstrap();

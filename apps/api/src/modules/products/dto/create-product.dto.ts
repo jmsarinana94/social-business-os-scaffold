@@ -1,56 +1,39 @@
-import { Transform, Type } from 'class-transformer';
-import {
-    IsIn,
-    IsNotEmpty,
-    IsNumber,
-    IsOptional,
-    IsPositive,
-    IsString,
-    MaxLength,
-} from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
 
-const PRODUCT_TYPES = ['physical', 'digital'] as const;
-const PRODUCT_STATUSES = ['active', 'inactive'] as const;
+export enum ProductTypeDto {
+  PHYSICAL = 'PHYSICAL',
+  DIGITAL = 'DIGITAL',
+}
+
+export enum ProductStatusDto {
+  ACTIVE = 'ACTIVE',
+  INACTIVE = 'INACTIVE',
+}
 
 export class CreateProductDto {
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(200)
-  title!: string;
-
   @IsOptional()
   @IsString()
-  @MaxLength(1000)
-  description?: string;
-
-  @IsString()
-  @IsNotEmpty()
-  @Transform(({ value }) =>
-    typeof value === 'string' ? value.toLowerCase().trim() : value,
-  )
-  @IsIn(PRODUCT_TYPES as unknown as string[], {
-    message: `type must be one of the following values: ${PRODUCT_TYPES.join(', ')}`,
-  })
-  type!: string;
-
-  @IsString()
-  @IsNotEmpty()
-  @Transform(({ value }) =>
-    typeof value === 'string' ? value.toLowerCase().trim() : value,
-  )
-  @IsIn(PRODUCT_STATUSES as unknown as string[], {
-    message: `status must be one of the following values: ${PRODUCT_STATUSES.join(', ')}`,
-  })
-  status!: string;
-
-  @Type(() => Number)
-  @IsNumber()
-  @IsPositive()
-  price!: number;
-
-  @IsOptional()
-  @IsString()
-  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @MaxLength(64)
   sku?: string;
+
+  @IsString()
+  title!: string;
+
+  @Transform(({ value }) => String(value).toUpperCase())
+  @IsEnum(ProductTypeDto)
+  type!: ProductTypeDto;
+
+  @Transform(({ value }) => String(value).toUpperCase())
+  @IsEnum(ProductStatusDto)
+  status!: ProductStatusDto;
+
+  // tests sometimes send number; store as string consistently
+  @Transform(({ value }) => (value == null ? undefined : String(value)))
+  @IsString()
+  price!: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string | null;
 }

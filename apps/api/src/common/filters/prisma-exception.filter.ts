@@ -1,35 +1,37 @@
-// apps/api/src/common/filters/prisma-exception.filter.ts
-import {
-    ArgumentsHost,
-    Catch,
-    ExceptionFilter,
-    HttpStatus,
-} from '@nestjs/common';
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
-import { Response } from 'express';
+import { ArgumentsHost, Catch, ExceptionFilter, HttpStatus } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 
-@Catch(PrismaClientKnownRequestError)
+@Catch(Prisma.PrismaClientKnownRequestError)
 export class PrismaExceptionFilter implements ExceptionFilter {
-  catch(exception: unknown, host: ArgumentsHost) {
-    const ctx = host.switchToHttp();
-    const res = ctx.getResponse<Response>();
-    const status = HttpStatus.BAD_REQUEST;
+  catch(e: Prisma.PrismaClientKnownRequestError, host: ArgumentsHost) {
+    const res = host.switchToHttp().getResponse();
 
-    let body: Record<string, unknown> = {
-      statusCode: status,
-      message: 'Prisma error',
-    };
-
-    if (exception instanceof PrismaClientKnownRequestError) {
-      if (exception.code === 'P2002') {
-        body = { statusCode: status, message: 'Unique constraint violation', meta: exception.meta };
-      } else if (exception.code === 'P2025') {
-        body = { statusCode: status, message: 'Record not found', meta: exception.meta };
-      } else {
-        body = { statusCode: status, message: exception.message, code: exception.code, meta: exception.meta };
-      }
+    // Unique constraint violation
+    if (e.code === 'P2002') {
+      return res.status(HttpStatus.CONFLICT).json({
+        statusCode: 409,
+        error: 'Conflict',
+        message: 'Unique constraint failed',
+        meta: e.meta,
+      });
     }
 
-    res.status(status).json(body);
+    // Foreign key constraint violation (e.g., bad orgId)
+    if (e.code === 'P2003') {
+      return res.status(HttpStatus.BAD_REQUEST).json({
+        statusCode: 400,
+        error: 'Bad Request',
+        message: 'Foreign key constraint failed (check x-org / orgId)',
+        meta: e.meta,
+      });
+    }
+
+    // Fallback
+    return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+      statusCode: 500,
+      error: 'Internal Server Error',
+      message: `Prisma error ${e.code}`,
+      meta: e.meta,
+    });
   }
 }

@@ -7,13 +7,29 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "dev": "tsc -w -p tsconfig.build.json",
-    "prisma": "prisma"
+    "prisma": "prisma",
+    "prisma:generate": "prisma generate --schema prisma/schema.prisma",
+    "prisma:migrate:deploy": "prisma migrate deploy --schema prisma/schema.prisma",
+    "prisma:migrate:dev": "prisma migrate dev --schema prisma/schema.prisma",
+    "prisma:studio": "prisma studio --schema prisma/schema.prisma",
+    "seed": "tsx prisma/seed.ts",
+    "seed:demo": "tsx prisma/seed.ts",
+    "seed:products": "tsx prisma/seed-products.ts",
+    "db:seed": "prisma db seed"
+  },
+  "prisma": {
+    "schema": "prisma/schema.prisma",
+    "seed": "ts-node --project packages/db/tsconfig.json packages/db/prisma/seed.ts"
   },
   "dependencies": {
-    "@prisma/client": "^5.22.0"
+    "@prisma/client": "6.14.0"
   },
   "devDependencies": {
-    "prisma": "^5.22.0",
-    "typescript": "^5.9.2"
+    "prisma": "6.14.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.9.2",
+     "ts-node": "^10.9.2",
+    "typescript": "^5.9.2",
+    "@types/node": "^24.3.1"
   }
 }

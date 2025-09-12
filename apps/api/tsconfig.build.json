@@ -1,5 +1,9 @@
 {
   "extends": "./tsconfig.json",
-  "compilerOptions": { "outDir": "./dist" },
-  "exclude": ["node_modules", "test", "dist", "**/*spec.ts", "src/auth/**", "src/products/**"]
+  "compilerOptions": {
+    "sourceMap": false,
+    "declaration": true,
+    "removeComments": true
+  },
+  "exclude": ["test", "**/*.e2e-spec.ts", "**/*.spec.ts"]
 }

@@ -1,10 +1,14 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "outDir": "./dist-test",
     "noEmit": true,
     "types": ["jest", "node"],
-    "esModuleInterop": true,
-    "allowJs": true
+    "baseUrl": ".",
+    "paths": {
+      "src/*": ["src/*"],
+      "@/*": ["src/*"]
+    }
   },
-  "include": ["test/**/*.ts", "jest.config.ts"]
+  "include": ["src/**/*.ts", "test/**/*.ts"]
 }

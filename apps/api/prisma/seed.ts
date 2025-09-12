@@ -1,62 +1,58 @@
-// apps/api/prisma/seed.ts
-import { PrismaClient } from '@prisma/client';
+// prisma/seed.ts
+import { $Enums, Prisma, PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
 async function main() {
-  const orgId = 'demo';
+  const org = await prisma.organization.upsert({
+    where: { slug: 'acme' },
+    update: {},
+    create: { slug: 'acme', name: 'Acme Co.' },
+  });
 
-  // If there are no products for this org yet, seed a few
-  const existing = await prisma.product.count({ where: { orgId } });
-  if (existing === 0) {
-    await prisma.product.createMany({
-      data: [
-        {
-          orgId,
-          title: 'Demo product',
-          type: 'physical',
-          description: 'Just a demo row',
-          price: 1999,
-          sku: 'DEMO-1',
-          inventoryQty: 10,
-          status: 'active',
-        },
-        {
-          orgId,
-          title: 'Blue Shirt',
-          type: 'physical',
-          description: 'Cotton shirt, size M',
-          price: 2499,
-          sku: 'SHIRT-BLUE-M',
-          inventoryQty: 25,
-          status: 'active',
-        },
-        {
-          orgId,
-          title: 'E-book: Growth Tactics',
-          type: 'digital',
-          description: 'PDF download',
-          price: 999,
-          sku: 'EBOOK-GROWTH',
-          inventoryQty: 0,
-          status: 'active',
-        },
-      ],
-    });
-     
-    console.log('Seeded demo products for org:', orgId);
-  } else {
-     
-    console.log(`Org ${orgId} already has ${existing} product(s); skipping seed.`);
-  }
+  await prisma.product.createMany({
+    data: [
+      {
+        orgId: org.id,
+        title: 'Cap',
+        type: $Enums.ProductType.PHYSICAL,
+        status: $Enums.ProductStatus.ACTIVE,
+        price: new Prisma.Decimal('14.99'),
+        sku: 'CAP-001',
+        description: 'Black dad hat',
+        inventoryQty: 0,
+      },
+      {
+        orgId: org.id,
+        title: 'Beanie',
+        type: $Enums.ProductType.PHYSICAL,
+        status: $Enums.ProductStatus.ACTIVE,
+        price: new Prisma.Decimal('12.00'),
+        sku: 'BEAN-001',
+        description: 'Warm beanie',
+        inventoryQty: 0,
+      },
+      {
+        orgId: org.id,
+        title: 'Sticker',
+        type: $Enums.ProductType.DIGITAL,
+        status: $Enums.ProductStatus.ACTIVE,
+        price: new Prisma.Decimal('9.99'),
+        sku: 'STICK-001',
+        description: 'Digital sticker pack',
+        inventoryQty: 0,
+      },
+    ],
+    skipDuplicates: true,
+  });
 }
 
 main()
-  .catch((e) => {
-     
-    console.error(e);
-    process.exit(1);
-  })
-  .finally(async () => {
+  .then(async () => {
     await prisma.$disconnect();
+  })
+  .catch(async (e) => {
+    console.error(e);
+    await prisma.$disconnect();
+    process.exit(1);
   });

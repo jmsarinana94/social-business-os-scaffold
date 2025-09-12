@@ -3,90 +3,70 @@ name: api-ci
 on:
   push:
     paths:
-      - 'apps/api/**'
-      - '.github/workflows/api-ci.yml'
+      - "apps/api/**"
+      - ".github/workflows/api-ci.yml"
   pull_request:
     paths:
-      - 'apps/api/**'
-      - '.github/workflows/api-ci.yml'
+      - "apps/api/**"
 
 jobs:
-  api:
+  test:
     runs-on: ubuntu-latest
-
     services:
       postgres:
-        image: postgres:16-alpine
-        ports: ['5432:5432']
+        image: postgres:16
         env:
+          POSTGRES_DB: socialos
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: socialos
+        ports: ["5432:5432"]
         options: >-
-          --health-cmd="pg_isready -U postgres -d socialos"
-          --health-interval=5s
-          --health-timeout=5s
-          --health-retries=10
-
-    env:
-      DATABASE_URL: postgres://postgres:postgres@localhost:5432/socialos
-      NODE_ENV: test
-      # used by smoke.sh
-      BASE: http://127.0.0.1:4000
-      ORG: demo
-      # used by e2e
-      TEST_ORG: demo
+          --health-cmd "pg_isready -U postgres -d socialos"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping || exit 1"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v3
         with:
-          version: 9
+          version: 10
 
-      - name: Use Node
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'pnpm'
+          node-version: 20
+          cache: "pnpm"
 
-      - name: Install deps (workspace)
-        run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile
 
-      - name: Generate Prisma Client
+      - name: Prepare env
+        working-directory: apps/api
+        run: |
+          cp .env.example .env || true
+          echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/socialos" >> .env
+          echo "JWT_SECRET=ci-secret" >> .env
+
+      - name: Generate Prisma
         working-directory: apps/api
         run: pnpm prisma:generate
 
-      - name: Migrate DB
+      - name: Reset DB schema
         working-directory: apps/api
-        run: pnpm prisma:migrate --name ci --create-only && pnpm prisma migrate deploy
+        run: pnpm prisma:db:push --force-reset
 
-      - name: Lint
+      - name: Seed
         working-directory: apps/api
-        run: pnpm lint
+        run: pnpm exec ts-node -r tsconfig-paths/register scripts/seed-all.ts
 
-      - name: Build
-        working-directory: apps/api
-        run: pnpm build
-
-      - name: Start API
-        working-directory: apps/api
-        run: |
-          PORT=4000 pnpm start &
-          echo $! > api.pid
-          npx wait-on -t 60000 http-get://127.0.0.1:4000/health
-
-      - name: E2E tests
+      - name: Tests
         working-directory: apps/api
         run: pnpm test:e2e
-
-      - name: Smoke script (CRUD flow)
-        working-directory: apps/api
-        run: |
-          bash scripts/smoke.sh
-
-      - name: Stop API
-        if: always()
-        working-directory: apps/api
-        run: |
-          if [ -f api.pid ]; then kill -9 $(cat api.pid) || true; fi

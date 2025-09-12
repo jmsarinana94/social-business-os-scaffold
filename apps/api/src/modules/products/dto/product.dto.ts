@@ -1,59 +1,69 @@
-import { PartialType } from '@nestjs/mapped-types';
-import { Transform, Type } from 'class-transformer';
-import {
-    IsIn,
-    IsNumber,
-    IsOptional,
-    IsPositive,
-    IsString,
-    MaxLength,
-} from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsIn, IsNotEmpty, IsOptional, IsString, Matches } from 'class-validator';
 
-import { CreateProductDto } from './create-product.dto';
-
-const PRODUCT_TYPES = ['physical', 'digital'] as const;
-const PRODUCT_STATUSES = ['active', 'inactive'] as const;
-
-export class UpdateProductDto extends PartialType(CreateProductDto) {
-  @IsOptional()
+export class CreateProductDto {
   @IsString()
-  @MaxLength(200)
-  title?: string;
+  @IsNotEmpty()
+  title!: string;
 
-  @IsOptional()
   @IsString()
-  @MaxLength(1000)
+  @IsOptional()
   description?: string;
 
-  @IsOptional()
   @IsString()
-  @Transform(({ value }) =>
-    typeof value === 'string' ? value.toLowerCase().trim() : value,
-  )
-  @IsIn(PRODUCT_TYPES as unknown as string[], {
-    message: `type must be one of the following values: ${PRODUCT_TYPES.join(', ')}`,
+  @IsIn(['physical', 'digital'])
+  type!: 'physical' | 'digital';
+
+  @IsString()
+  @IsIn(['active', 'inactive'])
+  status!: 'active' | 'inactive';
+
+  // Accept number or string; normalize to 2 decimals
+  @Transform(({ value }) => {
+    if (typeof value === 'number') return value.toFixed(2);
+    if (typeof value === 'string' && /^\d+(\.\d+)?$/.test(value)) return Number(value).toFixed(2);
+    return value;
   })
-  type?: string;
+  @IsString()
+  @Matches(/^\d+(\.\d{2})$/, { message: 'price must be a number with up to 2 decimals' })
+  price!: string;
 
   @IsOptional()
   @IsString()
-  @Transform(({ value }) =>
-    typeof value === 'string' ? value.toLowerCase().trim() : value,
-  )
-  @IsIn(PRODUCT_STATUSES as unknown as string[], {
-    message: `status must be one of the following values: ${PRODUCT_STATUSES.join(', ')}`,
+  sku?: string;
+}
+
+export class UpdateProductDto {
+  @IsString()
+  @IsOptional()
+  title?: string;
+
+  @IsString()
+  @IsOptional()
+  description?: string;
+
+  @IsString()
+  @IsOptional()
+  @IsIn(['physical', 'digital'])
+  type?: 'physical' | 'digital';
+
+  @IsString()
+  @IsOptional()
+  @IsIn(['active', 'inactive'])
+  status?: 'active' | 'inactive';
+
+  @Transform(({ value }) => {
+    if (value == null) return value;
+    if (typeof value === 'number') return value.toFixed(2);
+    if (typeof value === 'string' && /^\d+(\.\d+)?$/.test(value)) return Number(value).toFixed(2);
+    return value;
   })
-  status?: string;
-
   @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  @IsPositive()
-  price?: number;
+  @IsString()
+  @Matches(/^\d+(\.\d{2})$/, { message: 'price must be a number with up to 2 decimals' })
+  price?: string;
 
   @IsOptional()
   @IsString()
-  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  @MaxLength(64)
   sku?: string;
 }

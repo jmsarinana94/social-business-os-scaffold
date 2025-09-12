@@ -1,64 +1,24 @@
-version: '3.9'
-
+version: "3.9"
 services:
-  db:
-    image: postgres:15
-    container_name: sbo-db
+  postgres:
+    image: postgres:16
     environment:
-      POSTGRES_DB: demo
+      POSTGRES_DB: socialos
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
-      - '5432:5432'
+      - "5432:5432"
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U postgres -d demo']
-      interval: 3s
-      timeout: 3s
-      retries: 20
-
-  api:
-    build:
-      context: .
-      dockerfile: apps/api/Dockerfile.dev
-    container_name: sbo-api
-    working_dir: /work/apps/api
-    environment:
-      # Typical envs your API might need to connect to Postgres
-      DATABASE_URL: postgres://postgres:postgres@db:5432/demo
-      PGHOST: db
-      PGPORT: '5432'
-      PGUSER: postgres
-      PGPASSWORD: postgres
-      PGDATABASE: demo
-
-      # For the smoke helpers (shell scripts)
-      BASE: http://0.0.0.0:4000
-      ORG: demo
-      API_EMAIL: tester@example.com
-      API_PASS: password
-    depends_on:
-      db:
-        condition: service_healthy
+      test: ["CMD-SHELL", "pg_isready -U postgres -d socialos"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  redis:
+    image: redis:7
     ports:
-      - '4000:4000'
-    # If your API needs migrations/seed, add them to the command before start
-    command: >
-      bash -lc '
-        node -v;
-        npm -v || true;
-        if command -v pnpm >/dev/null 2>&1; then PM=pnpm;
-        elif command -v yarn >/dev/null 2>&1; then PM=yarn;
-        else PM=npm; fi;
-        $PM install;
-        # Uncomment if you have migration scripts:
-        # $PM run migrate || true;
-        # $PM run seed || true;
-        # Try common start scripts; fall back to Node
-        if $PM run | grep -q "start:dev"; then CMD="start:dev";
-        elif $PM run | grep -q "start:watch"; then CMD="start:watch";
-        elif $PM run | grep -q "start"; then CMD="start";
-        else CMD=""; fi;
-        if [ -n "$CMD" ]; then $PM run $CMD; else node dist/main.js; fi
-      '
-    volumes:
-      - ./:/work:cached
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10

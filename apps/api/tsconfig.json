@@ -1,29 +1,29 @@
 {
   "compilerOptions": {
-    "target": "ES2020",
+    "target": "ES2022",
     "module": "commonjs",
-    "lib": ["ES2020", "DOM"],
-    "declaration": false,
-    "sourceMap": true,
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "removeComments": true,
+    "moduleResolution": "node",
     "strict": true,
+    "noImplicitOverride": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
 
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
 
     "esModuleInterop": true,
-    "moduleResolution": "node",
     "resolveJsonModule": true,
     "skipLibCheck": true,
-    "useDefineForClassFields": false,
+    "sourceMap": true,
 
-    "baseUrl": "./src",
+    "baseUrl": ".",
+    "rootDir": ".",
+    "outDir": "dist",
+
     "paths": {
-      "@/*": ["*"]
+      "@/*": ["src/*"]
     }
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "test", "**/*spec.ts", "src/auth/**", "src/products/**"]
+  "include": ["src/**/*.ts", "test/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
 }

@@ -1,0 +1,11 @@
+// prisma.config.ts (root)
+export default {
+  // Point Prisma CLI to the monorepo schema
+  schema: 'packages/db/prisma/schema.prisma',
+
+  /**
+   * Seed command. Prisma 6 accepts a plain string here.
+   * (We keep it simple instead of using the provider/value object.)
+   */
+  seed: 'ts-node packages/db/prisma/seed.ts',
+};

@@ -1,7 +1,17 @@
 import 'express';
 
-declare module 'express-serve-static-core' {
-  interface Request {
-    orgId?: string;
+declare global {
+  namespace Express {
+    interface Request {
+      /** Populated by OrgMiddleware */
+      org?: { id: string; slug: string };
+      orgId?: string;
+      orgSlug?: string;
+
+      /** Populated by IdempotencyInterceptor */
+      idempotencyKey?: string;
+    }
   }
 }
+
+export { };

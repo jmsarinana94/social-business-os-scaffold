@@ -7,15 +7,44 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+/// --- Enums -------------------------------------------------
+enum ProductType {
+  PHYSICAL @map("physical")
+  DIGITAL  @map("digital")
+}
+
+enum ProductStatus {
+  ACTIVE   @map("active")
+  INACTIVE @map("inactive")
+}
+
+/// --- Models ------------------------------------------------
+model Organization {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slug      String   @unique
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  products Product[]
+}
+
 model Product {
-  id           String   @id @default(cuid())
-  orgId        String
+  id    String       @id @default(cuid())
+  orgId String       @db.Uuid
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
   title        String
-  type         String
+  type         ProductType
   description  String?
-  price        Int
-  sku          String?
-  inventoryQty Int
-  status       String
-  createdAt    DateTime @default(now())
+  price        Decimal       @db.Decimal(30, 2)
+  sku          String?       @db.VarChar(64)
+  inventoryQty Int           @default(0)
+  status       ProductStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([orgId, sku], map: "Product_org_sku_unique")
+  @@index([orgId, createdAt])
 }

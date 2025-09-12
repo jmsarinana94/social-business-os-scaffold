@@ -1,53 +1,59 @@
 import {
-    Body,
-    Controller,
-    Delete,
-    Get,
-    Headers,
-    Param,
-    Post,
-    Put,
-    Query,
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Headers,
+  Param,
+  Post,
+  Put,
+  Query,
 } from '@nestjs/common';
-
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductsService } from './products.service';
 
 @Controller('products')
 export class ProductsController {
-  constructor(private readonly products: ProductsService) {}
+  constructor(private readonly svc: ProductsService) {}
 
-  @Get()
-  list(
-    @Headers('x-org') org: string,
-    @Query('page') page = '1',
-    @Query('limit') limit = '10',
-  ) {
-    return this.products.list(org, Number(page), Number(limit));
+  private requireOrg(org?: string): string {
+    if (!org) throw new BadRequestException('Missing x-org header');
+    return org;
   }
 
-  @Post()
-  create(@Headers('x-org') org: string, @Body() dto: CreateProductDto) {
-    return this.products.create(org, dto);
+  @Get()
+  async list(
+    @Headers('x-org') org: string | undefined,
+    @Query('page') page = 1,
+    @Query('limit') limit = 10,
+  ) {
+    const o = this.requireOrg(org);
+    return this.svc.list(o, { page: Number(page) || 1, limit: Number(limit) || 10 });
   }
 
   @Get(':id')
-  get(@Headers('x-org') org: string, @Param('id') id: string) {
-    return this.products.get(org, id);
+  async get(@Param('id') id: string, @Headers('x-org') org?: string) {
+    const o = this.requireOrg(org);
+    return this.svc.get(o, id);
+  }
+
+  @Post()
+  async create(@Body() body: CreateProductDto, @Headers('x-org') org?: string) {
+    const o = this.requireOrg(org);
+    return this.svc.create(o, body);
   }
 
   @Put(':id')
-  update(
-    @Headers('x-org') org: string,
-    @Param('id') id: string,
-    @Body() dto: UpdateProductDto,
-  ) {
-    return this.products.update(org, id, dto);
+  async update(@Param('id') id: string, @Body() body: UpdateProductDto, @Headers('x-org') org?: string) {
+    const o = this.requireOrg(org);
+    return this.svc.update(o, id, body);
   }
 
   @Delete(':id')
-  remove(@Headers('x-org') org: string, @Param('id') id: string) {
-    return this.products.remove(org, id);
+  async remove(@Param('id') id: string, @Headers('x-org') org?: string) {
+    const o = this.requireOrg(org);
+    return this.svc.remove(o, id);
   }
 }

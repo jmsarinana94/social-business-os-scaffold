@@ -1,9 +1,10 @@
+// apps/api/src/health.controller.ts
 import { Controller, Get } from '@nestjs/common';
 
 @Controller('health')
 export class HealthController {
   @Get()
-  health() {
-    return { ok: true, ts: new Date().toISOString() };
+  ok() {
+    return { ok: true, ts: Date.now() };
   }
 }

@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "lib": ["ES2022"],
+    "moduleResolution": "node",
+    "strict": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+
+    "baseUrl": ".",
+    "paths": {
+      "@api/*": ["apps/api/src/*"]
+    },
+
+    "outDir": "dist",
+
+    /* 👇 Required by Nest + class-validator */
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+
+    /* 👇 Prevents class field init surprises in TS 5+ with decorators */
+    "useDefineForClassFields": false
+  }
+}

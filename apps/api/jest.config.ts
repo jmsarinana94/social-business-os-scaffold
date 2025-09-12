@@ -1,46 +1,33 @@
-import { Config } from 'jest';
+import type { Config } from 'jest';
 
-const config: Config = {
-  // Look at both src and tests
+const base: Config = {
+  preset: 'ts-jest',
+  testEnvironment: 'node',
+  rootDir: '.',
   roots: ['<rootDir>/src', '<rootDir>/test'],
   moduleFileExtensions: ['ts', 'js', 'json'],
-  testMatch: ['**/*.spec.ts', '**/*.e2e-spec.ts'],
   transform: {
-    '^.+\\.ts$': [
-      'ts-jest',
-      {
-        isolatedModules: true,
-        diagnostics: false
-      }
-    ]
+    '^.+\\.tsx?$': ['ts-jest', { tsconfig: 'tsconfig.json' }],
   },
   moduleNameMapper: {
-    '^src/(.*)$': '<rootDir>/src/$1'
+    '^@/(.*)$': '<rootDir>/src/$1',
   },
-  testPathIgnorePatterns: [
-    '/node_modules/',
-    '<rootDir>/dist/',
-    '<rootDir>/coverage/',
-    '<rootDir>/../web/.next/'
-  ],
-  modulePathIgnorePatterns: [
-    '<rootDir>/dist/',
-    '<rootDir>/../web/.next/'
-  ],
-  cacheDirectory: '<rootDir>/.jest-cache',
-  projects: [
-    {
-      displayName: 'unit',
-      testMatch: ['<rootDir>/test/**/*.spec.ts']
-    },
-    {
-      displayName: 'e2e',
-      testMatch: ['<rootDir>/test/**/*.e2e-spec.ts']
-    }
-  ],
-  clearMocks: true,
-  verbose: true,
-  testEnvironment: 'node'
+  // no "verbose" here (it was causing the warning)
 };
 
+const unit: Config = {
+  ...base,
+  displayName: 'unit',
+  testMatch: ['<rootDir>/test/unit/**/*.spec.ts'],
+};
+
+const e2e: Config = {
+  ...base,
+  displayName: 'e2e',
+  testMatch: ['<rootDir>/test/e2e/**/*.e2e-spec.ts', '<rootDir>/test/**/*.e2e-spec.ts'],
+};
+
+const config: Config = {
+  projects: [unit, e2e],
+};
 export default config;

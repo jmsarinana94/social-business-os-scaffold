@@ -1,5 +1,4 @@
 // apps/api/prisma/schema.prisma
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -9,31 +8,66 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Organization {
-  id       String    @id @default(cuid())
-  name     String
-  slug     String    @unique
-  products Product[]
+enum ProductType {
+  PHYSICAL
+  DIGITAL
+}
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+enum ProductStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model Organization {
+  id        String    @id @default(cuid())
+  name      String
+  slug      String    @unique
+  users     OrgUser[]
+  products  Product[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  passwordHash  String
+  orgs          OrgUser[]
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model OrgUser {
+  id        String        @id @default(cuid())
+  orgId     String
+  userId    String
+  role      String        @default("member")
+  org       Organization  @relation(fields: [orgId], references: [id])
+  user      User          @relation(fields: [userId], references: [id])
+
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@unique([orgId, userId])
+  @@index([userId])
 }
 
 model Product {
-  id          String       @id @default(cuid())
+  id          String         @id @default(cuid())
   title       String
   description String?
-  // Keep string to match your DTO validators (physical|digital)
-  type        String
-  // Keep string to match your DTO validators (active|inactive)
-  status      String
-  price       Decimal      @db.Decimal(10, 2)
-  sku         String       @unique
+  type        ProductType
+  status      ProductStatus
+  price       Decimal        @db.Decimal(10, 2)
+  sku         String         @unique
   orgId       String
-  org         Organization @relation(fields: [orgId], references: [id])
+  org         Organization   @relation(fields: [orgId], references: [id])
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
 
   @@index([orgId, createdAt])
   @@index([orgId, status])
