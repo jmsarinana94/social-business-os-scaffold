@@ -1,53 +1,47 @@
-// src/modules/products/products.dto.ts
-import { IsNumberString, IsOptional, IsString, Length } from 'class-validator';
+import { z } from 'zod';
 
-export class CreateProductDto {
-  @IsString()
-  title!: string;
+// normalize enums (accept lower/upper from tests)
+const TypeZ = z
+  .enum(['PHYSICAL', 'DIGITAL'])
+  .or(z.enum(['physical', 'digital']).transform((v) => v.toUpperCase() as 'PHYSICAL' | 'DIGITAL'));
 
-  @IsNumberString() // we accept "39.99" as string
-  price!: string;
+const StatusZ = z
+  .enum(['ACTIVE', 'INACTIVE'])
+  .or(z.enum(['active', 'inactive']).transform((v) => v.toUpperCase() as 'ACTIVE' | 'INACTIVE'));
 
-  @IsString() // raw string; service maps to enum
-  type!: string; // "physical" | "digital"
+// price: accept number or string, canonicalize to string, max 2 decimals
+const PriceZ = z.preprocess(
+  (v) => (typeof v === 'number' ? v.toString() : v),
+  z
+    .string()
+    .regex(/^\d+(\.\d{1,2})?$/, 'price must be a number with up to 2 decimals (e.g. 12 or 12.34)'),
+);
 
-  @IsString()
-  @IsOptional()
-  description?: string;
+const SkuZ = z.string().trim().max(64, 'sku must be <= 64 chars').optional();
 
-  @IsString()
-  @Length(1, 64)
-  @IsOptional()
-  sku?: string;
+export const CreateProductSchema = z.object({
+  sku: SkuZ,
+  title: z.string().trim().min(1, 'title is required').max(256),
+  type: TypeZ,
+  status: StatusZ,
+  price: PriceZ,
+  description: z.string().trim().max(10_000).nullable().optional().transform((v) => v ?? null),
+});
 
-  @IsString()
-  @IsOptional()
-  status?: string; // "active" | "inactive"
-}
+export const UpdateProductSchema = z
+  .object({
+    sku: SkuZ,
+    title: z.string().trim().min(1).max(256).optional(),
+    type: TypeZ.optional(),
+    status: StatusZ.optional(),
+    price: PriceZ.optional(),
+    description: z.string().trim().max(10_000).nullable().optional(),
+  })
+  .refine((obj) => Object.keys(obj).length > 0, {
+    message: 'At least one field must be provided',
+  });
 
-export class UpdateProductDto {
-  @IsString()
-  @IsOptional()
-  title?: string;
-
-  @IsNumberString()
-  @IsOptional()
-  price?: string;
-
-  @IsString()
-  @IsOptional()
-  type?: string;
-
-  @IsString()
-  @IsOptional()
-  description?: string;
-
-  @IsString()
-  @Length(1, 64)
-  @IsOptional()
-  sku?: string;
-
-  @IsString()
-  @IsOptional()
-  status?: string;
-}
+export type CreateProductDto = z.infer<typeof CreateProductSchema>;
+export type UpdateProductDto = z.infer<typeof UpdateProductSchema>;
+export type ProductTypeDto = z.infer<typeof TypeZ>;
+export type ProductStatusDto = z.infer<typeof StatusZ>;

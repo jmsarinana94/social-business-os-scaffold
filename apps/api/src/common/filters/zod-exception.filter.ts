@@ -1,6 +1,10 @@
-// apps/api/src/common/filters/zod-exception.filter.ts
-import { ArgumentsHost, Catch, ExceptionFilter, HttpStatus } from '@nestjs/common';
-import type { Request, Response } from 'express';
+import {
+  ArgumentsHost,
+  Catch,
+  ExceptionFilter,
+  HttpStatus,
+} from '@nestjs/common';
+import { Request, Response } from 'express';
 import { ZodError, ZodIssue } from 'zod';
 
 @Catch(ZodError)
@@ -16,13 +20,15 @@ export class ZodExceptionFilter implements ExceptionFilter {
       code: i.code,
     }));
 
-    return res.status(HttpStatus.BAD_REQUEST).json({
+    res.status(HttpStatus.BAD_REQUEST).json({
       statusCode: HttpStatus.BAD_REQUEST,
-      error: 'BadRequest',
-      message: 'Validation failed',
+      error: 'Bad Request',
+      message: details.map(
+        (d: ZodIssue | { message: string }) => (d as any).message,
+      ),
       details,
-      path: req.url,
       timestamp: new Date().toISOString(),
+      path: req.url,
     });
   }
 }

@@ -1,37 +1,67 @@
-import { ArgumentsHost, Catch, ExceptionFilter, HttpStatus } from '@nestjs/common';
+// apps/api/src/common/filters/prisma-exception.filter.ts
+import {
+  ArgumentsHost,
+  Catch,
+  ExceptionFilter,
+  HttpException,
+  HttpStatus,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
-@Catch(Prisma.PrismaClientKnownRequestError)
+@Catch()
 export class PrismaExceptionFilter implements ExceptionFilter {
-  catch(e: Prisma.PrismaClientKnownRequestError, host: ArgumentsHost) {
-    const res = host.switchToHttp().getResponse();
+  catch(exception: unknown, host: ArgumentsHost) {
+    const ctx = host.switchToHttp();
+    const response = ctx.getResponse();
 
-    // Unique constraint violation
-    if (e.code === 'P2002') {
-      return res.status(HttpStatus.CONFLICT).json({
-        statusCode: 409,
-        error: 'Conflict',
-        message: 'Unique constraint failed',
-        meta: e.meta,
-      });
+    // Pass through if it's already an HttpException
+    if (exception instanceof HttpException) {
+      const status = exception.getStatus();
+      return response.status(status).json(exception.getResponse());
     }
 
-    // Foreign key constraint violation (e.g., bad orgId)
-    if (e.code === 'P2003') {
-      return res.status(HttpStatus.BAD_REQUEST).json({
-        statusCode: 400,
-        error: 'Bad Request',
-        message: 'Foreign key constraint failed (check x-org / orgId)',
-        meta: e.meta,
-      });
+    // Prisma Known Errors
+    if (this.isPrismaKnownError(exception)) {
+      const e = exception as Prisma.PrismaClientKnownRequestError;
+      switch (e.code) {
+        case 'P2002': // unique violation
+          return response.status(HttpStatus.CONFLICT).json({
+            statusCode: HttpStatus.CONFLICT,
+            error: 'P2002',
+            message:
+              'A product with this SKU already exists for this organization.',
+          });
+        case 'P2025': // record not found
+          return response.status(HttpStatus.NOT_FOUND).json({
+            statusCode: HttpStatus.NOT_FOUND,
+            error: 'P2025',
+            message: 'Resource not found.',
+          });
+        case 'P2003': // FK constraint
+          return response.status(HttpStatus.CONFLICT).json({
+            statusCode: HttpStatus.CONFLICT,
+            error: 'P2003',
+            message: 'Foreign key constraint failed.',
+          });
+        default:
+          // fallthrough to generic
+          break;
+      }
     }
 
-    // Fallback
-    return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
-      statusCode: 500,
-      error: 'Internal Server Error',
-      message: `Prisma error ${e.code}`,
-      meta: e.meta,
+    // Generic 500
+    return response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+      statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+      message: 'Internal server error',
     });
+  }
+
+  private isPrismaKnownError(ex: unknown): ex is Prisma.PrismaClientKnownRequestError {
+    return Boolean(
+      ex &&
+        typeof ex === 'object' &&
+        'code' in (ex as any) &&
+        (ex as any).constructor?.name === 'PrismaClientKnownRequestError',
+    );
   }
 }

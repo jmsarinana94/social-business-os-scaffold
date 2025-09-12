@@ -1,58 +1,62 @@
 // prisma/seed.ts
-import { $Enums, Prisma, PrismaClient } from '@prisma/client';
+ 
+import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
+import 'dotenv/config';
 
 const prisma = new PrismaClient();
 
 async function main() {
+  const email = process.env.API_EMAIL || 'demo@demo.io';
+  const passwordPlain = process.env.API_PASS || 'pass123';
+  const orgSlug = process.env.ORG || 'demo';
+
+  const password = await bcrypt.hash(passwordPlain, 10);
+
+  // org
   const org = await prisma.organization.upsert({
-    where: { slug: 'acme' },
+    where: { slug: orgSlug },
+    create: { slug: orgSlug, name: 'Demo Org' },
     update: {},
-    create: { slug: 'acme', name: 'Acme Co.' },
   });
 
-  await prisma.product.createMany({
-    data: [
-      {
-        orgId: org.id,
-        title: 'Cap',
-        type: $Enums.ProductType.PHYSICAL,
-        status: $Enums.ProductStatus.ACTIVE,
-        price: new Prisma.Decimal('14.99'),
-        sku: 'CAP-001',
-        description: 'Black dad hat',
-        inventoryQty: 0,
-      },
-      {
-        orgId: org.id,
-        title: 'Beanie',
-        type: $Enums.ProductType.PHYSICAL,
-        status: $Enums.ProductStatus.ACTIVE,
-        price: new Prisma.Decimal('12.00'),
-        sku: 'BEAN-001',
-        description: 'Warm beanie',
-        inventoryQty: 0,
-      },
-      {
-        orgId: org.id,
-        title: 'Sticker',
-        type: $Enums.ProductType.DIGITAL,
-        status: $Enums.ProductStatus.ACTIVE,
-        price: new Prisma.Decimal('9.99'),
-        sku: 'STICK-001',
-        description: 'Digital sticker pack',
-        inventoryQty: 0,
-      },
-    ],
-    skipDuplicates: true,
+  // user
+  const user = await prisma.user.upsert({
+    where: { email },
+    create: { email, name: 'Demo', password },
+    update: {},
   });
+
+  // membership
+  await prisma.orgUser.upsert({
+    where: { orgId_userId: { orgId: org.id, userId: user.id } },
+    create: { orgId: org.id, userId: user.id, role: 'ADMIN' },
+    update: {},
+  });
+
+  // product (idempotent by (orgId, sku))
+  await prisma.product.upsert({
+    where: { orgId_sku: { orgId: org.id, sku: 'SKU-1' } },
+    create: {
+      orgId: org.id,
+      sku: 'SKU-1',
+      title: 'Widget A',
+      type: 'PHYSICAL',
+      status: 'ACTIVE',
+      price: '19.99',
+      description: 'Seeded item',
+    },
+    update: {},
+  });
+
+  console.log('Seed complete');
 }
 
 main()
-  .then(async () => {
-    await prisma.$disconnect();
-  })
-  .catch(async (e) => {
+  .catch((e) => {
     console.error(e);
-    await prisma.$disconnect();
     process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
   });

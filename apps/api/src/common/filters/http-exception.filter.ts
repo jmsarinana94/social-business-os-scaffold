@@ -1,22 +1,24 @@
-// apps/api/src/common/filters/http-exception.filter.ts
 import {
   ArgumentsHost,
   Catch,
   ExceptionFilter,
   HttpException,
   HttpStatus,
+  Logger,
 } from '@nestjs/common';
-import type { Request, Response } from 'express';
+import { Request, Response } from 'express';
 import { ZodError, ZodIssue } from 'zod';
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
+  private readonly logger = new Logger(HttpExceptionFilter.name);
+
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const res = ctx.getResponse<Response>();
     const req = ctx.getRequest<Request>();
 
-    // Special formatting for Zod validation errors
+    // Zod validation errors
     if (exception instanceof ZodError) {
       const details = exception.issues.map((i: ZodIssue) => ({
         path: i.path.join('.'),
@@ -26,38 +28,43 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
       return res.status(HttpStatus.BAD_REQUEST).json({
         statusCode: HttpStatus.BAD_REQUEST,
-        error: 'BadRequest',
-        message: 'Validation failed',
+        error: 'Bad Request',
+        message: details.map((d: ZodIssue | { message: string }) =>
+          // ZodIssue has .message; keep this tolerant
+          (d as any).message,
+        ),
         details,
-        path: req.url,
         timestamp: new Date().toISOString(),
+        path: req.url,
       });
     }
 
-    // Standard Nest HttpException
+    // Nest HttpException
     if (exception instanceof HttpException) {
       const status = exception.getStatus();
-      const payload = exception.getResponse();
-      const normalized =
-        typeof payload === 'string' ? { message: payload } : (payload as object);
+      const response = exception.getResponse() as
+        | string
+        | { message?: any; [k: string]: any };
 
       return res.status(status).json({
         statusCode: status,
-        path: req.url,
+        ...(typeof response === 'string' ? { message: response } : response),
         timestamp: new Date().toISOString(),
-        ...normalized,
+        path: req.url,
       });
     }
 
-    // Fallback for unexpected errors
-    // eslint-disable-next-line no-console
-    console.error(exception);
+    // Fallback
+    this.logger.error(
+      `Unhandled error on ${req.method} ${req.url}`,
+      (exception as any)?.stack ?? String(exception),
+    );
+
     return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
       statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-      error: 'InternalServerError',
-      message: 'Unexpected error',
-      path: req.url,
+      message: 'Internal server error',
       timestamp: new Date().toISOString(),
+      path: req.url,
     });
   }
 }

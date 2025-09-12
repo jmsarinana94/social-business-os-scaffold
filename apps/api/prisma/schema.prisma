@@ -8,6 +8,44 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Organization {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  name      String
+  products  Product[]
+  users     OrgUser[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String?
+  orgs      OrgUser[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model OrgUser {
+  id        String   @id @default(cuid())
+  orgId     String
+  userId    String
+  role      String   @default("member")
+
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, userId])
+  @@index([userId])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 enum ProductType {
   PHYSICAL
   DIGITAL
@@ -18,57 +56,24 @@ enum ProductStatus {
   INACTIVE
 }
 
-model Organization {
-  id        String    @id @default(cuid())
-  name      String
-  slug      String    @unique
-  users     OrgUser[]
-  products  Product[]
-
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-}
-
-model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  name          String?
-  passwordHash  String
-  orgs          OrgUser[]
-
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-}
-
-model OrgUser {
-  id        String        @id @default(cuid())
-  orgId     String
-  userId    String
-  role      String        @default("member")
-  org       Organization  @relation(fields: [orgId], references: [id])
-  user      User          @relation(fields: [userId], references: [id])
-
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
-
-  @@unique([orgId, userId])
-  @@index([userId])
-}
-
 model Product {
   id          String         @id @default(cuid())
+  orgId       String
+  // Case-insensitive SKU via citext
+  sku         String         @db.Citext
   title       String
-  description String?
   type        ProductType
   status      ProductStatus
-  price       Decimal        @db.Decimal(10, 2)
-  sku         String         @unique
-  orgId       String
-  org         Organization   @relation(fields: [orgId], references: [id])
+  price       String         // (see step 9 for cents/NUMERIC migration)
+  description String?
+  org         Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 
+  @@unique([orgId, sku])
   @@index([orgId, createdAt])
   @@index([orgId, status])
 }
+
+// (Optional, step 5–in-memory idempotency now; DB table later if you want durability)
