@@ -1,12 +1,19 @@
 #!/usr/bin/env bash
-# apps/api/scripts/e2e-mac.sh
-# Runs e2e with macOS-safe TMPDIR + explicit jest cache
 set -euo pipefail
+
+# Always run from apps/api/
 cd "$(dirname "$0")/.."
 
+echo "==> prisma generate"
+pnpm prisma generate --schema=prisma/schema.prisma
+
+echo "==> prisma db push"
+pnpm prisma db push
+
+echo "==> prisma seed (demo tester)"
+ORG=demo API_EMAIL="tester@example.com" API_PASS="password123" pnpm prisma db seed
+
 mkdir -p .tmp/jest-cache
+echo "==> e2e tests"
 TMPDIR="$(pwd)/.tmp" \
-API_EMAIL="${API_EMAIL:-tester@example.com}" \
-API_PASS="${API_PASS:-password123}" \
-ORG="${ORG:-demo}" \
-pnpm -F @repo/api test:e2e --cacheDirectory "$(pwd)/.tmp/jest-cache"
+pnpm -F @repo/api test:e2e -- --runInBand --cacheDirectory "$(pwd)/.tmp/jest-cache"

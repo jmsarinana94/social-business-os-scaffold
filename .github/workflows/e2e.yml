@@ -1,0 +1,58 @@
+name: e2e
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        ports:
+          - "5432:5432"
+        env:
+          POSTGRES_DB: sbo
+          POSTGRES_USER: sbo
+          POSTGRES_PASSWORD: sbo
+        options: >-
+          --health-cmd="pg_isready -U sbo -d sbo"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+    env:
+      DATABASE_URL: postgresql://sbo:sbo@localhost:5432/sbo?schema=public
+      ORG: demo
+      API_EMAIL: tester@example.com
+      API_PASS: password123
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Prisma generate
+        working-directory: apps/api
+        run: pnpm prisma generate --schema=prisma/schema.prisma
+
+      - name: Prisma db push
+        working-directory: apps/api
+        run: pnpm prisma db push
+
+      - name: Seed demo data
+        working-directory: apps/api
+        run: pnpm prisma db seed
+
+      - name: Run e2e tests
+        working-directory: apps/api
+        run: |
+          mkdir -p .tmp/jest-cache
+          TMPDIR="$(pwd)/.tmp" pnpm -F @repo/api test:e2e -- --runInBand --cacheDirectory "$(pwd)/.tmp/jest-cache"
