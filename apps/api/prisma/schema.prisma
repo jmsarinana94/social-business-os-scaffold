@@ -1,54 +1,17 @@
-// apps/api/prisma/schema.prisma
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
+  // Change to "sqlite" if you prefer; for Postgres adjust DATABASE_URL in .env
   provider = "postgresql"
   url      = env("DATABASE_URL")
-}
-
-model Organization {
-  id        String   @id @default(cuid())
-  slug      String   @unique
-  name      String
-  products  Product[]
-  users     OrgUser[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  name      String?
-  orgs      OrgUser[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model OrgUser {
-  id        String   @id @default(cuid())
-  orgId     String
-  userId    String
-  role      String   @default("member")
-
-  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([orgId, userId])
-  @@index([userId])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 }
 
 enum ProductType {
   PHYSICAL
   DIGITAL
+  SERVICE
 }
 
 enum ProductStatus {
@@ -56,24 +19,63 @@ enum ProductStatus {
   INACTIVE
 }
 
-model Product {
-  id          String         @id @default(cuid())
-  orgId       String
-  // Case-insensitive SKU via citext
-  sku         String         @db.Citext
-  title       String
-  type        ProductType
-  status      ProductStatus
-  price       String         // (see step 9 for cents/NUMERIC migration)
-  description String?
-  org         Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
-
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-
-  @@unique([orgId, sku])
-  @@index([orgId, createdAt])
-  @@index([orgId, status])
+enum UserRole {
+  OWNER
+  ADMIN
+  MEMBER
 }
 
-// (Optional, step 5–in-memory idempotency now; DB table later if you want durability)
+model Organization {
+  id        String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slug      String     @unique
+  name      String
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  products  Product[]
+  members   OrgMember[]
+}
+
+model User {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  password     String
+  name         String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  lastLoginAt  DateTime?  // <- must exist
+
+  memberships  OrgMember[]
+}
+
+model OrgMember {
+  id        String        @id @default(cuid())
+  orgId     String        @db.Uuid
+  userId    String
+  role      UserRole      @default(MEMBER)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  org       Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, userId])
+}
+
+model Product {
+  id              String        @id @default(cuid())
+  orgId           String        @db.Uuid
+  org             Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  title           String
+  sku             String
+  type            ProductType
+  status          ProductStatus @default(ACTIVE)
+  price           Decimal?      @db.Decimal(10, 2)
+  description     String?
+  inventoryQty    Int           @default(0)
+  lastPurchasedAt DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@unique([orgId, sku])
+}
