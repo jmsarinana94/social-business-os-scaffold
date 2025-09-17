@@ -6,7 +6,7 @@ import {
   HttpStatus,
   Post,
 } from '@nestjs/common';
-import { AuthService } from './auth.service';
+import AuthService from './auth.service'; // default import (matches your file)
 
 type AuthDto = {
   email: string;
@@ -22,17 +22,15 @@ export class AuthController {
     @Headers('x-org') org: string,
     @Body() dto: AuthDto,
   ) {
-    // AuthService expects a single payload object
     return this.auth.signup({ org, email: dto.email, password: dto.password });
   }
 
   @Post('login')
-  @HttpCode(HttpStatus.OK) // ensure 200 OK (tests expect 200)
+  @HttpCode(HttpStatus.OK) // tests expect 200 OK
   async login(
     @Headers('x-org') org: string,
     @Body() dto: AuthDto,
   ) {
-    // AuthService expects a single payload object
     return this.auth.login({ org, email: dto.email, password: dto.password });
   }
 }

@@ -1,6 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { Prisma, ProductStatus, ProductType } from '@prisma/client';
 import { PrismaService } from '../../shared/prisma/prisma.service';
 
 export type CreateDto = {
@@ -9,30 +12,52 @@ export type CreateDto = {
   description?: string | null;
   type: 'PHYSICAL' | 'DIGITAL';
   status: 'ACTIVE' | 'INACTIVE';
-  price: string; // stored as string/decimal in DB
+  price: string;
 };
-
-export type UpdateDto = Partial<CreateDto>;
 
 @Injectable()
 export class ProductsService {
   constructor(private readonly prisma: PrismaService) {}
 
   private async ensureOrg(orgSlug: string) {
-    let org = await this.prisma.organization.findUnique({ where: { slug: orgSlug } });
-    if (!org) {
-      org = await this.prisma.organization.create({
+    const org =
+      (await this.prisma.organization.findUnique({
+        where: { slug: orgSlug },
+      })) ??
+      (await this.prisma.organization.create({
         data: { slug: orgSlug, name: orgSlug },
-      });
-    }
+      }));
     return org;
+  }
+
+  private normalizeEnum<T extends string>(
+    value: string,
+    allowed: readonly T[],
+    field: string,
+  ): T {
+    const v = String(value).toUpperCase() as T;
+    if (!allowed.includes(v)) {
+      throw new BadRequestException(
+        `${field} must be one of: ${allowed.join(', ')}`,
+      );
+    }
+    return v;
+  }
+
+  private generateSku(prefix = 'AUTO') {
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let s = '';
+    for (let i = 0; i < 8; i++) {
+      s += alphabet[Math.floor(Math.random() * alphabet.length)];
+    }
+    return `${prefix}-${s}`;
   }
 
   async list(orgSlug: string, page = 1, limit = 10) {
     const org = await this.ensureOrg(orgSlug);
     const skip = (page - 1) * limit;
 
-    const [data, total] = await Promise.all([
+    const [data, total] = await this.prisma.$transaction([
       this.prisma.product.findMany({
         where: { orgId: org.id },
         orderBy: { createdAt: 'desc' },
@@ -55,26 +80,25 @@ export class ProductsService {
 
   async get(orgSlug: string, id: string) {
     const org = await this.ensureOrg(orgSlug);
-    const prod = await this.prisma.product.findFirst({
+    const row = await this.prisma.product.findFirst({
       where: { id, orgId: org.id },
     });
-    if (!prod) throw new NotFoundException('Product not found');
-    return prod;
+    if (!row) throw new NotFoundException('Product not found');
+    return row;
   }
 
   async create(orgSlug: string, dto: CreateDto) {
     const org = await this.ensureOrg(orgSlug);
 
-    // If SKU omitted, generate one
-    const sku = dto.sku ?? `AUTO-${Math.random().toString(36).slice(2).toUpperCase()}`.slice(0, 16);
+    const type = this.normalizeEnum(dto.type, ['PHYSICAL', 'DIGITAL'], 'type') as ProductType;
+    const status = this.normalizeEnum(dto.status, ['ACTIVE', 'INACTIVE'], 'status') as ProductStatus;
 
-    // Prisma typed input (relation via `org`)
     const data: Prisma.ProductCreateInput = {
-      sku, // required
+      sku: dto.sku ?? this.generateSku('AUTO'),
       title: dto.title,
       description: dto.description ?? null,
-      type: dto.type as any,
-      status: dto.status as any,
+      type,
+      status,
       price: dto.price,
       org: { connect: { id: org.id } },
     };
@@ -82,21 +106,25 @@ export class ProductsService {
     return this.prisma.product.create({ data });
   }
 
-  async update(orgSlug: string, id: string, dto: UpdateDto) {
+  async update(orgSlug: string, id: string, dto: Partial<CreateDto>) {
     const org = await this.ensureOrg(orgSlug);
-    const exists = await this.prisma.product.findFirst({
+    const existing = await this.prisma.product.findFirst({
       where: { id, orgId: org.id },
-      select: { id: true },
     });
-    if (!exists) throw new NotFoundException('Product not found');
+    if (!existing) throw new NotFoundException('Product not found');
 
     const data: Prisma.ProductUpdateInput = {
-      ...(dto.title !== undefined ? { title: dto.title } : {}),
-      ...(dto.description !== undefined ? { description: dto.description } : {}),
-      ...(dto.type !== undefined ? { type: dto.type as any } : {}),
-      ...(dto.status !== undefined ? { status: dto.status as any } : {}),
-      ...(dto.price !== undefined ? { price: dto.price } : {}),
-      ...(dto.sku !== undefined ? { sku: dto.sku } : {}),
+      sku: dto.sku ? { set: dto.sku } : undefined,
+      title: dto.title ? { set: dto.title } : undefined,
+      description:
+        dto.description !== undefined ? { set: dto.description } : undefined,
+      type: dto.type
+        ? { set: (this.normalizeEnum(dto.type, ['PHYSICAL', 'DIGITAL'], 'type') as ProductType) }
+        : undefined,
+      status: dto.status
+        ? { set: (this.normalizeEnum(dto.status, ['ACTIVE', 'INACTIVE'], 'status') as ProductStatus) }
+        : undefined,
+      price: dto.price ? { set: dto.price } : undefined,
     };
 
     return this.prisma.product.update({
@@ -107,11 +135,10 @@ export class ProductsService {
 
   async remove(orgSlug: string, id: string) {
     const org = await this.ensureOrg(orgSlug);
-    const exists = await this.prisma.product.findFirst({
+    const existing = await this.prisma.product.findFirst({
       where: { id, orgId: org.id },
-      select: { id: true },
     });
-    if (!exists) throw new NotFoundException('Product not found');
+    if (!existing) throw new NotFoundException('Product not found');
 
     await this.prisma.product.delete({ where: { id } });
     return { ok: true };
@@ -119,31 +146,34 @@ export class ProductsService {
 
   async getInventory(orgSlug: string, id: string) {
     const org = await this.ensureOrg(orgSlug);
-    const prod = await this.prisma.product.findFirst({
+    const row = await this.prisma.product.findFirst({
       where: { id, orgId: org.id },
       select: { id: true, inventoryQty: true },
     });
-    if (!prod) throw new NotFoundException('Product not found');
-    return { id: prod.id, inventoryQty: prod.inventoryQty };
+    if (!row) throw new NotFoundException('Product not found');
+    return row;
+  }
+
+  // kept for compatibility if any caller still uses readInventory()
+  async readInventory(orgSlug: string, id: string) {
+    return this.getInventory(orgSlug, id);
   }
 
   async adjustInventory(orgSlug: string, id: string, delta: number) {
     const org = await this.ensureOrg(orgSlug);
-    const prod = await this.prisma.product.findFirst({
+    const product = await this.prisma.product.findFirst({
       where: { id, orgId: org.id },
       select: { id: true, inventoryQty: true },
     });
-    if (!prod) throw new NotFoundException('Product not found');
+    if (!product) throw new NotFoundException('Product not found');
 
-    const next = (prod.inventoryQty ?? 0) + (delta ?? 0);
-
+    const next = (product.inventoryQty ?? 0) + Number(delta);
     if (next < 0) {
-      // <-- Return 400 instead of throwing a generic Error (which was 500)
       throw new BadRequestException('Inventory cannot go negative');
     }
 
     return this.prisma.product.update({
-      where: { id: prod.id },
+      where: { id },
       data: { inventoryQty: next },
     });
   }
