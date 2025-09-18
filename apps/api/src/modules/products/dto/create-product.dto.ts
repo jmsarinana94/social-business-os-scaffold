@@ -1,39 +1,56 @@
-import { Transform } from 'class-transformer';
-import { IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  IsDefined,
+  IsEnum,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Min,
+} from 'class-validator';
 
-export enum ProductTypeDto {
+export enum ProductType {
   PHYSICAL = 'PHYSICAL',
   DIGITAL = 'DIGITAL',
 }
 
-export enum ProductStatusDto {
+export enum ProductStatus {
   ACTIVE = 'ACTIVE',
   INACTIVE = 'INACTIVE',
 }
 
 export class CreateProductDto {
-  @IsOptional()
+  @IsDefined()
   @IsString()
-  @MaxLength(64)
-  sku?: string;
-
-  @IsString()
+  @IsNotEmpty()
   title!: string;
 
-  @Transform(({ value }) => String(value).toUpperCase())
-  @IsEnum(ProductTypeDto)
-  type!: ProductTypeDto;
-
-  @Transform(({ value }) => String(value).toUpperCase())
-  @IsEnum(ProductStatusDto)
-  status!: ProductStatusDto;
-
-  // tests sometimes send number; store as string consistently
-  @Transform(({ value }) => (value == null ? undefined : String(value)))
+  @IsDefined()
   @IsString()
-  price!: string;
+  @IsNotEmpty()
+  sku!: string;
+
+  @IsDefined()
+  @IsEnum(ProductType)
+  type!: ProductType;
+
+  @IsEnum(ProductStatus)
+  @IsOptional()
+  status: ProductStatus = ProductStatus.ACTIVE;
+
+  @IsDefined()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  price!: number;
 
   @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  inventoryQty?: number;
+
   @IsString()
-  description?: string | null;
+  @IsOptional()
+  description?: string;
 }

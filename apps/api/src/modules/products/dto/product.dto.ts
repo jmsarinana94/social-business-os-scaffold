@@ -1,69 +1,67 @@
 import { Transform } from 'class-transformer';
-import { IsIn, IsNotEmpty, IsOptional, IsString, Matches } from 'class-validator';
+import {
+  IsIn,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Matches,
+  MaxLength,
+} from 'class-validator';
 
-export class CreateProductDto {
+function toUpperString(v: unknown): string | undefined {
+  if (typeof v === 'string') return v.toUpperCase();
+  return undefined;
+}
+function toLowerString(v: unknown): string | undefined {
+  if (typeof v === 'string') return v.toLowerCase();
+  if (typeof v === 'number') return String(v).toLowerCase();
+  return undefined;
+}
+
+export class ProductDto {
   @IsString()
   @IsNotEmpty()
+  @MaxLength(256)
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
   title!: string;
 
-  @IsString()
-  @IsOptional()
-  description?: string;
+  @IsIn(['PHYSICAL', 'DIGITAL'])
+  @Transform(({ value }: { value: unknown }) => toUpperString(value))
+  type!: 'PHYSICAL' | 'DIGITAL';
 
-  @IsString()
-  @IsIn(['physical', 'digital'])
-  type!: 'physical' | 'digital';
+  @IsIn(['ACTIVE', 'INACTIVE'])
+  @Transform(({ value }: { value: unknown }) => toUpperString(value))
+  status!: 'ACTIVE' | 'INACTIVE';
 
+  // Keep as string for presentation; numeric is handled in create/update DTOs.
   @IsString()
-  @IsIn(['active', 'inactive'])
-  status!: 'active' | 'inactive';
-
-  // Accept number or string; normalize to 2 decimals
-  @Transform(({ value }) => {
-    if (typeof value === 'number') return value.toFixed(2);
-    if (typeof value === 'string' && /^\d+(\.\d+)?$/.test(value)) return Number(value).toFixed(2);
-    return value;
-  })
-  @IsString()
-  @Matches(/^\d+(\.\d{2})$/, { message: 'price must be a number with up to 2 decimals' })
+  @Matches(/^\d+(\.\d+)?$/)
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'number'
+      ? String(value)
+      : typeof value === 'string'
+      ? value.trim()
+      : value,
+  )
   price!: string;
 
   @IsOptional()
   @IsString()
-  sku?: string;
-}
-
-export class UpdateProductDto {
-  @IsString()
-  @IsOptional()
-  title?: string;
-
-  @IsString()
-  @IsOptional()
+  @MaxLength(10000)
+  @Transform(({ value }: { value: unknown }) => {
+    if (typeof value === 'string') {
+      const t = value.trim();
+      return t === '' ? undefined : t;
+    }
+    return undefined;
+  })
   description?: string;
 
-  @IsString()
-  @IsOptional()
-  @IsIn(['physical', 'digital'])
-  type?: 'physical' | 'digital';
-
-  @IsString()
-  @IsOptional()
-  @IsIn(['active', 'inactive'])
-  status?: 'active' | 'inactive';
-
-  @Transform(({ value }) => {
-    if (value == null) return value;
-    if (typeof value === 'number') return value.toFixed(2);
-    if (typeof value === 'string' && /^\d+(\.\d+)?$/.test(value)) return Number(value).toFixed(2);
-    return value;
-  })
   @IsOptional()
   @IsString()
-  @Matches(/^\d+(\.\d{2})$/, { message: 'price must be a number with up to 2 decimals' })
-  price?: string;
-
-  @IsOptional()
-  @IsString()
+  @MaxLength(128)
+  @Transform(({ value }: { value: unknown }) => toLowerString(value))
   sku?: string;
 }

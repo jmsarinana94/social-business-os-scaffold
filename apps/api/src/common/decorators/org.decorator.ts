@@ -1,12 +1,12 @@
-// apps/api/src/common/decorators/org.decorator.ts
-import { createParamDecorator, ExecutionContext } from '@nestjs/common';
+import { BadRequestException, createParamDecorator, ExecutionContext } from '@nestjs/common';
 
-export const Org = createParamDecorator((data: unknown, ctx: ExecutionContext) => {
+export const Org = createParamDecorator((data: unknown, ctx: ExecutionContext): string => {
   const req = ctx.switchToHttp().getRequest();
-  return req.org as { id: string; slug: string } | undefined;
-});
+  const raw = req.headers['x-org'] ?? req.header?.('x-org');
+  const org = typeof raw === 'string' ? raw.trim() : Array.isArray(raw) ? raw[0]?.trim() : '';
 
-export const OrgId = createParamDecorator((data: unknown, ctx: ExecutionContext) => {
-  const req = ctx.switchToHttp().getRequest();
-  return (req.org?.id as string) || undefined;
+  if (!org) {
+    throw new BadRequestException('Missing x-org header');
+  }
+  return org;
 });

@@ -1,42 +1,29 @@
-// apps/api/src/modules/products/guards/unique-sku.guard.ts
 import {
-    CanActivate,
-    ConflictException,
-    ExecutionContext,
-    Injectable,
+  CanActivate,
+  ExecutionContext,
+  Injectable,
 } from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
-
-type OrgInRequest =
-  | { id: string; slug: string; name?: string }
-  | undefined;
+import { PrismaService } from '../../../infra/prisma/prisma.service';
 
 @Injectable()
 export class UniqueSkuGuard implements CanActivate {
   constructor(private readonly prisma: PrismaService) {}
 
-  async canActivate(ctx: ExecutionContext): Promise<boolean> {
-    const req = ctx.switchToHttp().getRequest<{
-      body?: { sku?: string };
-      org?: OrgInRequest;
-    }>();
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const req = context.switchToHttp().getRequest();
+    const orgSlug: string | undefined =
+      req.headers['x-org'] || req.headers['X-Org'];
 
-    const sku = req.body?.sku?.trim();
-    if (!sku) return true; // no SKU in payload -> let DTO validation handle it
+    // If no SKU in body, skip
+    const sku: string | undefined = req.body?.sku;
+    if (!sku) return true;
 
-    const org = req.org;
-    if (!org?.id) return true; // org middleware should enforce this; fail-open here
-
+    // Ensure we scope by org slug
     const existing = await this.prisma.product.findFirst({
-      where: { orgId: org.id, sku },
+      where: { sku, org: { slug: String(orgSlug) } },
       select: { id: true },
     });
 
-    if (existing) {
-      throw new ConflictException(
-        `SKU "${sku}" already exists in this organization.`,
-      );
-    }
-    return true;
+    return !existing;
   }
 }

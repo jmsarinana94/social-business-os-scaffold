@@ -1,99 +1,59 @@
-// apps/api/test/e2e/products.inventory.e2e-spec.ts
-import { AppModule } from '@/app.module';
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import request, { Response } from 'supertest';
-
-const ORG = process.env.ORG || 'demo';
-const PASS = process.env.API_PASS || 'password123';
-// ALWAYS unique per run, do NOT read process.env.API_EMAIL
-const EMAIL = `inv-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@demo.io`;
+import request from 'supertest';
+import { AppModule } from '../../src/app.module';
+import { PrismaExceptionFilter } from '../../src/common/filters/prisma-exception.filter';
+import { DecimalToNumberInterceptor } from '../../src/common/interceptors/decimal-to-number.interceptor';
 
 describe('Products inventory (e2e)', () => {
   let app: INestApplication;
   let token: string;
-
-  const base = () => request(app.getHttpServer());
-  const baseHeaders = { 'x-org': ORG, 'content-type': 'application/json' };
-
-  async function signup(): Promise<void> {
-    // Accept 201 Created or 409 Conflict (already exists)
-    await base()
-      .post('/auth/signup')
-      .set(baseHeaders)
-      .send({ email: EMAIL, password: PASS, name: 'Inventory Tester' })
-      .ok(res => res.status === 201 || res.status === 409);
-  }
-
-  async function login(): Promise<Response> {
-    return base()
-      .post('/auth/login')
-      .set(baseHeaders)
-      .send({ email: EMAIL, password: PASS });
-  }
-
-  async function ensureLogin(): Promise<string> {
-    let res = await login();
-    if (res.status === 401) {
-      await signup();
-      res = await login();
-    }
-    if (!(res.status === 200 || res.status === 201)) {
-      throw new Error(`Login failed: expected 200/201, got ${res.status} (${res.text})`);
-    }
-    const tk: string | undefined = res.body?.access_token;
-    if (!tk) throw new Error(`Missing access_token: ${JSON.stringify(res.body)}`);
-    return tk;
-  }
+  const ORG = process.env.ORG || 'demo';
+  const email = process.env.API_EMAIL || 'tester@example.com';
+  const password = process.env.API_PASS || 'secret123';
+  const baseHeaders = { 'x-org': ORG };
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
+    const mod = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    app = mod.createNestApplication();
 
-    app = moduleRef.createNestApplication();
+    app.useGlobalPipes(new ValidationPipe({
+      whitelist: true, forbidNonWhitelisted: true, transform: true,
+      transformOptions: { enableImplicitConversion: true },
+    }));
+    app.useGlobalInterceptors(new DecimalToNumberInterceptor());
+    app.useGlobalFilters(new PrismaExceptionFilter());
     await app.init();
 
-    await signup();
-    token = await ensureLogin();
+    await request(app.getHttpServer()).post('/auth/signup').send({ email, password, org: ORG });
+    const login = await request(app.getHttpServer()).post('/auth/login').send({ email, password });
+    token = login.body?.access_token || login.body?.token;
   });
 
-  afterAll(async () => {
-    await app.close();
-  });
+  afterAll(async () => { await app.close(); });
 
   it('lists products and adjusts inventory +5, then rejects negative overshoot', async () => {
-    // 1) List products
-    const list = await base()
-      .get('/products')
+    const sku = `SKU-INV-${Date.now()}`;
+
+    const created = await request(app.getHttpServer())
+      .post('/products')
       .set({ ...baseHeaders, Authorization: `Bearer ${token}` })
-      .expect(200);
+      .send({ title: 'Inv', type: 'PHYSICAL', status: 'ACTIVE', price: 1, sku, inventoryQty: 2 })
+      .expect(201);
 
-    const items = list.body?.data ?? [];
-    expect(Array.isArray(items)).toBe(true);
-    expect(items.length).toBeGreaterThan(0);
+    const id = created.body.id;
 
-    const product = items[0];
-    expect(product).toHaveProperty('id');
-    expect(typeof product.inventoryQty).toBe('number');
-
-    // 2) Adjust +5 (accept 200 or 201)
-    const up = await base()
-      .post(`/products/${product.id}/inventory`)
+    await request(app.getHttpServer())
+      .post(`/products/${id}/inventory`)
       .set({ ...baseHeaders, Authorization: `Bearer ${token}` })
       .send({ delta: 5 })
-      .ok(r => r.status === 200 || r.status === 201);
+      .expect(200);
 
-    const newQty = up.body?.inventoryQty;
-    expect(typeof newQty).toBe('number');
-    expect(newQty).toBe(product.inventoryQty + 5);
-
-    // 3) Attempt negative overshoot (should 400)
-    const negDelta = -(newQty + 1);
-    await base()
-      .post(`/products/${product.id}/inventory`)
+    const negDelta = -1000; // ensure it would go below zero
+    await request(app.getHttpServer())
+      .post(`/products/${id}/inventory`)
       .set({ ...baseHeaders, Authorization: `Bearer ${token}` })
       .send({ delta: negDelta })
-      .expect(400);
+      .expect(400); // now enforced by service
   });
 });

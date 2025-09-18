@@ -1,39 +1,35 @@
-// src/common/middleware/org.middleware.ts
-import {
-  BadRequestException,
-  Injectable,
-  NestMiddleware,
-  UnauthorizedException,
-} from '@nestjs/common';
-import type { NextFunction, Request, Response } from 'express';
-import { PrismaService } from '../../prisma/prisma.service';
+import { BadRequestException, Injectable, NestMiddleware } from '@nestjs/common';
+import { NextFunction, Request, Response } from 'express';
+import { PrismaService } from '../../infra/prisma/prisma.service';
 
-// Augment Express.Request safely without relying on 'express-serve-static-core'
 declare global {
   namespace Express {
     interface Request {
-      org?: { id: string; slug: string; name: string };
+      org?: {
+        id: string;
+        slug: string | null;
+        name: string | null;
+      };
     }
   }
 }
 
 @Injectable()
 export class OrgMiddleware implements NestMiddleware {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) {}
 
   async use(req: Request, _res: Response, next: NextFunction) {
-    const slug = req.header('x-org')?.trim();
-    if (!slug) {
-      throw new BadRequestException('Missing x-org header');
-    }
+    const slug = req.header('x-org');
+    if (!slug) throw new BadRequestException('x-org header is required');
 
-    const org = await this.prisma.organization.findUnique({ where: { slug } });
-    if (!org) {
-      throw new UnauthorizedException('Organization not found');
-    }
+    const org = await this.prisma.organization.findUnique({
+      where: { slug },
+      select: { id: true, slug: true, name: true },
+    });
 
-    // Keep the shape in sync with the declaration above
-    req.org = { id: org.id, slug: org.slug, name: org.name };
+    if (!org) throw new BadRequestException('Organization not found');
+
+    req.org = { id: org.id, slug: org.slug ?? null, name: org.name ?? null };
     next();
   }
 }

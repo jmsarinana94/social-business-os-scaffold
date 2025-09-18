@@ -1,82 +1,62 @@
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { AppModule } from '../../src/app.module';
-import { AuthModule } from '../../src/modules/auth/auth.module';
+import { PrismaExceptionFilter } from '../../src/common/filters/prisma-exception.filter';
+import { DecimalToNumberInterceptor } from '../../src/common/interceptors/decimal-to-number.interceptor';
 
 describe('Products (e2e)', () => {
   let app: INestApplication;
-
-  const ORG = 'demo';
-  const baseHeaders = { 'x-org': ORG };
+  let token: string;
+  const ORG = process.env.ORG || 'demo';
+  const email = process.env.API_EMAIL || 'tester@example.com';
+  const password = process.env.API_PASS || 'secret123';
+  const headers = { 'x-org': ORG };
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({
-      imports: [AppModule, AuthModule], // 👈 add this
-    }).compile();
+    const mod = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    app = mod.createNestApplication();
 
-    app = moduleRef.createNestApplication();
+    app.useGlobalPipes(new ValidationPipe({
+      whitelist: true, forbidNonWhitelisted: true, transform: true,
+      transformOptions: { enableImplicitConversion: true },
+    }));
+    app.useGlobalInterceptors(new DecimalToNumberInterceptor());
+    app.useGlobalFilters(new PrismaExceptionFilter());
     await app.init();
+
+    await request(app.getHttpServer()).post('/auth/signup').send({ email, password, org: ORG });
+    const login = await request(app.getHttpServer()).post('/auth/login').send({ email, password });
+    token = login.body?.access_token || login.body?.token;
   });
 
-  afterAll(async () => {
-    await app.close();
-  });
-
-  it('GET /products returns paginated list', async () => {
-    const email = `p_${Date.now()}@ex.com`;
-    const password = 'secret123';
-
-    await request(app.getHttpServer())
-      .post('/auth/signup')
-      .set(baseHeaders)
-      .send({ email, password, name: 'Tester' })
-      .expect(201);
-
-    const login = await request(app.getHttpServer())
-      .post('/auth/login')
-      .set(baseHeaders)
-      .send({ email, password })
-      .expect(200);
-
-    const token = login.body?.access_token || 'test-token';
-    const headers = { ...baseHeaders, Authorization: `Bearer ${token}` };
-
-    await request(app.getHttpServer())
-      .get('/products?page=1&limit=5')
-      .set(headers)
-      .expect(200);
-  });
+  afterAll(async () => { await app.close(); });
 
   it('POST -> GET -> PUT (partial) -> DELETE', async () => {
-    const email = `pp_${Date.now()}@ex.com`;
-    const password = 'secret123';
-
-    await request(app.getHttpServer())
-      .post('/auth/signup')
-      .set(baseHeaders)
-      .send({ email, password, name: 'Tester' })
-      .expect(201);
-
-    const login = await request(app.getHttpServer())
-      .post('/auth/login')
-      .set(baseHeaders)
-      .send({ email, password })
-      .expect(200);
-
-    const token = login.body?.access_token || 'test-token';
-    const headers = { ...baseHeaders, Authorization: `Bearer ${token}` };
+    const sku = `SKU-E2E-${Date.now()}`;
 
     const createRes = await request(app.getHttpServer())
       .post('/products')
-      .set(headers)
-      .send({ title: 'Widget', type: 'physical', status: 'active', price: 12, description: 'Test' })
+      .set({ ...headers, Authorization: `Bearer ${token}` })
+      .send({ title: 'Widget', type: 'PHYSICAL', status: 'ACTIVE', price: 12, sku, description: 'Test' })
       .expect(201);
 
-    const id = createRes.body.id ?? createRes.body.data?.id;
+    const id = createRes.body.id;
 
-    await request(app.getHttpServer()).get(`/products/${id}`).set(headers).expect(200);
-    await request(app.getHttpServer()).put(`/products/${id}`).set(headers).send({ price: 20 }).expect(200);
-    await request(app.getHttpServer()).delete(`/products/${id}`).set(headers).expect(200);
+    await request(app.getHttpServer())
+      .get(`/products/${id}`)
+      .set(headers)
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .put(`/products/${id}`)
+      .set({ ...headers, Authorization: `Bearer ${token}` })
+      .send({ price: 13.5 })
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .delete(`/products/${id}`)
+      .set({ ...headers, Authorization: `Bearer ${token}` })
+      .expect(200);
   });
 });

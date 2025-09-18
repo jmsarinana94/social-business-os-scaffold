@@ -1,12 +1,17 @@
 import { Module } from '@nestjs/common';
-import { HealthController } from './health/health.controller';
-import { PrismaModule } from './infra/prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { HealthModule } from './modules/health/health.module';
 import { ProductsModule } from './modules/products/products.module';
-import { VersionController } from './version/version.controller';
+import { PrismaModule } from './shared/prisma/prisma.module';
 
 @Module({
-  imports: [PrismaModule, AuthModule, ProductsModule],
-  controllers: [HealthController, VersionController],
+  imports: [
+    PrismaModule,   // global PrismaService provider
+    AuthModule,
+    ProductsModule,
+    HealthModule,
+    // NOTE: If you later re-add your OpenAPI docs module,
+    // import it here once the file exists again.
+  ],
 })
 export class AppModule {}

@@ -1,31 +1,16 @@
-// apps/api/src/common/guards/org.guard.ts
-import { PrismaService } from '@/infra/prisma/prisma.service';
-import {
-  BadRequestException,
-  CanActivate,
-  ExecutionContext,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
+import { Request } from 'express';
 
 @Injectable()
-export class OrgGuard implements CanActivate {
-  constructor(private prisma: PrismaService) {}
-
-  async canActivate(ctx: ExecutionContext): Promise<boolean> {
-    const req = ctx.switchToHttp().getRequest();
-    const slug = (req.headers['x-org'] as string | undefined)?.trim();
-
+export class OrgHeaderGuard implements CanActivate {
+  canActivate(context: ExecutionContext): boolean {
+    const req = context.switchToHttp().getRequest<Request>();
+    const slug = req.header('x-org')?.trim();
     if (!slug) {
-      throw new BadRequestException('Missing x-org header');
+      throw new BadRequestException('x-org header required');
     }
-
-    const org = await this.prisma.organization.findUnique({ where: { slug } });
-    if (!org) {
-      throw new NotFoundException('Organization not found');
-    }
-
-    req.org = { id: org.id, slug: org.slug };
+    // stow for handlers that want it without re-reading headers
+    (req as any).__orgSlug = slug;
     return true;
     }
 }

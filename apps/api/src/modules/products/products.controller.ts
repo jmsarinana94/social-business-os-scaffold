@@ -4,24 +4,18 @@ import {
   Delete,
   Get,
   Headers,
+  HttpCode,
+  HttpStatus,
   Param,
   Post,
   Put,
   Query,
+  UseGuards,
 } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+import { CreateProductDto } from './dto/create-product.dto';
+import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductsService } from './products.service';
-
-type CreateBody = {
-  sku?: string;
-  title: string;
-  description?: string | null;
-  type: 'PHYSICAL' | 'DIGITAL';
-  status: 'ACTIVE' | 'INACTIVE';
-  price: string;
-};
-
-type UpdateBody = Partial<CreateBody>;
-type AdjustBody = { delta: number };
 
 @Controller('products')
 export class ProductsController {
@@ -33,61 +27,54 @@ export class ProductsController {
     @Query('page') page = '1',
     @Query('limit') limit = '10',
   ) {
-    const p = Number.parseInt(page as string, 10) || 1;
-    const l = Number.parseInt(limit as string, 10) || 10;
-    return this.products.list(org, p, l);
+    const p = Math.max(1, Number(page) || 1);
+    const l = Math.max(1, Math.min(100, Number(limit) || 10));
+    return this.products.findAll(org, p, l);
   }
 
   @Get(':id')
-  async get(
-    @Headers('x-org') org: string,
-    @Param('id') id: string,
-  ) {
-    return this.products.get(org, id);
+  async get(@Headers('x-org') org: string, @Param('id') id: string) {
+    return this.products.findOne(org, id);
   }
 
+  @UseGuards(AuthGuard('jwt'))
   @Post()
   async create(
     @Headers('x-org') org: string,
-    @Body() body: CreateBody,
+    @Body() dto: CreateProductDto,
   ) {
-    // Let the service normalize enums; no string re-casting here
-    return this.products.create(org, body);
+    return this.products.create(org, dto);
   }
 
+  @UseGuards(AuthGuard('jwt'))
   @Put(':id')
   async update(
     @Headers('x-org') org: string,
     @Param('id') id: string,
-    @Body() body: UpdateBody,
+    @Body() dto: UpdateProductDto,
   ) {
-    // Pass through; service validates & normalizes
-    return this.products.update(org, id, body);
+    return this.products.update(org, id, dto);
   }
 
+  @UseGuards(AuthGuard('jwt'))
   @Delete(':id')
-  async remove(
-    @Headers('x-org') org: string,
-    @Param('id') id: string,
-  ) {
+  async remove(@Headers('x-org') org: string, @Param('id') id: string) {
     return this.products.remove(org, id);
   }
 
   @Get(':id/inventory')
-  async getInventory(
-    @Headers('x-org') org: string,
-    @Param('id') id: string,
-  ) {
+  async getInventory(@Headers('x-org') org: string, @Param('id') id: string) {
     return this.products.getInventory(org, id);
   }
 
+  @UseGuards(AuthGuard('jwt'))
   @Post(':id/inventory')
-  async adjustInventory(
+  @HttpCode(HttpStatus.OK) // <-- return 200 instead of default 201
+  async addInventory(
     @Headers('x-org') org: string,
     @Param('id') id: string,
-    @Body() body: AdjustBody,
+    @Body() payload: { delta: number },
   ) {
-    const delta = Number(body?.delta ?? 0);
-    return this.products.adjustInventory(org, id, delta);
+    return this.products.addInventory(org, id, payload);
   }
 }

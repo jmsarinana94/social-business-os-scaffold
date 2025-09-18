@@ -1,11 +1,17 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 
 @Injectable()
-export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
+export class PrismaService
+  extends PrismaClient<Prisma.PrismaClientOptions>
+  implements OnModuleInit, OnModuleDestroy
+{
   constructor() {
-    // Log nothing by default; customize if you want
-    super({ log: [] });
+    super({
+      log: process.env.NODE_ENV === 'test' ? [] : ['warn', 'error'],
+    } as Prisma.PrismaClientOptions);
+
+    this.setupProcessListeners();
   }
 
   async onModuleInit() {
@@ -16,18 +22,16 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     await this.$disconnect();
   }
 
-  /**
-   * Helper that works whether your model is `model Org` (delegate: `org`)
-   * or `model Organization` (delegate: `organization`).
-   */
-  async findOrgBySlug(slug: string) {
-    const anyClient = this as any;
-    const delegate = anyClient.org ?? anyClient.organization;
-    if (!delegate) {
-      throw new Error(
-        'No Prisma delegate found for `Org` or `Organization`. Check your Prisma schema.',
-      );
-    }
-    return delegate.findFirst({ where: { slug } });
+  private setupProcessListeners() {
+    const disconnect = async () => {
+      try { await this.$disconnect(); } catch {}
+    };
+    process.on('beforeExit', disconnect);
+    process.on('SIGINT', disconnect);
+    process.on('SIGTERM', disconnect);
+    process.on('SIGUSR2', async () => {
+      await disconnect();
+      process.kill(process.pid, 'SIGUSR2');
+    });
   }
 }

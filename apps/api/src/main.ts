@@ -1,38 +1,28 @@
-import { ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import { PrismaExceptionFilter } from './common/filters/prisma-exception.filter';
+import { DecimalToNumberInterceptor } from './common/interceptors/decimal-to-number.interceptor';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // Global pipes/middleware
+  app.enableCors({ origin: true, credentials: true });
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
+      forbidNonWhitelisted: true,
       transform: true,
-      forbidUnknownValues: false,
+      transformOptions: { enableImplicitConversion: true },
     }),
   );
-  app.enableCors();
 
-  // Swagger
-  const config = new DocumentBuilder()
-    .setTitle('Social Business OS – API')
-    .setDescription('REST endpoints for auth & products')
-    .setVersion(process.env.npm_package_version ?? '0.1.0')
-    .addBearerAuth() // Authorization: Bearer <token>
-    .addApiKey(
-      { type: 'apiKey', name: 'x-org', in: 'header', description: 'Organization slug' },
-      'x-org',
-    )
-    .build();
+  app.useGlobalInterceptors(new DecimalToNumberInterceptor());
+  app.useGlobalFilters(new PrismaExceptionFilter());
 
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('docs', app, document, {
-    swaggerOptions: { persistAuthorization: true },
-  });
-
-  await app.listen(process.env.PORT ? Number(process.env.PORT) : 4000);
+  const port = Number(process.env.PORT ?? 4000);
+  await app.listen(port, '0.0.0.0');
+  Logger.log(`API listening on http://0.0.0.0:${port}`, 'Bootstrap');
 }
 bootstrap();
