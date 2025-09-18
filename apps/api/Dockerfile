@@ -1,62 +1,35 @@
-# apps/api/Dockerfile
-# syntax=docker/dockerfile:1.7
-
-#####################################
-# Base with pnpm
-#####################################
-FROM node:20-alpine AS base
+# ---------- build ----------
+FROM node:20-alpine AS build
 WORKDIR /repo
-RUN corepack enable && corepack prepare pnpm@10.15.0 --activate
+ENV NODE_ENV=production
+RUN corepack enable
 
-#####################################
-# Install deps (workspace-aware)
-#####################################
-FROM base AS deps
+# minimal files to wire the workspace quickly
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY apps/api/package.json apps/api/
+COPY apps/api/prisma/schema.prisma apps/api/prisma/schema.prisma
 
-# Root workspace files
-COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
+# install all workspace deps (honors lockfile)
+RUN pnpm install --frozen-lockfile
 
-# Packages that API may depend on
-COPY packages ./packages
+# prisma client for the API package
+RUN pnpm -C apps/api exec prisma generate --schema prisma/schema.prisma
 
-# API package manifest (so pnpm can resolve workspace deps)
-COPY apps/api/package.json ./apps/api/package.json
+# bring in the source and build
+COPY . .
+RUN pnpm -C apps/api build
 
-# Install all workspace deps (not production yet; we need dev deps to build)
-RUN pnpm install --frozen-lockfile=false
+# ✅ export a self-contained deployable for the API (dist + node_modules + package.json)
+RUN pnpm -w -r deploy --filter "./apps/api" /out
 
-#####################################
-# Build the API
-#####################################
-FROM deps AS build
-
-# Copy sources
-COPY tsconfig*.json ./
-COPY apps/api ./apps/api
-COPY packages ./packages
-
-# (Optional) Prisma generate if you use Prisma (uncomment if needed)
-# RUN pnpm --filter ./apps/api... prisma generate
-
-# Build only the API app
-RUN pnpm --filter ./apps/api... build
-
-#####################################
-# Runtime image
-#####################################
-FROM node:20-alpine AS runner
-WORKDIR /app
+# ---------- runtime ----------
+FROM node:20-alpine AS runtime
 ENV NODE_ENV=production
 ENV PORT=4000
+WORKDIR /app
 
-# Copy the API dist and its package.json
-COPY --from=build /repo/apps/api/dist ./dist
-COPY --from=build /repo/apps/api/package.json ./package.json
-
-# Copy node_modules from the monorepo (contains all resolved workspace deps)
-COPY --from=build /repo/node_modules ./node_modules
-# If your API has its own local node_modules (usually empty with workspaces), keep this line:
-# COPY --from=build /repo/apps/api/node_modules ./node_modules
+# copy the exported app
+COPY --from=build /out ./
 
 EXPOSE 4000
-CMD ["node", "dist/main.js"]
+CMD ["node", "dist/src/main.js"]
