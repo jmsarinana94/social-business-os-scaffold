@@ -1,0 +1,68 @@
+abd6d19a4cf1dc26be4161b070c8a6ad
+"use strict";
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.AuthController = void 0;
+const common_1 = require("@nestjs/common");
+const auth_service_1 = __importDefault(require("./auth.service"));
+const jwt_auth_guard_1 = require("./jwt-auth.guard");
+let AuthController = class AuthController {
+    constructor(auth) {
+        this.auth = auth;
+    }
+    async signup(slug, dto) {
+        return this.auth.signup({ org: slug, email: dto.email, password: dto.password });
+    }
+    async login(slug, dto) {
+        return this.auth.login({ org: slug, email: dto.email, password: dto.password });
+    }
+    me(req) {
+        // req.user is set by JwtStrategy.validate
+        return { id: req.user.id, email: req.user.email };
+    }
+};
+exports.AuthController = AuthController;
+__decorate([
+    (0, common_1.Post)('signup'),
+    __param(0, (0, common_1.Headers)('x-org')),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "signup", null);
+__decorate([
+    (0, common_1.Post)('login'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.OK),
+    __param(0, (0, common_1.Headers)('x-org')),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "login", null);
+__decorate([
+    (0, common_1.Get)('me'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    __param(0, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], AuthController.prototype, "me", null);
+exports.AuthController = AuthController = __decorate([
+    (0, common_1.Controller)('auth'),
+    __metadata("design:paramtypes", [auth_service_1.default])
+], AuthController);
+//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJmaWxlIjoiL1VzZXJzL21hbm55c2FyaW5hbmEvRG93bmxvYWRzL3NvY2lhbC1idXNpbmVzcy1vcy1zY2FmZm9sZC12MC4yL2FwcHMvYXBpL3NyYy9tb2R1bGVzL2F1dGgvYXV0aC5jb250cm9sbGVyLnRzIiwibWFwcGluZ3MiOiI7Ozs7Ozs7Ozs7Ozs7Ozs7OztBQUFBLDJDQUE0RztBQUM1RyxrRUFBeUM7QUFDekMscURBQWdEO0FBR3pDLElBQU0sY0FBYyxHQUFwQixNQUFNLGNBQWM7SUFDekIsWUFBNkIsSUFBaUI7UUFBakIsU0FBSSxHQUFKLElBQUksQ0FBYTtJQUFHLENBQUM7SUFHNUMsQUFBTixLQUFLLENBQUMsTUFBTSxDQUFtQixJQUFZLEVBQVUsR0FBd0M7UUFDM0YsT0FBTyxJQUFJLENBQUMsSUFBSSxDQUFDLE1BQU0sQ0FBQyxFQUFFLEdBQUcsRUFBRSxJQUFJLEVBQUUsS0FBSyxFQUFFLEdBQUcsQ0FBQyxLQUFLLEVBQUUsUUFBUSxFQUFFLEdBQUcsQ0FBQyxRQUFRLEVBQUUsQ0FBQyxDQUFDO0lBQ25GLENBQUM7SUFJSyxBQUFOLEtBQUssQ0FBQyxLQUFLLENBQW1CLElBQVksRUFBVSxHQUF3QztRQUMxRixPQUFPLElBQUksQ0FBQyxJQUFJLENBQUMsS0FBSyxDQUFDLEVBQUUsR0FBRyxFQUFFLElBQUksRUFBRSxLQUFLLEVBQUUsR0FBRyxDQUFDLEtBQUssRUFBRSxRQUFRLEVBQUUsR0FBRyxDQUFDLFFBQVEsRUFBRSxDQUFDLENBQUM7SUFDbEYsQ0FBQztJQUlELEVBQUUsQ0FBUSxHQUFRO1FBQ2hCLDBDQUEwQztRQUMxQyxPQUFPLEVBQUUsRUFBRSxFQUFFLEdBQUcsQ0FBQyxJQUFJLENBQUMsRUFBRSxFQUFFLEtBQUssRUFBRSxHQUFHLENBQUMsSUFBSSxDQUFDLEtBQUssRUFBRSxDQUFDO0lBQ3BELENBQUM7Q0FDRixDQUFBO0FBcEJZLHdDQUFjO0FBSW5CO0lBREwsSUFBQSxhQUFJLEVBQUMsUUFBUSxDQUFDO0lBQ0QsV0FBQSxJQUFBLGdCQUFPLEVBQUMsT0FBTyxDQUFDLENBQUE7SUFBZ0IsV0FBQSxJQUFBLGFBQUksR0FBRSxDQUFBOzs7OzRDQUVuRDtBQUlLO0lBRkwsSUFBQSxhQUFJLEVBQUMsT0FBTyxDQUFDO0lBQ2IsSUFBQSxpQkFBUSxFQUFDLG1CQUFVLENBQUMsRUFBRSxDQUFDO0lBQ1gsV0FBQSxJQUFBLGdCQUFPLEVBQUMsT0FBTyxDQUFDLENBQUE7SUFBZ0IsV0FBQSxJQUFBLGFBQUksR0FBRSxDQUFBOzs7OzJDQUVsRDtBQUlEO0lBRkMsSUFBQSxZQUFHLEVBQUMsSUFBSSxDQUFDO0lBQ1QsSUFBQSxrQkFBUyxFQUFDLDZCQUFZLENBQUM7SUFDcEIsV0FBQSxJQUFBLFlBQUcsR0FBRSxDQUFBOzs7O3dDQUdSO3lCQW5CVSxjQUFjO0lBRDFCLElBQUEsbUJBQVUsRUFBQyxNQUFNLENBQUM7cUNBRWtCLHNCQUFXO0dBRG5DLGNBQWMsQ0FvQjFCIiwibmFtZXMiOltdLCJzb3VyY2VzIjpbIi9Vc2Vycy9tYW5ueXNhcmluYW5hL0Rvd25sb2Fkcy9zb2NpYWwtYnVzaW5lc3Mtb3Mtc2NhZmZvbGQtdjAuMi9hcHBzL2FwaS9zcmMvbW9kdWxlcy9hdXRoL2F1dGguY29udHJvbGxlci50cyJdLCJzb3VyY2VzQ29udGVudCI6WyJpbXBvcnQgeyBCb2R5LCBDb250cm9sbGVyLCBHZXQsIEhlYWRlcnMsIEh0dHBDb2RlLCBIdHRwU3RhdHVzLCBQb3N0LCBSZXEsIFVzZUd1YXJkcyB9IGZyb20gJ0BuZXN0anMvY29tbW9uJztcbmltcG9ydCBBdXRoU2VydmljZSBmcm9tICcuL2F1dGguc2VydmljZSc7XG5pbXBvcnQgeyBKd3RBdXRoR3VhcmQgfSBmcm9tICcuL2p3dC1hdXRoLmd1YXJkJztcblxuQENvbnRyb2xsZXIoJ2F1dGgnKVxuZXhwb3J0IGNsYXNzIEF1dGhDb250cm9sbGVyIHtcbiAgY29uc3RydWN0b3IocHJpdmF0ZSByZWFkb25seSBhdXRoOiBBdXRoU2VydmljZSkge31cblxuICBAUG9zdCgnc2lnbnVwJylcbiAgYXN5bmMgc2lnbnVwKEBIZWFkZXJzKCd4LW9yZycpIHNsdWc6IHN0cmluZywgQEJvZHkoKSBkdG86IHsgZW1haWw6IHN0cmluZzsgcGFzc3dvcmQ6IHN0cmluZyB9KSB7XG4gICAgcmV0dXJuIHRoaXMuYXV0aC5zaWdudXAoeyBvcmc6IHNsdWcsIGVtYWlsOiBkdG8uZW1haWwsIHBhc3N3b3JkOiBkdG8ucGFzc3dvcmQgfSk7XG4gIH1cblxuICBAUG9zdCgnbG9naW4nKVxuICBASHR0cENvZGUoSHR0cFN0YXR1cy5PSylcbiAgYXN5bmMgbG9naW4oQEhlYWRlcnMoJ3gtb3JnJykgc2x1Zzogc3RyaW5nLCBAQm9keSgpIGR0bzogeyBlbWFpbDogc3RyaW5nOyBwYXNzd29yZDogc3RyaW5nIH0pIHtcbiAgICByZXR1cm4gdGhpcy5hdXRoLmxvZ2luKHsgb3JnOiBzbHVnLCBlbWFpbDogZHRvLmVtYWlsLCBwYXNzd29yZDogZHRvLnBhc3N3b3JkIH0pO1xuICB9XG5cbiAgQEdldCgnbWUnKVxuICBAVXNlR3VhcmRzKEp3dEF1dGhHdWFyZClcbiAgbWUoQFJlcSgpIHJlcTogYW55KSB7XG4gICAgLy8gcmVxLnVzZXIgaXMgc2V0IGJ5IEp3dFN0cmF0ZWd5LnZhbGlkYXRlXG4gICAgcmV0dXJuIHsgaWQ6IHJlcS51c2VyLmlkLCBlbWFpbDogcmVxLnVzZXIuZW1haWwgfTtcbiAgfVxufSJdLCJ2ZXJzaW9uIjozfQ==

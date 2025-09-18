@@ -1,9 +1,13 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "sourceMap": false,
-    "declaration": true,
-    "removeComments": true
+    "outDir": "./dist",
+    "declaration": false,
+    "removeComments": true,
+    "sourceMap": true,
+    "module": "CommonJS",
+    "target": "ES2019"
   },
-  "exclude": ["test", "**/*.e2e-spec.ts", "**/*.spec.ts"]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "test", "dist", "**/*spec.ts"]
 }

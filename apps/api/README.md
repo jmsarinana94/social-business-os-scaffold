@@ -22,3 +22,38 @@ direnv allow   # one-time; afterwards automatic
 # export API_EMAIL=tester@example.com
 # export API_PASS=*****
 ```
+## Quick test loop
+```bash
+direnv allow
+pnpm prisma generate --schema=prisma/schema.prisma
+pnpm prisma db push
+ORG=demo API_EMAIL="tester@example.com" API_PASS="password123" pnpm prisma db seed
+mkdir -p .tmp/jest-cache
+TMPDIR="$(pwd)/.tmp" pnpm -F @repo/api test:e2e --cacheDirectory "$(pwd)/.tmp/jest-cache"
+
+# API (NestJS + Prisma)
+
+## Quickstart
+
+```bash
+# Postgres running locally on 5432
+cp .env.example .env
+
+# install
+pnpm install
+pnpm -C apps/api install
+
+# migrate + seed (optional)
+pnpm -C apps/api prisma:deploy
+ORG=demo API_EMAIL=tester@example.com API_PASS=secret123 pnpm -C apps/api prisma db seed
+
+# dev
+pnpm -C apps/api dev
+# or build + start
+pnpm -C apps/api build && pnpm -C apps/api start
+
+## Inventory API Quick Test
+
+Use these curl commands to quickly verify inventory behavior without running the full test suite.
+
+```bash

@@ -1,0 +1,22 @@
+90caca3dd9a2c365ddd19ef0879ab37d
+"use strict";
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.AdjustInventoryDto = void 0;
+const class_validator_1 = require("class-validator");
+class AdjustInventoryDto {
+}
+exports.AdjustInventoryDto = AdjustInventoryDto;
+__decorate([
+    (0, class_validator_1.IsInt)(),
+    __metadata("design:type", Number)
+], AdjustInventoryDto.prototype, "delta", void 0);
+//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJmaWxlIjoiL1VzZXJzL21hbm55c2FyaW5hbmEvRG93bmxvYWRzL3NvY2lhbC1idXNpbmVzcy1vcy1zY2FmZm9sZC12MC4yL2FwcHMvYXBpL3NyYy9tb2R1bGVzL3Byb2R1Y3RzL2R0by9hZGp1c3QtaW52ZW50b3J5LmR0by50cyIsIm1hcHBpbmdzIjoiOzs7Ozs7Ozs7Ozs7QUFBQSxxREFBd0M7QUFFeEMsTUFBYSxrQkFBa0I7Q0FHOUI7QUFIRCxnREFHQztBQURDO0lBREMsSUFBQSx1QkFBSyxHQUFFOztpREFDTyIsIm5hbWVzIjpbXSwic291cmNlcyI6WyIvVXNlcnMvbWFubnlzYXJpbmFuYS9Eb3dubG9hZHMvc29jaWFsLWJ1c2luZXNzLW9zLXNjYWZmb2xkLXYwLjIvYXBwcy9hcGkvc3JjL21vZHVsZXMvcHJvZHVjdHMvZHRvL2FkanVzdC1pbnZlbnRvcnkuZHRvLnRzIl0sInNvdXJjZXNDb250ZW50IjpbImltcG9ydCB7IElzSW50IH0gZnJvbSAnY2xhc3MtdmFsaWRhdG9yJztcblxuZXhwb3J0IGNsYXNzIEFkanVzdEludmVudG9yeUR0byB7XG4gIEBJc0ludCgpXG4gIGRlbHRhITogbnVtYmVyOyAvLyBwb3NpdGl2ZSBvciBuZWdhdGl2ZVxufSJdLCJ2ZXJzaW9uIjozfQ==

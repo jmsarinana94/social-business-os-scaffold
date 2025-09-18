@@ -1,0 +1,87 @@
+name: API e2e
+
+on:
+  pull_request:
+    paths:
+      - "apps/api/**"
+      - "prisma/**"
+      - "openapi.yaml"
+      - ".github/workflows/api-e2e.yml"
+  push:
+    branches: [ main ]
+    paths:
+      - "apps/api/**"
+      - "prisma/**"
+      - "openapi.yaml"
+      - ".github/workflows/api-e2e.yml"
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        ports: ["5432:5432"]
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: sbo
+        options: >-
+          --health-cmd="pg_isready -U postgres -d sbo"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sbo?schema=public
+      JWT_SECRET: ci-secret
+      JWT_EXPIRES_IN: 1d
+      ORG: demo
+      API_EMAIL: tester@example.com
+      API_PASS: secret123
+      CORS_ORIGIN: http://localhost:5173
+      REQUEST_LOGGING: "0"
+      RATE_LIMIT_ENABLED: "0"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node (LTS)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Enable corepack + set pnpm
+        run: |
+          corepack enable
+          corepack install -g pnpm@10.17.0
+
+      - name: Install deps (root)
+        run: pnpm install --frozen-lockfile
+
+      - name: Install deps (apps/api)
+        run: pnpm -C apps/api install --frozen-lockfile
+
+      - name: Prisma generate
+        run: pnpm -C apps/api prisma generate
+
+      - name: Migrate DB fresh (reset)
+        run: pnpm -C apps/api prisma migrate deploy
+
+      - name: Optional seed (demo org/user)
+        run: |
+          ORG=$ORG \
+          SEED_ORG_SLUG=$ORG \
+          SEED_ORG_NAME="Demo Org" \
+          SEED_EMAIL=$API_EMAIL \
+          SEED_PASSWORD=$API_PASS \
+          pnpm -C apps/api prisma db seed
+
+      - name: Build API
+        run: pnpm -C apps/api build
+
+      - name: Run e2e tests
+        run: pnpm -C apps/api test:e2e

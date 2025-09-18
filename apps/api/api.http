@@ -1,0 +1,22 @@
+@base = http://localhost:4000
+@org = demo
+@content = application/json
+
+### Health
+GET {{base}}/health
+
+### Login
+POST {{base}}/auth/login
+x-org: {{org}}
+content-type: {{content}}
+
+{
+  "email": "{{API_EMAIL}}",
+  "password": "{{API_PASS}}"
+}
+
+### Me (paste token below)
+@token = {{JWT}}
+GET {{base}}/auth/me
+x-org: {{org}}
+authorization: Bearer {{token}}

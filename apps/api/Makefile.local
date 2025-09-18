@@ -1,0 +1,18 @@
+# apps/api/Makefile.local
+.PHONY: echo-db prisma-seed-demo prisma-reset e2e-mac e2e-all
+
+echo-db:
+	@./scripts/echo-db.sh
+
+prisma-seed-demo:
+	@./scripts/prisma-seed-demo.sh
+
+prisma-reset:
+	@./scripts/prisma-reset.sh
+
+# e2e with mac-safe TMPDIR (recommended on macOS)
+e2e-mac:
+	@./scripts/e2e-mac.sh
+
+# one-shot: generate, push, seed, and then e2e (good for clean runs)
+e2e-all: prisma-seed-demo e2e-mac

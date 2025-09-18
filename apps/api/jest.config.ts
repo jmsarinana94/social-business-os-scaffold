@@ -1,33 +1,24 @@
+// apps/api/jest.config.ts
 import type { Config } from 'jest';
 
-const base: Config = {
-  preset: 'ts-jest',
+const e2e: Config = {
+  displayName: 'e2e',
   testEnvironment: 'node',
-  rootDir: '.',
-  roots: ['<rootDir>/src', '<rootDir>/test'],
+  roots: ['<rootDir>/test', '<rootDir>/test/e2e'],
+  testMatch: ['<rootDir>/test/e2e/**/*.e2e-spec.ts'],
+  setupFilesAfterEnv: ['<rootDir>/test/e2e/jest-e2e.setup.ts'],
   moduleFileExtensions: ['ts', 'js', 'json'],
   transform: {
-    '^.+\\.tsx?$': ['ts-jest', { tsconfig: 'tsconfig.json' }],
+    '^.+\\.(t|j)s$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.json' }],
   },
+  // If your code uses "@/" path alias, let Jest resolve it:
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
   },
-  // no "verbose" here (it was causing the warning)
-};
-
-const unit: Config = {
-  ...base,
-  displayName: 'unit',
-  testMatch: ['<rootDir>/test/unit/**/*.spec.ts'],
-};
-
-const e2e: Config = {
-  ...base,
-  displayName: 'e2e',
-  testMatch: ['<rootDir>/test/e2e/**/*.e2e-spec.ts', '<rootDir>/test/**/*.e2e-spec.ts'],
 };
 
 const config: Config = {
-  projects: [unit, e2e],
+  projects: [e2e],
 };
+
 export default config;

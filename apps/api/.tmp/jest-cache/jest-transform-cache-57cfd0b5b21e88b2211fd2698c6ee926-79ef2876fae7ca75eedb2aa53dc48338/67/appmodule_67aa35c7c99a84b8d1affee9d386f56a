@@ -1,0 +1,31 @@
+0ed22e9294eecdc250e6de809b99e43c
+"use strict";
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.AppModule = void 0;
+const common_1 = require("@nestjs/common");
+const core_1 = require("@nestjs/core");
+const roles_guard_1 = require("./common/guards/roles.guard");
+const logging_interceptor_1 = require("./common/interceptors/logging.interceptor");
+const prisma_module_1 = require("./infra/prisma/prisma.module");
+const auth_module_1 = require("./modules/auth/auth.module");
+const health_module_1 = require("./modules/health/health.module");
+const products_module_1 = require("./modules/products/products.module");
+let AppModule = class AppModule {
+};
+exports.AppModule = AppModule;
+exports.AppModule = AppModule = __decorate([
+    (0, common_1.Module)({
+        imports: [prisma_module_1.PrismaModule, auth_module_1.AuthModule, products_module_1.ProductsModule, health_module_1.HealthModule],
+        providers: [
+            { provide: core_1.APP_INTERCEPTOR, useClass: logging_interceptor_1.LoggingInterceptor },
+            { provide: core_1.APP_GUARD, useClass: roles_guard_1.RolesGuard },
+        ],
+    })
+], AppModule);
+//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJmaWxlIjoiL1VzZXJzL21hbm55c2FyaW5hbmEvRG93bmxvYWRzL3NvY2lhbC1idXNpbmVzcy1vcy1zY2FmZm9sZC12MC4yL2FwcHMvYXBpL3NyYy9hcHAubW9kdWxlLnRzIiwibWFwcGluZ3MiOiI7Ozs7Ozs7OztBQUFBLDJDQUF3QztBQUN4Qyx1Q0FBMEQ7QUFFMUQsNkRBQXlEO0FBQ3pELG1GQUErRTtBQUUvRSxnRUFBNEQ7QUFDNUQsNERBQXdEO0FBQ3hELGtFQUE4RDtBQUM5RCx3RUFBb0U7QUFTN0QsSUFBTSxTQUFTLEdBQWYsTUFBTSxTQUFTO0NBQUcsQ0FBQTtBQUFaLDhCQUFTO29CQUFULFNBQVM7SUFQckIsSUFBQSxlQUFNLEVBQUM7UUFDTixPQUFPLEVBQUUsQ0FBQyw0QkFBWSxFQUFFLHdCQUFVLEVBQUUsZ0NBQWMsRUFBRSw0QkFBWSxDQUFDO1FBQ2pFLFNBQVMsRUFBRTtZQUNULEVBQUUsT0FBTyxFQUFFLHNCQUFlLEVBQUUsUUFBUSxFQUFFLHdDQUFrQixFQUFFO1lBQzFELEVBQUUsT0FBTyxFQUFFLGdCQUFTLEVBQUUsUUFBUSxFQUFFLHdCQUFVLEVBQUU7U0FDN0M7S0FDRixDQUFDO0dBQ1csU0FBUyxDQUFHIiwibmFtZXMiOltdLCJzb3VyY2VzIjpbIi9Vc2Vycy9tYW5ueXNhcmluYW5hL0Rvd25sb2Fkcy9zb2NpYWwtYnVzaW5lc3Mtb3Mtc2NhZmZvbGQtdjAuMi9hcHBzL2FwaS9zcmMvYXBwLm1vZHVsZS50cyJdLCJzb3VyY2VzQ29udGVudCI6WyJpbXBvcnQgeyBNb2R1bGUgfSBmcm9tICdAbmVzdGpzL2NvbW1vbic7XG5pbXBvcnQgeyBBUFBfR1VBUkQsIEFQUF9JTlRFUkNFUFRPUiB9IGZyb20gJ0BuZXN0anMvY29yZSc7XG5cbmltcG9ydCB7IFJvbGVzR3VhcmQgfSBmcm9tICcuL2NvbW1vbi9ndWFyZHMvcm9sZXMuZ3VhcmQnO1xuaW1wb3J0IHsgTG9nZ2luZ0ludGVyY2VwdG9yIH0gZnJvbSAnLi9jb21tb24vaW50ZXJjZXB0b3JzL2xvZ2dpbmcuaW50ZXJjZXB0b3InO1xuXG5pbXBvcnQgeyBQcmlzbWFNb2R1bGUgfSBmcm9tICcuL2luZnJhL3ByaXNtYS9wcmlzbWEubW9kdWxlJztcbmltcG9ydCB7IEF1dGhNb2R1bGUgfSBmcm9tICcuL21vZHVsZXMvYXV0aC9hdXRoLm1vZHVsZSc7XG5pbXBvcnQgeyBIZWFsdGhNb2R1bGUgfSBmcm9tICcuL21vZHVsZXMvaGVhbHRoL2hlYWx0aC5tb2R1bGUnO1xuaW1wb3J0IHsgUHJvZHVjdHNNb2R1bGUgfSBmcm9tICcuL21vZHVsZXMvcHJvZHVjdHMvcHJvZHVjdHMubW9kdWxlJztcblxuQE1vZHVsZSh7XG4gIGltcG9ydHM6IFtQcmlzbWFNb2R1bGUsIEF1dGhNb2R1bGUsIFByb2R1Y3RzTW9kdWxlLCBIZWFsdGhNb2R1bGVdLFxuICBwcm92aWRlcnM6IFtcbiAgICB7IHByb3ZpZGU6IEFQUF9JTlRFUkNFUFRPUiwgdXNlQ2xhc3M6IExvZ2dpbmdJbnRlcmNlcHRvciB9LFxuICAgIHsgcHJvdmlkZTogQVBQX0dVQVJELCB1c2VDbGFzczogUm9sZXNHdWFyZCB9LFxuICBdLFxufSlcbmV4cG9ydCBjbGFzcyBBcHBNb2R1bGUge30iXSwidmVyc2lvbiI6M30=

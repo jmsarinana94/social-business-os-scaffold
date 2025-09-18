@@ -5,120 +5,115 @@ import {
   Delete,
   Get,
   Headers,
+  HttpCode,
+  HttpStatus,
   Param,
   Post,
   Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
-import { ProductsService } from './products.service';
+import { TestOrJwtAuthGuard } from '../auth/guards/test-or-jwt.guard';
+import {
+  AdjustInventoryDto,
+  CreateProductDto,
+  UpdateProductDto,
+} from './products.dto';
+import { OrgRef, ProductsService } from './products.service';
 
-// DTOs — keep these import paths as they are in your repo
-import { AdjustInventoryDto } from './dto/adjust-inventory.dto';
-import { CreateProductDto } from './dto/create-product.dto';
-import { UpdateProductDto } from './dto/update-product.dto';
+function orgFromHeaders(
+  headers: Record<string, string | string[] | undefined>,
+): OrgRef {
+  // Accept either x-org (slug) or x-org-id (UUID)
+  const slug = headers['x-org'] as string | undefined;
+  const id = headers['x-org-id'] as string | undefined;
 
-// Types the service expects
-type OrgRef =
-  | { slug: string; id?: never }
-  | { orgId: string; slug?: never };
+  if (!slug && !id) {
+    throw new BadRequestException('Missing x-org header');
+  }
+  return { slug, id };
+}
 
-@Controller({
-  path: 'products',
-  version: '1',
-})
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(TestOrJwtAuthGuard)
+@Controller({ path: 'products', version: '1' })
 export class ProductsController {
   constructor(private readonly products: ProductsService) {}
 
-  /** Accept either x-org (slug) or x-org-id (uuid). Case-insensitive, trims empties. */
-  private resolveOrgFromHeaders(headers: Record<string, any>): OrgRef {
-    // Express lower-cases header keys; still be defensive
-    const rawSlug =
-      headers['x-org'] ??
-      headers['X-Org'] ??
-      headers['x-org'.toLowerCase()];
-    const rawOrgId =
-      headers['x-org-id'] ??
-      headers['X-Org-Id'] ??
-      headers['x-org-id'.toLowerCase()];
-
-    const slug = typeof rawSlug === 'string' ? rawSlug.trim() : '';
-    const orgId = typeof rawOrgId === 'string' ? rawOrgId.trim() : '';
-
-    if (slug) return { slug };
-    if (orgId) return { orgId };
-
-    // This is the exact error your script is seeing — now only thrown if *both* are truly absent
-    throw new BadRequestException('Missing x-org header');
-  }
-
+  // GET /v1/products?page=&limit=
   @Get()
-  async findAll(
-    @Headers() headers: Record<string, any>,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
+  async list(
+    @Headers() headers: Record<string, string>,
+    @Query('page') page = '1',
+    @Query('limit') limit = '10',
   ) {
-    const org = this.resolveOrgFromHeaders(headers);
-    const p = Math.max(parseInt(page ?? '1', 10) || 1, 1);
-    const l = Math.min(Math.max(parseInt(limit ?? '10', 10) || 10, 1), 100);
+    const org = orgFromHeaders(headers);
+    const p = Math.max(parseInt(String(page), 10) || 1, 1);
+    const l = Math.min(Math.max(parseInt(String(limit), 10) || 10, 1), 100);
     return this.products.findAll(org, p, l);
   }
 
+  // GET /v1/products/:id
   @Get(':id')
-  async findOne(
-    @Headers() headers: Record<string, any>,
+  async getOne(
+    @Headers() headers: Record<string, string>,
     @Param('id') id: string,
   ) {
-    const org = this.resolveOrgFromHeaders(headers);
+    const org = orgFromHeaders(headers);
     return this.products.findOne(org, id);
   }
 
+  // POST /v1/products
   @Post()
+  @HttpCode(HttpStatus.CREATED)
   async create(
-    @Headers() headers: Record<string, any>,
+    @Headers() headers: Record<string, string>,
     @Body() dto: CreateProductDto,
   ) {
-    const org = this.resolveOrgFromHeaders(headers);
+    const org = orgFromHeaders(headers);
     return this.products.create(org, dto);
   }
 
+  // PUT /v1/products/:id
   @Put(':id')
   async update(
-    @Headers() headers: Record<string, any>,
+    @Headers() headers: Record<string, string>,
     @Param('id') id: string,
     @Body() dto: UpdateProductDto,
   ) {
-    const org = this.resolveOrgFromHeaders(headers);
+    const org = orgFromHeaders(headers);
     return this.products.update(org, id, dto);
   }
 
+  // DELETE /v1/products/:id
   @Delete(':id')
+  @HttpCode(HttpStatus.OK)
   async remove(
-    @Headers() headers: Record<string, any>,
+    @Headers() headers: Record<string, string>,
     @Param('id') id: string,
   ) {
-    const org = this.resolveOrgFromHeaders(headers);
+    const org = orgFromHeaders(headers);
     return this.products.remove(org, id);
   }
 
+  // GET /v1/products/:id/inventory
   @Get(':id/inventory')
   async getInventory(
-    @Headers() headers: Record<string, any>,
+    @Headers() headers: Record<string, string>,
     @Param('id') id: string,
   ) {
-    const org = this.resolveOrgFromHeaders(headers);
+    const org = orgFromHeaders(headers);
     return this.products.getInventory(org, id);
   }
 
+  // POST /v1/products/:id/inventory  -> should be 200 OK (not 201)
   @Post(':id/inventory')
+  @HttpCode(HttpStatus.OK)
   async addInventory(
-    @Headers() headers: Record<string, any>,
+    @Headers() headers: Record<string, string>,
     @Param('id') id: string,
     @Body() payload: AdjustInventoryDto,
   ) {
-    const org = this.resolveOrgFromHeaders(headers);
+    const org = orgFromHeaders(headers);
     return this.products.addInventory(org, id, payload);
   }
 }

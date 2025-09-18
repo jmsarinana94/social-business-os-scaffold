@@ -1,0 +1,55 @@
+42ef8bebae4c1c3fc13c874e09ef963a
+"use strict";
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.AuthController = void 0;
+const common_1 = require("@nestjs/common");
+const auth_service_1 = require("./auth.service");
+const login_dto_1 = require("./dto/login.dto");
+const signup_dto_1 = require("./dto/signup.dto");
+let AuthController = class AuthController {
+    constructor(auth) {
+        this.auth = auth;
+    }
+    async signup(body) {
+        const access_token = await this.auth.signup(body.email, body.password);
+        return { access_token };
+    }
+    async login(body) {
+        const access_token = await this.auth.login(body.email, body.password);
+        return { access_token };
+    }
+};
+exports.AuthController = AuthController;
+__decorate([
+    (0, common_1.Post)('signup'),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [signup_dto_1.SignupDto]),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "signup", null);
+__decorate([
+    (0, common_1.Post)('login'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.OK) // tests expect 200 for login
+    ,
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [login_dto_1.LoginDto]),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "login", null);
+exports.AuthController = AuthController = __decorate([
+    (0, common_1.Controller)('auth'),
+    __metadata("design:paramtypes", [auth_service_1.AuthService])
+], AuthController);
+//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJmaWxlIjoiL1VzZXJzL21hbm55c2FyaW5hbmEvRG93bmxvYWRzL3NvY2lhbC1idXNpbmVzcy1vcy1zY2FmZm9sZC12MC4yL2FwcHMvYXBpL3NyYy9tb2R1bGVzL2F1dGgvYXV0aC5jb250cm9sbGVyLnRzIiwibWFwcGluZ3MiOiI7Ozs7Ozs7Ozs7Ozs7OztBQUFBLDJDQUE4RTtBQUM5RSxpREFBNkM7QUFDN0MsK0NBQTJDO0FBQzNDLGlEQUE2QztBQUd0QyxJQUFNLGNBQWMsR0FBcEIsTUFBTSxjQUFjO0lBQ3pCLFlBQTZCLElBQWlCO1FBQWpCLFNBQUksR0FBSixJQUFJLENBQWE7SUFBRyxDQUFDO0lBRzVDLEFBQU4sS0FBSyxDQUFDLE1BQU0sQ0FBUyxJQUFlO1FBQ2xDLE1BQU0sWUFBWSxHQUFHLE1BQU0sSUFBSSxDQUFDLElBQUksQ0FBQyxNQUFNLENBQUMsSUFBSSxDQUFDLEtBQUssRUFBRSxJQUFJLENBQUMsUUFBUSxDQUFDLENBQUM7UUFDdkUsT0FBTyxFQUFFLFlBQVksRUFBRSxDQUFDO0lBQzFCLENBQUM7SUFJSyxBQUFOLEtBQUssQ0FBQyxLQUFLLENBQVMsSUFBYztRQUNoQyxNQUFNLFlBQVksR0FBRyxNQUFNLElBQUksQ0FBQyxJQUFJLENBQUMsS0FBSyxDQUFDLElBQUksQ0FBQyxLQUFLLEVBQUUsSUFBSSxDQUFDLFFBQVEsQ0FBQyxDQUFDO1FBQ3RFLE9BQU8sRUFBRSxZQUFZLEVBQUUsQ0FBQztJQUMxQixDQUFDO0NBQ0YsQ0FBQTtBQWZZLHdDQUFjO0FBSW5CO0lBREwsSUFBQSxhQUFJLEVBQUMsUUFBUSxDQUFDO0lBQ0QsV0FBQSxJQUFBLGFBQUksR0FBRSxDQUFBOztxQ0FBTyxzQkFBUzs7NENBR25DO0FBSUs7SUFGTCxJQUFBLGFBQUksRUFBQyxPQUFPLENBQUM7SUFDYixJQUFBLGlCQUFRLEVBQUMsbUJBQVUsQ0FBQyxFQUFFLENBQUMsQ0FBQyw2QkFBNkI7O0lBQ3pDLFdBQUEsSUFBQSxhQUFJLEdBQUUsQ0FBQTs7cUNBQU8sb0JBQVE7OzJDQUdqQzt5QkFkVSxjQUFjO0lBRDFCLElBQUEsbUJBQVUsRUFBQyxNQUFNLENBQUM7cUNBRWtCLDBCQUFXO0dBRG5DLGNBQWMsQ0FlMUIiLCJuYW1lcyI6W10sInNvdXJjZXMiOlsiL1VzZXJzL21hbm55c2FyaW5hbmEvRG93bmxvYWRzL3NvY2lhbC1idXNpbmVzcy1vcy1zY2FmZm9sZC12MC4yL2FwcHMvYXBpL3NyYy9tb2R1bGVzL2F1dGgvYXV0aC5jb250cm9sbGVyLnRzIl0sInNvdXJjZXNDb250ZW50IjpbImltcG9ydCB7IEJvZHksIENvbnRyb2xsZXIsIEh0dHBDb2RlLCBIdHRwU3RhdHVzLCBQb3N0IH0gZnJvbSAnQG5lc3Rqcy9jb21tb24nO1xuaW1wb3J0IHsgQXV0aFNlcnZpY2UgfSBmcm9tICcuL2F1dGguc2VydmljZSc7XG5pbXBvcnQgeyBMb2dpbkR0byB9IGZyb20gJy4vZHRvL2xvZ2luLmR0byc7XG5pbXBvcnQgeyBTaWdudXBEdG8gfSBmcm9tICcuL2R0by9zaWdudXAuZHRvJztcblxuQENvbnRyb2xsZXIoJ2F1dGgnKVxuZXhwb3J0IGNsYXNzIEF1dGhDb250cm9sbGVyIHtcbiAgY29uc3RydWN0b3IocHJpdmF0ZSByZWFkb25seSBhdXRoOiBBdXRoU2VydmljZSkge31cblxuICBAUG9zdCgnc2lnbnVwJylcbiAgYXN5bmMgc2lnbnVwKEBCb2R5KCkgYm9keTogU2lnbnVwRHRvKSB7XG4gICAgY29uc3QgYWNjZXNzX3Rva2VuID0gYXdhaXQgdGhpcy5hdXRoLnNpZ251cChib2R5LmVtYWlsLCBib2R5LnBhc3N3b3JkKTtcbiAgICByZXR1cm4geyBhY2Nlc3NfdG9rZW4gfTtcbiAgfVxuXG4gIEBQb3N0KCdsb2dpbicpXG4gIEBIdHRwQ29kZShIdHRwU3RhdHVzLk9LKSAvLyB0ZXN0cyBleHBlY3QgMjAwIGZvciBsb2dpblxuICBhc3luYyBsb2dpbihAQm9keSgpIGJvZHk6IExvZ2luRHRvKSB7XG4gICAgY29uc3QgYWNjZXNzX3Rva2VuID0gYXdhaXQgdGhpcy5hdXRoLmxvZ2luKGJvZHkuZW1haWwsIGJvZHkucGFzc3dvcmQpO1xuICAgIHJldHVybiB7IGFjY2Vzc190b2tlbiB9O1xuICB9XG59Il0sInZlcnNpb24iOjN9

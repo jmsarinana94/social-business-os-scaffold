@@ -1,0 +1,53 @@
+c90033a1f3b4f132107ad565d09484e9
+"use strict";
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.HealthController = void 0;
+const common_1 = require("@nestjs/common");
+const startedAt = Date.now();
+let HealthController = class HealthController {
+    basic() {
+        return { ok: true, service: 'api', time: new Date().toISOString() };
+    }
+    healthz() {
+        let version = '0.0.0';
+        try {
+            // Resolve from the app’s working dir (apps/api)
+            const pkg = require(process.cwd() + '/package.json');
+            version = pkg?.version ?? version;
+        }
+        catch { }
+        return {
+            ok: true,
+            service: 'api',
+            version,
+            uptimeSec: Math.round((Date.now() - startedAt) / 1000),
+            now: new Date().toISOString(),
+        };
+    }
+};
+exports.HealthController = HealthController;
+__decorate([
+    (0, common_1.Get)(),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], HealthController.prototype, "basic", null);
+__decorate([
+    (0, common_1.Get)('z'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], HealthController.prototype, "healthz", null);
+exports.HealthController = HealthController = __decorate([
+    (0, common_1.Controller)('health')
+], HealthController);
+//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJmaWxlIjoiL1VzZXJzL21hbm55c2FyaW5hbmEvRG93bmxvYWRzL3NvY2lhbC1idXNpbmVzcy1vcy1zY2FmZm9sZC12MC4yL2FwcHMvYXBpL3NyYy9tb2R1bGVzL2hlYWx0aC9oZWFsdGguY29udHJvbGxlci50cyIsIm1hcHBpbmdzIjoiOzs7Ozs7Ozs7Ozs7QUFBQSwyQ0FBaUQ7QUFDakQsTUFBTSxTQUFTLEdBQUcsSUFBSSxDQUFDLEdBQUcsRUFBRSxDQUFDO0FBR3RCLElBQU0sZ0JBQWdCLEdBQXRCLE1BQU0sZ0JBQWdCO0lBRTNCLEtBQUs7UUFDSCxPQUFPLEVBQUUsRUFBRSxFQUFFLElBQUksRUFBRSxPQUFPLEVBQUUsS0FBSyxFQUFFLElBQUksRUFBRSxJQUFJLElBQUksRUFBRSxDQUFDLFdBQVcsRUFBRSxFQUFFLENBQUM7SUFDdEUsQ0FBQztJQUdELE9BQU87UUFDTCxJQUFJLE9BQU8sR0FBRyxPQUFPLENBQUM7UUFDdEIsSUFBSSxDQUFDO1lBQ0gsZ0RBQWdEO1lBRWhELE1BQU0sR0FBRyxHQUFHLE9BQU8sQ0FBQyxPQUFPLENBQUMsR0FBRyxFQUFFLEdBQUcsZUFBZSxDQUFDLENBQUM7WUFDckQsT0FBTyxHQUFHLEdBQUcsRUFBRSxPQUFPLElBQUksT0FBTyxDQUFDO1FBQ3BDLENBQUM7UUFBQyxNQUFNLENBQUMsQ0FBQSxDQUFDO1FBQ1YsT0FBTztZQUNMLEVBQUUsRUFBRSxJQUFJO1lBQ1IsT0FBTyxFQUFFLEtBQUs7WUFDZCxPQUFPO1lBQ1AsU0FBUyxFQUFFLElBQUksQ0FBQyxLQUFLLENBQUMsQ0FBQyxJQUFJLENBQUMsR0FBRyxFQUFFLEdBQUcsU0FBUyxDQUFDLEdBQUcsSUFBSSxDQUFDO1lBQ3RELEdBQUcsRUFBRSxJQUFJLElBQUksRUFBRSxDQUFDLFdBQVcsRUFBRTtTQUM5QixDQUFDO0lBQ0osQ0FBQztDQUNGLENBQUE7QUF2QlksNENBQWdCO0FBRTNCO0lBREMsSUFBQSxZQUFHLEdBQUU7Ozs7NkNBR0w7QUFHRDtJQURDLElBQUEsWUFBRyxFQUFDLEdBQUcsQ0FBQzs7OzsrQ0FnQlI7MkJBdEJVLGdCQUFnQjtJQUQ1QixJQUFBLG1CQUFVLEVBQUMsUUFBUSxDQUFDO0dBQ1IsZ0JBQWdCLENBdUI1QiIsIm5hbWVzIjpbXSwic291cmNlcyI6WyIvVXNlcnMvbWFubnlzYXJpbmFuYS9Eb3dubG9hZHMvc29jaWFsLWJ1c2luZXNzLW9zLXNjYWZmb2xkLXYwLjIvYXBwcy9hcGkvc3JjL21vZHVsZXMvaGVhbHRoL2hlYWx0aC5jb250cm9sbGVyLnRzIl0sInNvdXJjZXNDb250ZW50IjpbImltcG9ydCB7IENvbnRyb2xsZXIsIEdldCB9IGZyb20gJ0BuZXN0anMvY29tbW9uJztcbmNvbnN0IHN0YXJ0ZWRBdCA9IERhdGUubm93KCk7XG5cbkBDb250cm9sbGVyKCdoZWFsdGgnKVxuZXhwb3J0IGNsYXNzIEhlYWx0aENvbnRyb2xsZXIge1xuICBAR2V0KClcbiAgYmFzaWMoKSB7XG4gICAgcmV0dXJuIHsgb2s6IHRydWUsIHNlcnZpY2U6ICdhcGknLCB0aW1lOiBuZXcgRGF0ZSgpLnRvSVNPU3RyaW5nKCkgfTtcbiAgfVxuXG4gIEBHZXQoJ3onKVxuICBoZWFsdGh6KCkge1xuICAgIGxldCB2ZXJzaW9uID0gJzAuMC4wJztcbiAgICB0cnkge1xuICAgICAgLy8gUmVzb2x2ZSBmcm9tIHRoZSBhcHDigJlzIHdvcmtpbmcgZGlyIChhcHBzL2FwaSlcbiAgICAgICBcbiAgICAgIGNvbnN0IHBrZyA9IHJlcXVpcmUocHJvY2Vzcy5jd2QoKSArICcvcGFja2FnZS5qc29uJyk7XG4gICAgICB2ZXJzaW9uID0gcGtnPy52ZXJzaW9uID8/IHZlcnNpb247XG4gICAgfSBjYXRjaCB7fVxuICAgIHJldHVybiB7XG4gICAgICBvazogdHJ1ZSxcbiAgICAgIHNlcnZpY2U6ICdhcGknLFxuICAgICAgdmVyc2lvbixcbiAgICAgIHVwdGltZVNlYzogTWF0aC5yb3VuZCgoRGF0ZS5ub3coKSAtIHN0YXJ0ZWRBdCkgLyAxMDAwKSxcbiAgICAgIG5vdzogbmV3IERhdGUoKS50b0lTT1N0cmluZygpLFxuICAgIH07XG4gIH1cbn0iXSwidmVyc2lvbiI6M30=

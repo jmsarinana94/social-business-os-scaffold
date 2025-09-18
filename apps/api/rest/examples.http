@@ -1,0 +1,65 @@
+@base = http://localhost:4000
+@org = demo
+@content = application/json
+@auth = {{login.response.body.$.access_token}}
+
+### Health
+GET {{base}}/health
+x-org: {{org}}
+
+### Login
+# @name login
+POST {{base}}/auth/login
+x-org: {{org}}
+content-type: {{content}}
+
+{
+  "email": "tester@example.com",
+  "password": "password123"
+}
+
+### Me
+GET {{base}}/auth/me
+x-org: {{org}}
+authorization: Bearer {{auth}}
+
+### Create product
+POST {{base}}/products
+x-org: {{org}}
+content-type: {{content}}
+
+{
+  "title": "HTTP Widget",
+  "type": "PHYSICAL",
+  "status": "ACTIVE",
+  "price": "12"
+}
+
+### List
+GET {{base}}/products?page=1&limit=5
+x-org: {{org}}
+
+### Get by id
+# replace {{id}} after create
+GET {{base}}/products/{{id}}
+x-org: {{org}}
+
+### Inventory (read)
+GET {{base}}/products/{{id}}/inventory
+x-org: {{org}}
+authorization: Bearer {{auth}}
+
+### Inventory (adjust)
+POST {{base}}/products/{{id}}/inventory
+x-org: {{org}}
+authorization: Bearer {{auth}}
+content-type: {{content}}
+
+{
+  "delta": 5
+}
+
+### Delete
+DELETE {{base}}/products/{{id}}
+x-org: {{org}}
+authorization: Bearer {{auth}}

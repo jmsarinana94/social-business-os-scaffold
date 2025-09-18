@@ -1,0 +1,351 @@
+openapi: 3.1.0
+info:
+  title: Social Business OS – API
+  version: 0.2.0
+  description: >
+    Minimal spec matching current e2e behavior.
+    Notes:
+      - Auth: `POST /auth/signup` -> 201, `POST /auth/login` -> 200 (returns `access_token`)
+      - All product routes require `x-org` header.
+      - Inventory adjust returns **201 Created** with the updated product.
+servers:
+  - url: http://localhost:4000
+
+tags:
+  - name: Auth
+  - name: Products
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  headers:
+    XOrg:
+      description: Organization slug
+      schema: { type: string, example: demo }
+      required: true
+  schemas:
+    AuthSignupRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email, example: tester@example.com }
+        password: { type: string, example: password123 }
+        name: { type: string, example: "Demo User" }
+    AuthLoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email, example: tester@example.com }
+        password: { type: string, example: password123 }
+    AuthLoginResponse:
+      type: object
+      required: [access_token]
+      properties:
+        access_token: { type: string, description: "JWT Bearer token" }
+
+    Product:
+      type: object
+      required: [id, orgId, sku, title, type, status, price, inventoryQty, createdAt, updatedAt]
+      properties:
+        id: { type: string, example: cmfmw64gb0004siow7eb9jh52 }
+        orgId: { type: string }
+        sku: { type: string, example: WID-001 }
+        title: { type: string, example: Widget }
+        type:
+          type: string
+          enum: [PHYSICAL, DIGITAL, SERVICE]
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE]
+        price: { type: string, example: "12.34" }
+        description: { type: [string, "null"] }
+        inventoryQty: { type: integer, example: 25 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    ProductCreateRequest:
+      type: object
+      required: [sku, title, type, status, price]
+      properties:
+        sku: { type: string, example: DUP-001 }
+        title: { type: string, example: Widget }
+        type: { $ref: "#/components/schemas/Product/properties/type" }
+        status: { $ref: "#/components/schemas/Product/properties/status" }
+        price: { type: string, example: "1.00" }
+        description: { type: [string, "null"] }
+    ProductUpdateRequest:
+      type: object
+      properties:
+        sku: { type: string }
+        title: { type: string }
+        type: { $ref: "#/components/schemas/Product/properties/type" }
+        status: { $ref: "#/components/schemas/Product/properties/status" }
+        price: { type: string }
+        description: { type: [string, "null"] }
+
+    PaginatedProducts:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/Product" }
+        meta:
+          type: object
+          required: [page, limit, total, pages]
+          properties:
+            page: { type: integer, example: 1 }
+            limit: { type: integer, example: 10 }
+            total: { type: integer, example: 3 }
+            pages: { type: integer, example: 1 }
+
+    InventoryAdjustRequest:
+      type: object
+      required: [delta]
+      properties:
+        delta:
+          type: integer
+          description: Positive to add stock; negative to deduct.
+          example: 5
+    ErrorResponse:
+      type: object
+      required: [statusCode, message]
+      properties:
+        statusCode: { type: integer }
+        message: { type: string }
+        error: { type: string }
+
+paths:
+  /auth/signup:
+    post:
+      tags: [Auth]
+      summary: Sign up a user (creates user in org context via x-org)
+      parameters:
+        - in: header
+          name: x-org
+          required: true
+          schema: { type: string, example: demo }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AuthSignupRequest" }
+      responses:
+        "201":
+          description: User created
+        "409":
+          description: Email already exists
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Log in and receive a JWT
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AuthLoginRequest" }
+      responses:
+        "200":
+          description: Logged in
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthLoginResponse" }
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+  /products:
+    get:
+      tags: [Products]
+      summary: List products (paginated)
+      parameters:
+        - in: header
+          name: x-org
+          required: true
+          schema: { type: string, example: demo }
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 100, default: 10 }
+      security:
+        - bearerAuth: [ ]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PaginatedProducts" }
+        "400":
+          description: Missing x-org
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+    post:
+      tags: [Products]
+      summary: Create a product
+      parameters:
+        - in: header
+          name: x-org
+          required: true
+          schema: { type: string, example: demo }
+      security:
+        - bearerAuth: [ ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProductCreateRequest" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Product" }
+        "409":
+          description: Duplicate SKU (same org)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+  /products/{id}:
+    get:
+      tags: [Products]
+      summary: Get a product by ID
+      parameters:
+        - in: header
+          name: x-org
+          required: true
+          schema: { type: string, example: demo }
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      security:
+        - bearerAuth: [ ]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Product" }
+        "404":
+          description: Product not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+    patch:
+      tags: [Products]
+      summary: Update a product (partial)
+      parameters:
+        - in: header
+          name: x-org
+          required: true
+          schema: { type: string, example: demo }
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      security:
+        - bearerAuth: [ ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProductUpdateRequest" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Product" }
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+    delete:
+      tags: [Products]
+      summary: Delete a product
+      parameters:
+        - in: header
+          name: x-org
+          required: true
+          schema: { type: string, example: demo }
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      security:
+        - bearerAuth: [ ]
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+  /products/{id}/inventory:
+    post:
+      tags: [Products]
+      summary: Adjust inventory by delta
+      description: >
+        Adjust product inventory by a positive (add) or negative (deduct) delta.
+        Returns the updated product. **Current behavior** returns **201 Created**.
+      parameters:
+        - in: header
+          name: x-org
+          required: true
+          schema: { type: string, example: demo }
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      security:
+        - bearerAuth: [ ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InventoryAdjustRequest" }
+      responses:
+        "201":
+          description: Inventory updated (created adjustment)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Product" }
+        "400":
+          description: Invalid delta (e.g., negative overshoot)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Product not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }

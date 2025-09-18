@@ -1,47 +1,73 @@
-import { z } from 'zod';
+import { IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 
-// normalize enums (accept lower/upper from tests)
-const TypeZ = z
-  .enum(['PHYSICAL', 'DIGITAL'])
-  .or(z.enum(['physical', 'digital']).transform((v) => v.toUpperCase() as 'PHYSICAL' | 'DIGITAL'));
+export enum ProductType {
+  PHYSICAL = 'PHYSICAL',
+  DIGITAL = 'DIGITAL',
+}
 
-const StatusZ = z
-  .enum(['ACTIVE', 'INACTIVE'])
-  .or(z.enum(['active', 'inactive']).transform((v) => v.toUpperCase() as 'ACTIVE' | 'INACTIVE'));
+export enum ProductStatus {
+  ACTIVE = 'ACTIVE',
+  INACTIVE = 'INACTIVE',
+}
 
-// price: accept number or string, canonicalize to string, max 2 decimals
-const PriceZ = z.preprocess(
-  (v) => (typeof v === 'number' ? v.toString() : v),
-  z
-    .string()
-    .regex(/^\d+(\.\d{1,2})?$/, 'price must be a number with up to 2 decimals (e.g. 12 or 12.34)'),
-);
+export class CreateProductDto {
+  @IsString()
+  @IsNotEmpty()
+  sku!: string;
 
-const SkuZ = z.string().trim().max(64, 'sku must be <= 64 chars').optional();
+  @IsString()
+  @IsNotEmpty()
+  title!: string;
 
-export const CreateProductSchema = z.object({
-  sku: SkuZ,
-  title: z.string().trim().min(1, 'title is required').max(256),
-  type: TypeZ,
-  status: StatusZ,
-  price: PriceZ,
-  description: z.string().trim().max(10_000).nullable().optional().transform((v) => v ?? null),
-});
+  @IsOptional()
+  @IsString()
+  description?: string | null;
 
-export const UpdateProductSchema = z
-  .object({
-    sku: SkuZ,
-    title: z.string().trim().min(1).max(256).optional(),
-    type: TypeZ.optional(),
-    status: StatusZ.optional(),
-    price: PriceZ.optional(),
-    description: z.string().trim().max(10_000).nullable().optional(),
-  })
-  .refine((obj) => Object.keys(obj).length > 0, {
-    message: 'At least one field must be provided',
-  });
+  @IsEnum(ProductType)
+  type!: ProductType;
 
-export type CreateProductDto = z.infer<typeof CreateProductSchema>;
-export type UpdateProductDto = z.infer<typeof UpdateProductSchema>;
-export type ProductTypeDto = z.infer<typeof TypeZ>;
-export type ProductStatusDto = z.infer<typeof StatusZ>;
+  @IsEnum(ProductStatus)
+  status!: ProductStatus;
+
+  @IsNumber()
+  @Min(0)
+  price!: number;
+
+  // Some e2e tests include this in the payload; allow it but validate.
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  inventoryQty?: number;
+}
+
+export class UpdateProductDto {
+  @IsOptional()
+  @IsString()
+  sku?: string;
+
+  @IsOptional()
+  @IsString()
+  title?: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string | null;
+
+  @IsOptional()
+  @IsEnum(ProductType)
+  type?: ProductType;
+
+  @IsOptional()
+  @IsEnum(ProductStatus)
+  status?: ProductStatus;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  price?: number;
+}
+
+export class AdjustInventoryDto {
+  @IsNumber()
+  delta!: number;
+}

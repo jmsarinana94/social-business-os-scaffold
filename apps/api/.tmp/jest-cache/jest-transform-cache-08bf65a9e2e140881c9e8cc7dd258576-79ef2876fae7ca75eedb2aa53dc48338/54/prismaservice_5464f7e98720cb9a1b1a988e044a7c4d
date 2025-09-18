@@ -1,0 +1,43 @@
+79a20032cc4efd832b4c425294824bda
+"use strict";
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.PrismaService = void 0;
+const common_1 = require("@nestjs/common");
+const client_1 = require("@prisma/client");
+/**
+ * We extend PrismaClient and explicitly declare the event types we use
+ * so `$on('beforeExit', ...)` is correctly typed.
+ */
+let PrismaService = class PrismaService extends client_1.PrismaClient {
+    constructor() {
+        super({
+            // keep logs quiet in tests, louder otherwise
+            log: process.env.NODE_ENV === 'test' ? [] : ['warn', 'error'],
+        });
+    }
+    async onModuleInit() {
+        await this.$connect();
+        // graceful shutdown when the Node process is about to exit
+        this.$on('beforeExit', async () => {
+            await this.$disconnect();
+        });
+    }
+    async onModuleDestroy() {
+        await this.$disconnect();
+    }
+};
+exports.PrismaService = PrismaService;
+exports.PrismaService = PrismaService = __decorate([
+    (0, common_1.Injectable)(),
+    __metadata("design:paramtypes", [])
+], PrismaService);
+//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJmaWxlIjoiL1VzZXJzL21hbm55c2FyaW5hbmEvRG93bmxvYWRzL3NvY2lhbC1idXNpbmVzcy1vcy1zY2FmZm9sZC12MC4yL2FwcHMvYXBpL3NyYy9wcmlzbWEvcHJpc21hLnNlcnZpY2UudHMiLCJtYXBwaW5ncyI6Ijs7Ozs7Ozs7Ozs7O0FBQUEsMkNBQTJFO0FBQzNFLDJDQUFzRDtBQUV0RDs7O0dBR0c7QUFFSSxJQUFNLGFBQWEsR0FBbkIsTUFBTSxhQUNYLFNBQVEscUJBQXNEO0lBRzlEO1FBQ0UsS0FBSyxDQUFDO1lBQ0osNkNBQTZDO1lBQzdDLEdBQUcsRUFBRSxPQUFPLENBQUMsR0FBRyxDQUFDLFFBQVEsS0FBSyxNQUFNLENBQUMsQ0FBQyxDQUFDLEVBQUUsQ0FBQyxDQUFDLENBQUMsQ0FBQyxNQUFNLEVBQUUsT0FBTyxDQUFDO1NBQ2hDLENBQUMsQ0FBQztJQUNuQyxDQUFDO0lBRUQsS0FBSyxDQUFDLFlBQVk7UUFDaEIsTUFBTSxJQUFJLENBQUMsUUFBUSxFQUFFLENBQUM7UUFFdEIsMkRBQTJEO1FBQzNELElBQUksQ0FBQyxHQUFHLENBQUMsWUFBWSxFQUFFLEtBQUssSUFBSSxFQUFFO1lBQ2hDLE1BQU0sSUFBSSxDQUFDLFdBQVcsRUFBRSxDQUFDO1FBQzNCLENBQUMsQ0FBQyxDQUFDO0lBQ0wsQ0FBQztJQUVELEtBQUssQ0FBQyxlQUFlO1FBQ25CLE1BQU0sSUFBSSxDQUFDLFdBQVcsRUFBRSxDQUFDO0lBQzNCLENBQUM7Q0FDRixDQUFBO0FBdkJZLHNDQUFhO3dCQUFiLGFBQWE7SUFEekIsSUFBQSxtQkFBVSxHQUFFOztHQUNBLGFBQWEsQ0F1QnpCIiwibmFtZXMiOltdLCJzb3VyY2VzIjpbIi9Vc2Vycy9tYW5ueXNhcmluYW5hL0Rvd25sb2Fkcy9zb2NpYWwtYnVzaW5lc3Mtb3Mtc2NhZmZvbGQtdjAuMi9hcHBzL2FwaS9zcmMvcHJpc21hL3ByaXNtYS5zZXJ2aWNlLnRzIl0sInNvdXJjZXNDb250ZW50IjpbImltcG9ydCB7IEluamVjdGFibGUsIE9uTW9kdWxlRGVzdHJveSwgT25Nb2R1bGVJbml0IH0gZnJvbSAnQG5lc3Rqcy9jb21tb24nO1xuaW1wb3J0IHsgUHJpc21hLCBQcmlzbWFDbGllbnQgfSBmcm9tICdAcHJpc21hL2NsaWVudCc7XG5cbi8qKlxuICogV2UgZXh0ZW5kIFByaXNtYUNsaWVudCBhbmQgZXhwbGljaXRseSBkZWNsYXJlIHRoZSBldmVudCB0eXBlcyB3ZSB1c2VcbiAqIHNvIGAkb24oJ2JlZm9yZUV4aXQnLCAuLi4pYCBpcyBjb3JyZWN0bHkgdHlwZWQuXG4gKi9cbkBJbmplY3RhYmxlKClcbmV4cG9ydCBjbGFzcyBQcmlzbWFTZXJ2aWNlXG4gIGV4dGVuZHMgUHJpc21hQ2xpZW50PFByaXNtYS5QcmlzbWFDbGllbnRPcHRpb25zLCAnYmVmb3JlRXhpdCc+XG4gIGltcGxlbWVudHMgT25Nb2R1bGVJbml0LCBPbk1vZHVsZURlc3Ryb3lcbntcbiAgY29uc3RydWN0b3IoKSB7XG4gICAgc3VwZXIoe1xuICAgICAgLy8ga2VlcCBsb2dzIHF1aWV0IGluIHRlc3RzLCBsb3VkZXIgb3RoZXJ3aXNlXG4gICAgICBsb2c6IHByb2Nlc3MuZW52Lk5PREVfRU5WID09PSAndGVzdCcgPyBbXSA6IFsnd2FybicsICdlcnJvciddLFxuICAgIH0gYXMgUHJpc21hLlByaXNtYUNsaWVudE9wdGlvbnMpO1xuICB9XG5cbiAgYXN5bmMgb25Nb2R1bGVJbml0KCkge1xuICAgIGF3YWl0IHRoaXMuJGNvbm5lY3QoKTtcblxuICAgIC8vIGdyYWNlZnVsIHNodXRkb3duIHdoZW4gdGhlIE5vZGUgcHJvY2VzcyBpcyBhYm91dCB0byBleGl0XG4gICAgdGhpcy4kb24oJ2JlZm9yZUV4aXQnLCBhc3luYyAoKSA9PiB7XG4gICAgICBhd2FpdCB0aGlzLiRkaXNjb25uZWN0KCk7XG4gICAgfSk7XG4gIH1cblxuICBhc3luYyBvbk1vZHVsZURlc3Ryb3koKSB7XG4gICAgYXdhaXQgdGhpcy4kZGlzY29ubmVjdCgpO1xuICB9XG59Il0sInZlcnNpb24iOjN9

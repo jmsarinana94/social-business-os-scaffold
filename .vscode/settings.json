@@ -27,5 +27,6 @@
       "rootPath": "./apps/api",
       "tsconfig": "tsconfig.spec.json"
     }
-  ]
+  ],
+  "makefile.configureOnOpen": false
 }

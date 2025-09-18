@@ -1,160 +1,159 @@
-// apps/api/src/modules/products/products.service.ts
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 
-export interface OrgRef {
-  id?: string;
-  slug?: string;
+export type OrgRef = { id?: string; slug?: string };
+
+import {
+  AdjustInventoryDto,
+  CreateProductDto,
+  UpdateProductDto,
+} from './products.dto';
+
+function ensureOrg(org: OrgRef): OrgRef {
+  if (!org?.id && !org?.slug) {
+    throw new BadRequestException('Missing x-org header');
+  }
+  return org;
 }
 
-export type CreateProductDto = {
-  sku: string;
-  title: string;
-  description?: string | null;
-  type: 'PHYSICAL' | 'DIGITAL';
-  status: 'ACTIVE' | 'INACTIVE';
-  price: number;
-};
+function orgConnectArg(org: OrgRef): any {
+  const o = ensureOrg(org);
+  if (o.id) return { id: o.id } as any;
+  return { slug: o.slug! } as any;
+}
 
-export type UpdateProductDto = Partial<CreateProductDto>;
+function orgFilter(org: OrgRef): any {
+  const o = ensureOrg(org);
+  if (o.id) return { id: o.id };
+  return { slug: o.slug! };
+}
 
 @Injectable()
 export class ProductsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  // ---- helpers --------------------------------------------------------------
-
-  private toNumber(n: unknown): number | null {
-    if (n == null) return null;
-    if (typeof n === 'number') return n;
-    // Prisma Decimal (or string) → number
-    const asNum = Number((n as any)?.toString?.() ?? n);
-    if (Number.isNaN(asNum)) return null;
-    return asNum;
-  }
-
-  private serialize<T extends { price?: any; createdAt?: Date; updatedAt?: Date }>(row: T) {
-    return {
-      ...row,
-      price: this.toNumber(row.price),
-      createdAt: row.createdAt ? row.createdAt.toISOString() : undefined,
-      updatedAt: row.updatedAt ? row.updatedAt.toISOString() : undefined,
-    };
-  }
-
-  private orgWhere(org: OrgRef): Prisma.OrganizationWhereUniqueInput {
-    if (org?.id) return { id: org.id };
-    if (org?.slug) return { slug: org.slug };
-    throw new BadRequestException('Missing organization id or slug');
-  }
-
-  private ensureNonNegativePrice(dto: { price?: any }) {
-    if (dto.price == null) throw new BadRequestException('price must be provided');
-    const n = this.toNumber(dto.price);
-    if (n == null || n < 0) throw new BadRequestException('price must be a non-negative number');
-    return n;
-  }
-
-  // ---- queries --------------------------------------------------------------
-
+  // ---------- LIST ----------
   async findAll(org: OrgRef, page = 1, limit = 10) {
-    const whereOrg = this.orgWhere(org);
-
+    const where = { org: { ...orgFilter(org) } };
     const [data, total] = await this.prisma.$transaction([
       this.prisma.product.findMany({
-        where: { org: { ...whereOrg } },
+        where,
         orderBy: { createdAt: 'desc' },
-        skip: (Math.max(page, 1) - 1) * Math.max(limit, 1),
-        take: Math.max(limit, 1),
+        skip: (page - 1) * limit,
+        take: limit,
       }),
-      this.prisma.product.count({ where: { org: { ...whereOrg } } }),
+      this.prisma.product.count({ where }),
     ]);
 
+    const pages = Math.max(Math.ceil(total / limit) || 1, 1);
     return {
-      data: data.map((p) => this.serialize(p)),
-      meta: {
-        page,
-        limit,
-        total,
-        pages: Math.max(1, Math.ceil(total / Math.max(limit, 1))),
-      },
+      data: data.map(this.serialize),
+      meta: { page, limit, total, pages },
     };
   }
 
+  // ---------- GET ONE ----------
   async findOne(org: OrgRef, id: string) {
-    const whereOrg = this.orgWhere(org);
-    const found = await this.prisma.product.findFirst({
-      where: { id, org: { ...whereOrg } },
+    const item = await this.prisma.product.findFirst({
+      where: { id, org: { ...orgFilter(org) } },
     });
-    if (!found) throw new NotFoundException('product not found');
-    return this.serialize(found);
+    if (!item) throw new NotFoundException('product not found');
+    return this.serialize(item);
   }
 
-  // ---- mutations ------------------------------------------------------------
-
+  // ---------- CREATE ----------
   async create(org: OrgRef, dto: CreateProductDto) {
-    const whereOrg = this.orgWhere(org);
-    const price = this.ensureNonNegativePrice(dto);
+    if (!dto?.title) throw new BadRequestException('title is required');
+    if (!dto?.sku) throw new BadRequestException('sku is required');
+    if (!dto?.type) throw new BadRequestException('type is required');
+    if (!dto?.status) throw new BadRequestException('status is required');
 
-    if (!dto.sku?.trim()) throw new BadRequestException('sku is required');
-    if (!dto.title?.trim()) throw new BadRequestException('title is required');
+    if (dto.price == null || Number.isNaN(Number(dto.price))) {
+      throw new BadRequestException('price must be a number');
+    }
+    const priceNum = Number(dto.price);
+    if (priceNum < 0) throw new BadRequestException('price must be a non-negative number');
+
+    let initialQty = 0;
+    if (dto.inventoryQty !== undefined) {
+      const q = Number(dto.inventoryQty);
+      if (!Number.isFinite(q) || q < 0) {
+        throw new BadRequestException('inventoryQty must be a non-negative number');
+      }
+      initialQty = Math.floor(q);
+    }
 
     try {
       const created = await this.prisma.product.create({
         data: {
-          org: { connect: whereOrg },
-          sku: dto.sku.trim(),
-          title: dto.title.trim(),
+          org: { connect: orgConnectArg(org) },
+          sku: dto.sku,
+          title: dto.title,
           description: dto.description ?? null,
           type: dto.type,
           status: dto.status,
-          price, // store as number; prisma will coerce to Decimal if needed
-          inventoryQty: 0,
+          price: priceNum,
+          inventoryQty: initialQty,
         },
       });
       return this.serialize(created);
-    } catch (e: any) {
-      if (e?.code === 'P2002') {
-        // unique constraint (e.g., SKU)
-        throw new BadRequestException('sku already exists');
+    } catch (err: any) {
+      if (err?.code === 'P2002') {
+        // Unique constraint (likely unique on orgId+sku)
+        throw new ConflictException('SKU already exists in this org');
       }
-      throw e;
+      throw err;
     }
   }
 
+  // ---------- UPDATE (partial) ----------
   async update(org: OrgRef, id: string, dto: UpdateProductDto) {
-    const whereOrg = this.orgWhere(org);
-
     const existing = await this.prisma.product.findFirst({
-      where: { id, org: { ...whereOrg } },
-      select: { id: true },
+      where: { id, org: { ...orgFilter(org) } },
     });
     if (!existing) throw new NotFoundException('product not found');
 
-    const data: Prisma.ProductUpdateInput = {};
-    if (dto.sku != null) data.sku = dto.sku.trim();
-    if (dto.title != null) data.title = dto.title.trim();
-    if (dto.description !== undefined) data.description = dto.description ?? null;
-    if (dto.type != null) data.type = dto.type;
-    if (dto.status != null) data.status = dto.status;
-    if (dto.price != null) {
-      const n = this.ensureNonNegativePrice({ price: dto.price });
-      data.price = n;
+    let pricePatch: number | undefined;
+    if (dto.price !== undefined) {
+      if (dto.price == null || Number.isNaN(Number(dto.price))) {
+        throw new BadRequestException('price must be a number');
+      }
+      const n = Number(dto.price);
+      if (n < 0) throw new BadRequestException('price must be a non-negative number');
+      pricePatch = n;
     }
 
-    const updated = await this.prisma.product.update({
-      where: { id },
-      data,
-    });
-    return this.serialize(updated);
+    try {
+      const updated = await this.prisma.product.update({
+        where: { id },
+        data: {
+          sku: dto.sku ?? existing.sku,
+          title: dto.title ?? existing.title,
+          description:
+            dto.description === undefined ? existing.description : dto.description,
+          type: dto.type ?? existing.type,
+          status: dto.status ?? existing.status,
+          price: pricePatch ?? (existing as any).price,
+        },
+      });
+      return this.serialize(updated);
+    } catch (err: any) {
+      if (err?.code === 'P2002') {
+        throw new ConflictException('SKU already exists in this org');
+      }
+      throw err;
+    }
   }
 
+  // ---------- DELETE ----------
   async remove(org: OrgRef, id: string) {
-    const whereOrg = this.orgWhere(org);
-
     const existing = await this.prisma.product.findFirst({
-      where: { id, org: { ...whereOrg } },
+      where: { id, org: { ...orgFilter(org) } },
       select: { id: true },
     });
     if (!existing) throw new NotFoundException('product not found');
@@ -163,44 +162,59 @@ export class ProductsService {
     return { ok: true };
   }
 
-  // ---- inventory ------------------------------------------------------------
-
+  // ---------- INVENTORY (GET) ----------
   async getInventory(org: OrgRef, id: string) {
-    const whereOrg = this.orgWhere(org);
-    const found = await this.prisma.product.findFirst({
-      where: { id, org: { ...whereOrg } },
-      select: { id: true, inventoryQty: true, price: true, createdAt: true, updatedAt: true },
+    const item = await this.prisma.product.findFirst({
+      where: { id, org: { ...orgFilter(org) } },
+      select: { id: true, inventoryQty: true },
     });
-    if (!found) throw new NotFoundException('product not found');
-    return this.serialize(found);
+    if (!item) throw new NotFoundException('product not found');
+    return { id: item.id, inventoryQty: item.inventoryQty };
   }
 
-  async addInventory(org: OrgRef, id: string, payload: { delta: number }) {
-    const whereOrg = this.orgWhere(org);
+  // ---------- INVENTORY (ADJUST) ----------
+  async addInventory(org: OrgRef, id: string, payload: AdjustInventoryDto) {
     const delta = Number(payload?.delta);
-    if (!Number.isFinite(delta) || Math.trunc(delta) !== delta) {
-      throw new BadRequestException('delta must be an integer');
+    if (!Number.isFinite(delta)) {
+      throw new BadRequestException('delta must be a number');
     }
 
-    // Use a transaction + check to enforce non-negative inventory
-    return await this.prisma.$transaction(async (tx) => {
-      const product = await tx.product.findFirst({
-        where: { id, org: { ...whereOrg } },
-        select: { id: true, inventoryQty: true, price: true, createdAt: true, updatedAt: true },
+    return this.prisma.$transaction(async (tx) => {
+      const item = await tx.product.findFirst({
+        where: { id, org: { ...orgFilter(org) } },
+        select: { id: true, inventoryQty: true },
       });
-      if (!product) throw new NotFoundException('product not found');
+      if (!item) throw new NotFoundException('product not found');
 
-      const next = (product.inventoryQty ?? 0) + delta;
-      if (next < 0) {
+      const nextQty = item.inventoryQty + delta;
+      if (nextQty < 0) {
         throw new BadRequestException('inventory cannot go below zero');
       }
 
       const updated = await tx.product.update({
         where: { id },
-        data: { inventoryQty: next },
+        data: { inventoryQty: nextQty },
       });
 
       return this.serialize(updated);
     });
   }
+
+  // ---------- Serializer ----------
+  private serialize(row: any) {
+    const base = row && typeof row === 'object' ? { ...(row as Record<string, any>) } : row;
+    const out: any = base;
+
+    if (out?.price != null) {
+      const asNum = Number(out.price);
+      if (Number.isFinite(asNum)) out.price = asNum;
+    }
+
+    if (out?.createdAt instanceof Date) out.createdAt = out.createdAt.toISOString();
+    if (out?.updatedAt instanceof Date) out.updatedAt = out.updatedAt.toISOString();
+    if (out?.lastPurchasedAt instanceof Date)
+      out.lastPurchasedAt = out.lastPurchasedAt.toISOString();
+
+    return out;
+    }
 }

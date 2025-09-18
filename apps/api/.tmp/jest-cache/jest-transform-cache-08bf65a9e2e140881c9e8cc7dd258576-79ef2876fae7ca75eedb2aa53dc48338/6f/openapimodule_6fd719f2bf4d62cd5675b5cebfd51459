@@ -1,0 +1,26 @@
+a5487d0cb53905f72c734b29ae7b5e63
+"use strict";
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.OpenApiModule = void 0;
+// apps/api/src/openapi/openapi.module.ts
+const common_1 = require("@nestjs/common");
+/**
+ * Minimal placeholder OpenAPI module so AppModule can import it
+ * without pulling in swagger deps during tests.
+ *
+ * If you later want Swagger UI, you can expand this module
+ * (or call a static setup() from main.ts) — but for now it’s no-op.
+ */
+let OpenApiModule = class OpenApiModule {
+};
+exports.OpenApiModule = OpenApiModule;
+exports.OpenApiModule = OpenApiModule = __decorate([
+    (0, common_1.Module)({})
+], OpenApiModule);
+//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJmaWxlIjoiL1VzZXJzL21hbm55c2FyaW5hbmEvRG93bmxvYWRzL3NvY2lhbC1idXNpbmVzcy1vcy1zY2FmZm9sZC12MC4yL2FwcHMvYXBpL3NyYy9vcGVuYXBpL29wZW5hcGkubW9kdWxlLnRzIiwibWFwcGluZ3MiOiI7Ozs7Ozs7OztBQUFBLHlDQUF5QztBQUN6QywyQ0FBd0M7QUFFeEM7Ozs7OztHQU1HO0FBRUksSUFBTSxhQUFhLEdBQW5CLE1BQU0sYUFBYTtDQUFHLENBQUE7QUFBaEIsc0NBQWE7d0JBQWIsYUFBYTtJQUR6QixJQUFBLGVBQU0sRUFBQyxFQUFFLENBQUM7R0FDRSxhQUFhLENBQUciLCJuYW1lcyI6W10sInNvdXJjZXMiOlsiL1VzZXJzL21hbm55c2FyaW5hbmEvRG93bmxvYWRzL3NvY2lhbC1idXNpbmVzcy1vcy1zY2FmZm9sZC12MC4yL2FwcHMvYXBpL3NyYy9vcGVuYXBpL29wZW5hcGkubW9kdWxlLnRzIl0sInNvdXJjZXNDb250ZW50IjpbIi8vIGFwcHMvYXBpL3NyYy9vcGVuYXBpL29wZW5hcGkubW9kdWxlLnRzXG5pbXBvcnQgeyBNb2R1bGUgfSBmcm9tICdAbmVzdGpzL2NvbW1vbic7XG5cbi8qKlxuICogTWluaW1hbCBwbGFjZWhvbGRlciBPcGVuQVBJIG1vZHVsZSBzbyBBcHBNb2R1bGUgY2FuIGltcG9ydCBpdFxuICogd2l0aG91dCBwdWxsaW5nIGluIHN3YWdnZXIgZGVwcyBkdXJpbmcgdGVzdHMuXG4gKlxuICogSWYgeW91IGxhdGVyIHdhbnQgU3dhZ2dlciBVSSwgeW91IGNhbiBleHBhbmQgdGhpcyBtb2R1bGVcbiAqIChvciBjYWxsIGEgc3RhdGljIHNldHVwKCkgZnJvbSBtYWluLnRzKSDigJQgYnV0IGZvciBub3cgaXTigJlzIG5vLW9wLlxuICovXG5ATW9kdWxlKHt9KVxuZXhwb3J0IGNsYXNzIE9wZW5BcGlNb2R1bGUge30iXSwidmVyc2lvbiI6M30=

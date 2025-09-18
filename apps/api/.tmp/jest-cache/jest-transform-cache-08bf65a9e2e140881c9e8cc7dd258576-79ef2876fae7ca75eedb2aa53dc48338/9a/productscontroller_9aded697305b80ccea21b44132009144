@@ -1,0 +1,175 @@
+872c45b827411435c79a2dc3f69c1d68
+"use strict";
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.ProductsController = void 0;
+const common_1 = require("@nestjs/common");
+const client_1 = require("@prisma/client");
+const class_validator_1 = require("class-validator");
+const products_service_1 = require("./products.service");
+class CreateDto {
+}
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], CreateDto.prototype, "sku", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.MinLength)(1),
+    __metadata("design:type", String)
+], CreateDto.prototype, "title", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", Object)
+], CreateDto.prototype, "description", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsEnum)(client_1.ProductType),
+    __metadata("design:type", String)
+], CreateDto.prototype, "type", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsEnum)(client_1.ProductStatus),
+    __metadata("design:type", String)
+], CreateDto.prototype, "status", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], CreateDto.prototype, "price", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.Min)(0),
+    __metadata("design:type", Number)
+], CreateDto.prototype, "priceNumber", void 0);
+let ProductsController = class ProductsController {
+    constructor(products) {
+        this.products = products;
+    }
+    async list(orgHeader, pageQ, limitQ) {
+        const org = (orgHeader ?? 'demo').trim();
+        const page = Math.max(1, parseInt(pageQ ?? '1', 10) || 1);
+        const limit = Math.max(1, Math.min(100, parseInt(limitQ ?? '10', 10) || 10));
+        return this.products.list(org, page, limit);
+    }
+    async get(orgHeader, id) {
+        const org = (orgHeader ?? 'demo').trim();
+        return this.products.get(org, id);
+    }
+    async create(orgHeader, dto) {
+        const org = (orgHeader ?? 'demo').trim();
+        const price = dto.price ?? (dto.priceNumber !== undefined ? String(dto.priceNumber) : '0');
+        return this.products.create(org, {
+            sku: dto.sku,
+            title: dto.title,
+            description: dto.description ?? null,
+            type: typeof dto.type === 'string' ? dto.type : String(dto.type),
+            status: typeof dto.status === 'string' ? dto.status : String(dto.status),
+            price,
+        });
+    }
+    async update(orgHeader, id, dto) {
+        const org = (orgHeader ?? 'demo').trim();
+        const price = dto.price ??
+            (dto.priceNumber !== undefined ? String(dto.priceNumber) : undefined);
+        return this.products.update(org, id, {
+            sku: dto.sku,
+            title: dto.title,
+            description: dto.description ?? null,
+            type: dto.type ? (typeof dto.type === 'string' ? dto.type : String(dto.type)) : undefined,
+            status: dto.status ? (typeof dto.status === 'string' ? dto.status : String(dto.status)) : undefined,
+            price,
+        });
+    }
+    async remove(orgHeader, id) {
+        const org = (orgHeader ?? 'demo').trim();
+        return this.products.remove(org, id);
+    }
+    async adjustInventory(orgHeader, id, delta) {
+        const org = (orgHeader ?? 'demo').trim();
+        return this.products.adjustInventory(org, id, Number(delta || 0));
+    }
+    async readInventory(orgHeader, id) {
+        const org = (orgHeader ?? 'demo').trim();
+        return this.products.readInventory(org, id);
+    }
+};
+exports.ProductsController = ProductsController;
+__decorate([
+    (0, common_1.Get)(),
+    __param(0, (0, common_1.Headers)('x-org')),
+    __param(1, (0, common_1.Query)('page')),
+    __param(2, (0, common_1.Query)('limit')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String, String]),
+    __metadata("design:returntype", Promise)
+], ProductsController.prototype, "list", null);
+__decorate([
+    (0, common_1.Get)(':id'),
+    __param(0, (0, common_1.Headers)('x-org')),
+    __param(1, (0, common_1.Param)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String]),
+    __metadata("design:returntype", Promise)
+], ProductsController.prototype, "get", null);
+__decorate([
+    (0, common_1.Post)(),
+    __param(0, (0, common_1.Headers)('x-org')),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, CreateDto]),
+    __metadata("design:returntype", Promise)
+], ProductsController.prototype, "create", null);
+__decorate([
+    (0, common_1.Put)(':id'),
+    __param(0, (0, common_1.Headers)('x-org')),
+    __param(1, (0, common_1.Param)('id')),
+    __param(2, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String, Object]),
+    __metadata("design:returntype", Promise)
+], ProductsController.prototype, "update", null);
+__decorate([
+    (0, common_1.Delete)(':id'),
+    __param(0, (0, common_1.Headers)('x-org')),
+    __param(1, (0, common_1.Param)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String]),
+    __metadata("design:returntype", Promise)
+], ProductsController.prototype, "remove", null);
+__decorate([
+    (0, common_1.Post)(':id/inventory'),
+    __param(0, (0, common_1.Headers)('x-org')),
+    __param(1, (0, common_1.Param)('id')),
+    __param(2, (0, common_1.Body)('delta')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String, Number]),
+    __metadata("design:returntype", Promise)
+], ProductsController.prototype, "adjustInventory", null);
+__decorate([
+    (0, common_1.Get)(':id/inventory'),
+    __param(0, (0, common_1.Headers)('x-org')),
+    __param(1, (0, common_1.Param)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String]),
+    __metadata("design:returntype", Promise)
+], ProductsController.prototype, "readInventory", null);
+exports.ProductsController = ProductsController = __decorate([
+    (0, common_1.Controller)('products'),
+    __metadata("design:paramtypes", [products_service_1.ProductsService])
+], ProductsController);
+//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJmaWxlIjoiL1VzZXJzL21hbm55c2FyaW5hbmEvRG93bmxvYWRzL3NvY2lhbC1idXNpbmVzcy1vcy1zY2FmZm9sZC12MC4yL2FwcHMvYXBpL3NyYy9tb2R1bGVzL3Byb2R1Y3RzL3Byb2R1Y3RzLmNvbnRyb2xsZXIudHMiLCJtYXBwaW5ncyI6Ijs7Ozs7Ozs7Ozs7Ozs7O0FBQUEsMkNBVXdCO0FBQ3hCLDJDQUE0RDtBQUM1RCxxREFBeUY7QUFDekYseURBQXFEO0FBRXJELE1BQU0sU0FBUztDQThCZDtBQTNCQztJQUZDLElBQUEsNEJBQVUsR0FBRTtJQUNaLElBQUEsMEJBQVEsR0FBRTs7c0NBQ0U7QUFJYjtJQUZDLElBQUEsMEJBQVEsR0FBRTtJQUNWLElBQUEsMkJBQVMsRUFBQyxDQUFDLENBQUM7O3dDQUNFO0FBSWY7SUFGQyxJQUFBLDRCQUFVLEdBQUU7SUFDWixJQUFBLDBCQUFRLEdBQUU7OzhDQUNpQjtBQUk1QjtJQUZDLElBQUEsMEJBQVEsR0FBRTtJQUNWLElBQUEsd0JBQU0sRUFBQyxvQkFBVyxDQUFDOzt1Q0FDUTtBQUk1QjtJQUZDLElBQUEsMEJBQVEsR0FBRTtJQUNWLElBQUEsd0JBQU0sRUFBQyxzQkFBYSxDQUFDOzt5Q0FDVTtBQUtoQztJQUZDLElBQUEsMEJBQVEsR0FBRTtJQUNWLElBQUEsNEJBQVUsR0FBRTs7d0NBQ0U7QUFLZjtJQUhDLElBQUEsNEJBQVUsR0FBRTtJQUNaLElBQUEsMEJBQVEsR0FBRTtJQUNWLElBQUEscUJBQUcsRUFBQyxDQUFDLENBQUM7OzhDQUNjO0FBSWhCLElBQU0sa0JBQWtCLEdBQXhCLE1BQU0sa0JBQWtCO0lBQzdCLFlBQTZCLFFBQXlCO1FBQXpCLGFBQVEsR0FBUixRQUFRLENBQWlCO0lBQUcsQ0FBQztJQUdwRCxBQUFOLEtBQUssQ0FBQyxJQUFJLENBQ1UsU0FBNkIsRUFDaEMsS0FBYyxFQUNiLE1BQWU7UUFFL0IsTUFBTSxHQUFHLEdBQUcsQ0FBQyxTQUFTLElBQUksTUFBTSxDQUFDLENBQUMsSUFBSSxFQUFFLENBQUM7UUFDekMsTUFBTSxJ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QUMsQ0FBQTtJQUNoQixXQUFBLElBQUEsY0FBSyxFQUFDLElBQUksQ0FBQyxDQUFBOzs7O3VEQUliOzZCQXhGVSxrQkFBa0I7SUFEOUIsSUFBQSxtQkFBVSxFQUFDLFVBQVUsQ0FBQztxQ0FFa0Isa0NBQWU7R0FEM0Msa0JBQWtCLENBeUY5QiIsIm5hbWVzIjpbXSwic291cmNlcyI6WyIvVXNlcnMvbWFubnlzYXJpbmFuYS9Eb3dubG9hZHMvc29jaWFsLWJ1c2luZXNzLW9zLXNjYWZmb2xkLXYwLjIvYXBwcy9hcGkvc3JjL21vZHVsZXMvcHJvZHVjdHMvcHJvZHVjdHMuY29udHJvbGxlci50cyJdLCJzb3VyY2VzQ29udGVudCI6WyJpbXBvcnQge1xuICBCb2R5LFxuICBDb250cm9sbGVyLFxuICBEZWxldGUsXG4gIEdldCxcbiAgSGVhZGVycyxcbiAgUGFyYW0sXG4gIFBvc3QsXG4gIFB1dCxcbiAgUXVlcnksXG59IGZyb20gJ0BuZXN0anMvY29tbW9uJztcbmltcG9ydCB7IFByb2R1Y3RTdGF0dXMsIFByb2R1Y3RUeXBlIH0gZnJvbSAnQHByaXNtYS9jbGllbnQnO1xuaW1wb3J0IHsgSXNFbnVtLCBJc051bWJlciwgSXNPcHRpb25hbCwgSXNTdHJpbmcsIE1pbiwgTWluTGVuZ3RoIH0gZnJvbSAnY2xhc3MtdmFsaWRhdG9yJztcbmltcG9ydCB7IFByb2R1Y3RzU2VydmljZSB9IGZyb20gJy4vcHJvZHVjdHMuc2VydmljZSc7XG5cbmNsYXNzIENyZWF0ZUR0byB7XG4gIEBJc09wdGlvbmFsKClcbiAgQElzU3RyaW5nKClcbiAgc2t1Pzogc3RyaW5nO1xuXG4gIEBJc1N0cmluZygpXG4gIEBNaW5MZW5ndGgoMSlcbiAgdGl0bGUhOiBzdHJpbmc7XG5cbiAgQElzT3B0aW9uYWwoKVxuICBASXNTdHJpbmcoKVxuICBkZXNjcmlwdGlvbj86IHN0cmluZyB8IG51bGw7XG5cbiAgQElzU3RyaW5nKClcbiAgQElzRW51bShQcm9kdWN0VHlwZSlcbiAgdHlwZSE6IFByb2R1Y3RUeXBlIHwgc3RyaW5nO1xuXG4gIEBJc1N0cmluZygpXG4gIEBJc0VudW0oUHJvZHVjdFN0YXR1cylcbiAgc3RhdHVzITogUHJvZHVjdFN0YXR1cyB8IHN0cmluZztcblxuICAvLyBBY2NlcHQgbnVtYmVyIG9yIHN0cmluZyBhdCB0aGUgZWRnZTsgY29lcmNlIHRvIHN0cmluZyBmb3IgdGhlIHNlcnZpY2VcbiAgQElzU3RyaW5nKClcbiAgQElzT3B0aW9uYWwoKVxuICBwcmljZT86IHN0cmluZztcblxuICBASXNPcHRpb25hbCgpXG4gIEBJc051bWJlcigpXG4gIEBNaW4oMClcbiAgcHJpY2VOdW1iZXI/OiBudW1iZXI7XG59XG5cbkBDb250cm9sbGVyKCdwcm9kdWN0cycpXG5leHBvcnQgY2xhc3MgUHJvZHVjdHNDb250cm9sbGVyIHtcbiAgY29uc3RydWN0b3IocHJpdmF0ZSByZWFkb25seSBwcm9kdWN0czogUHJvZHVjdHNTZXJ2aWNlKSB7fVxuXG4gIEBHZXQoKVxuICBhc3luYyBsaXN0KFxuICAgIEBIZWFkZXJzKCd4LW9yZycpIG9yZ0hlYWRlcjogc3RyaW5nIHwgdW5kZWZpbmVkLFxuICAgIEBRdWVyeSgncGFnZScpIHBhZ2VRPzogc3RyaW5nLFxuICAgIEBRdWVyeSgnbGltaXQnKSBsaW1pdFE/OiBzdHJpbmcsXG4gICkge1xuICAgIGNvbnN0IG9yZyA9IChvcmdIZWFkZXIgPz8gJ2RlbW8nKS50cmltKCk7XG4gICAgY29uc3QgcGFnZSA9IE1hdGgubWF4KDEsIHBhcnNlSW50KHBhZ2VRID8/ICcxJywgMTApIHx8IDEpO1xuICAgIGNvbnN0IGxpbWl0ID0gTWF0aC5tYXgoMSwgTWF0aC5taW4oMTAwLCBwYXJzZUludChsaW1pdFEgPz8gJzEwJywgMTApIHx8IDEwKSk7XG4gICAgcmV0dXJuIHRoaXMucHJvZHVjdHMubGlzdChvcmcsIHBhZ2UsIGxpbWl0KTtcbiAgfVxuXG4gIEBHZXQoJzppZCcpXG4gIGFzeW5jIGdldChcbiAgICBASGVhZGVycygneC1vcmcnKSBvcmdIZWFkZXI6IHN0cmluZyB8IHVuZGVmaW5lZCxcbiAgICBAUGFyYW0oJ2lkJykgaWQ6IHN0cmluZyxcbiAgKSB7XG4gICAgY29uc3Qgb3JnID0gKG9yZ0hlYWRlciA/PyAnZGVtbycpLnRyaW0oKTtcbiAgICByZXR1cm4gdGhpcy5wcm9kdWN0cy5nZXQob3JnLCBpZCk7XG4gIH1cblxuICBAUG9zdCgpXG4gIGFzeW5jIGNyZWF0ZShcbiAgICBASGVhZGVycygneC1vcmcnKSBvcmdIZWFkZXI6IHN0cmluZyB8IHVuZGVmaW5lZCxcbiAgICBAQm9keSgpIGR0bzogQ3JlYXRlRHRvLFxuICApIHtcbiAgICBjb25zdCBvcmcgPSAob3JnSGVhZGVyID8/ICdkZW1vJykudHJpbSgpO1xuICAgIGNvbnN0IHByaWNlID0gZHRvLnByaWNlID8/IChkdG8ucHJpY2VOdW1iZXIgIT09IHVuZGVmaW5lZCA/IFN0cmluZyhkdG8ucHJpY2VOdW1iZXIpIDogJzAnKTtcbiAgICByZXR1cm4gdGhpcy5wcm9kdWN0cy5jcmVhdGUob3JnLCB7XG4gICAgICBza3U6IGR0by5za3UsXG4gICAgICB0aXRsZTogZHRvLnRpdGxlLFxuICAgICAgZGVzY3JpcHRpb246IGR0by5kZXNjcmlwdGlvbiA/PyBudWxsLFxuICAgICAgdHlwZTogdHlwZW9mIGR0by50eXBlID09PSAnc3RyaW5nJyA/IGR0by50eXBlIDogU3RyaW5nKGR0by50eXBlKSxcbiAgICAgIHN0YXR1czogdHlwZW9mIGR0by5zdGF0dXMgPT09ICdzdHJpbmcnID8gZHRvLnN0YXR1cyA6IFN0cmluZyhkdG8uc3RhdHVzKSxcbiAgICAgIHByaWNlLFxuICAgIH0pO1xuICB9XG5cbiAgQFB1dCgnOmlkJylcbiAgYXN5bmMgdXBkYXRlKFxuICAgIEBIZWFkZXJzKCd4LW9yZycpIG9yZ0hlYWRlcjogc3RyaW5nIHwgdW5kZWZpbmVkLFxuICAgIEBQYXJhbSgnaWQnKSBpZDogc3RyaW5nLFxuICAgIEBCb2R5KCkgZHRvOiBQYXJ0aWFsPENyZWF0ZUR0bz4sXG4gICkge1xuICAgIGNvbnN0IG9yZyA9IChvcmdIZWFkZXIgPz8gJ2RlbW8nKS50cmltKCk7XG4gICAgY29uc3QgcHJpY2UgPVxuICAgICAgZHRvLnByaWNlID8/XG4gICAgICAoZHRvLnByaWNlTnVtYmVyICE9PSB1bmRlZmluZWQgPyBTdHJpbmcoZHRvLnByaWNlTnVtYmVyKSA6IHVuZGVmaW5lZCk7XG5cbiAgICByZXR1cm4gdGhpcy5wcm9kdWN0cy51cGRhdGUob3JnLCBpZCwge1xuICAgICAgc2t1OiBkdG8uc2t1LFxuICAgICAgdGl0bGU6IGR0by50aXRsZSxcbiAgICAgIGRlc2NyaXB0aW9uOiBkdG8uZGVzY3JpcHRpb24gPz8gbnVsbCxcbiAgICAgIHR5cGU6IGR0by50eXBlID8gKHR5cGVvZiBkdG8udHlwZSA9PT0gJ3N0cmluZycgPyBkdG8udHlwZSA6IFN0cmluZyhkdG8udHlwZSkpIDogdW5kZWZpbmVkLFxuICAgICAgc3RhdHVzOiBkdG8uc3RhdHVzID8gKHR5cGVvZiBkdG8uc3RhdHVzID09PSAnc3RyaW5nJyA/IGR0by5zdGF0dXMgOiBTdHJpbmcoZHRvLnN0YXR1cykpIDogdW5kZWZpbmVkLFxuICAgICAgcHJpY2UsXG4gICAgfSk7XG4gIH1cblxuICBARGVsZXRlKCc6aWQnKVxuICBhc3luYyByZW1vdmUoXG4gICAgQEhlYWRlcnMoJ3gtb3JnJykgb3JnSGVhZGVyOiBzdHJpbmcgfCB1bmRlZmluZWQsXG4gICAgQFBhcmFtKCdpZCcpIGlkOiBzdHJpbmcsXG4gICkge1xuICAgIGNvbnN0IG9yZyA9IChvcmdIZWFkZXIgPz8gJ2RlbW8nKS50cmltKCk7XG4gICAgcmV0dXJuIHRoaXMucHJvZHVjdHMucmVtb3ZlKG9yZywgaWQpO1xuICB9XG5cbiAgQFBvc3QoJzppZC9pbnZlbnRvcnknKVxuICBhc3luYyBhZGp1c3RJbnZlbnRvcnkoXG4gICAgQEhlYWRlcnMoJ3gtb3JnJykgb3JnSGVhZGVyOiBzdHJpbmcgfCB1bmRlZmluZWQsXG4gICAgQFBhcmFtKCdpZCcpIGlkOiBzdHJpbmcsXG4gICAgQEJvZHkoJ2RlbHRhJykgZGVsdGE6IG51bWJlcixcbiAgKSB7XG4gICAgY29uc3Qgb3JnID0gKG9yZ0hlYWRlciA/PyAnZGVtbycpLnRyaW0oKTtcbiAgICByZXR1cm4gdGhpcy5wcm9kdWN0cy5hZGp1c3RJbnZlbnRvcnkob3JnLCBpZCwgTnVtYmVyKGRlbHRhIHx8IDApKTtcbiAgfVxuXG4gIEBHZXQoJzppZC9pbnZlbnRvcnknKVxuICBhc3luYyByZWFkSW52ZW50b3J5KFxuICAgIEBIZWFkZXJzKCd4LW9yZycpIG9yZ0hlYWRlcjogc3RyaW5nIHwgdW5kZWZpbmVkLFxuICAgIEBQYXJhbSgnaWQnKSBpZDogc3RyaW5nLFxuICApIHtcbiAgICBjb25zdCBvcmcgPSAob3JnSGVhZGVyID8/ICdkZW1vJykudHJpbSgpO1xuICAgIHJldHVybiB0aGlzLnByb2R1Y3RzLnJlYWRJbnZlbnRvcnkob3JnLCBpZCk7XG4gIH1cbn0iXSwidmVyc2lvbiI6M30=

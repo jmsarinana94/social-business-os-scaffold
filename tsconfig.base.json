@@ -4,6 +4,7 @@
     "module": "commonjs",
     "lib": ["ES2022"],
     "moduleResolution": "node",
+
     "strict": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
@@ -23,5 +24,11 @@
 
     /* 👇 Prevents class field init surprises in TS 5+ with decorators */
     "useDefineForClassFields": false
-  }
+  },
+  "exclude": [
+    "node_modules",
+    "**/dist",
+    "**/*.spec.ts",
+    "**/*.e2e-spec.ts"
+  ]
 }

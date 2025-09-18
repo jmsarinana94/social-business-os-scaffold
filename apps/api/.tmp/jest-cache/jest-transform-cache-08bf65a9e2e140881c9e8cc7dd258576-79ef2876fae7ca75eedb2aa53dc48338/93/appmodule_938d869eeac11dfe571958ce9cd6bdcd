@@ -1,0 +1,31 @@
+e4edb051ba4959d12e4d3fdb98eae615
+"use strict";
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.AppModule = void 0;
+const common_1 = require("@nestjs/common");
+const auth_module_1 = require("./modules/auth/auth.module");
+const health_module_1 = require("./modules/health/health.module");
+const products_module_1 = require("./modules/products/products.module");
+const prisma_module_1 = require("./shared/prisma/prisma.module");
+let AppModule = class AppModule {
+};
+exports.AppModule = AppModule;
+exports.AppModule = AppModule = __decorate([
+    (0, common_1.Module)({
+        imports: [
+            prisma_module_1.PrismaModule, // global PrismaService provider
+            auth_module_1.AuthModule,
+            products_module_1.ProductsModule,
+            health_module_1.HealthModule,
+            // NOTE: If you later re-add your OpenAPI docs module,
+            // import it here once the file exists again.
+        ],
+    })
+], AppModule);
+//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJmaWxlIjoiL1VzZXJzL21hbm55c2FyaW5hbmEvRG93bmxvYWRzL3NvY2lhbC1idXNpbmVzcy1vcy1zY2FmZm9sZC12MC4yL2FwcHMvYXBpL3NyYy9hcHAubW9kdWxlLnRzIiwibWFwcGluZ3MiOiI7Ozs7Ozs7OztBQUFBLDJDQUF3QztBQUN4Qyw0REFBd0Q7QUFDeEQsa0VBQThEO0FBQzlELHdFQUFvRTtBQUNwRSxpRUFBNkQ7QUFZdEQsSUFBTSxTQUFTLEdBQWYsTUFBTSxTQUFTO0NBQUcsQ0FBQTtBQUFaLDhCQUFTO29CQUFULFNBQVM7SUFWckIsSUFBQSxlQUFNLEVBQUM7UUFDTixPQUFPLEVBQUU7WUFDUCw0QkFBWSxFQUFJLGdDQUFnQztZQUNoRCx3QkFBVTtZQUNWLGdDQUFjO1lBQ2QsNEJBQVk7WUFDWixzREFBc0Q7WUFDdEQsNkNBQTZDO1NBQzlDO0tBQ0YsQ0FBQztHQUNXLFNBQVMsQ0FBRyIsIm5hbWVzIjpbXSwic291cmNlcyI6WyIvVXNlcnMvbWFubnlzYXJpbmFuYS9Eb3dubG9hZHMvc29jaWFsLWJ1c2luZXNzLW9zLXNjYWZmb2xkLXYwLjIvYXBwcy9hcGkvc3JjL2FwcC5tb2R1bGUudHMiXSwic291cmNlc0NvbnRlbnQiOlsiaW1wb3J0IHsgTW9kdWxlIH0gZnJvbSAnQG5lc3Rqcy9jb21tb24nO1xuaW1wb3J0IHsgQXV0aE1vZHVsZSB9IGZyb20gJy4vbW9kdWxlcy9hdXRoL2F1dGgubW9kdWxlJztcbmltcG9ydCB7IEhlYWx0aE1vZHVsZSB9IGZyb20gJy4vbW9kdWxlcy9oZWFsdGgvaGVhbHRoLm1vZHVsZSc7XG5pbXBvcnQgeyBQcm9kdWN0c01vZHVsZSB9IGZyb20gJy4vbW9kdWxlcy9wcm9kdWN0cy9wcm9kdWN0cy5tb2R1bGUnO1xuaW1wb3J0IHsgUHJpc21hTW9kdWxlIH0gZnJvbSAnLi9zaGFyZWQvcHJpc21hL3ByaXNtYS5tb2R1bGUnO1xuXG5ATW9kdWxlKHtcbiAgaW1wb3J0czogW1xuICAgIFByaXNtYU1vZHVsZSwgICAvLyBnbG9iYWwgUHJpc21hU2VydmljZSBwcm92aWRlclxuICAgIEF1dGhNb2R1bGUsXG4gICAgUHJvZHVjdHNNb2R1bGUsXG4gICAgSGVhbHRoTW9kdWxlLFxuICAgIC8vIE5PVEU6IElmIHlvdSBsYXRlciByZS1hZGQgeW91ciBPcGVuQVBJIGRvY3MgbW9kdWxlLFxuICAgIC8vIGltcG9ydCBpdCBoZXJlIG9uY2UgdGhlIGZpbGUgZXhpc3RzIGFnYWluLlxuICBdLFxufSlcbmV4cG9ydCBjbGFzcyBBcHBNb2R1bGUge30iXSwidmVyc2lvbiI6M30=

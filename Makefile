@@ -137,3 +137,54 @@ _inline_smoke:
 # Tiny helper to emulate an "or" for jq-typed defaults in update
 # Usage: $(or $(VAR),default)
 or = $(firstword $(strip $1) $(strip $2))
+
+# Simple helpers for apps/api
+API_DIR := apps/api
+BASE    ?= http://localhost:4000
+ORG     ?= demo
+EMAIL   ?= tester@example.com
+PASS    ?= password123
+
+.PHONY: help
+help:
+	@echo "Targets:"
+	@echo "  make api.build        - nest build"
+	@echo "  make api.start        - node dist/src/main.js"
+	@echo "  make api.stop         - kill anything listening on :4000"
+	@echo "  make prisma.push      - prisma db push"
+	@echo "  make prisma.seed      - seed demo user/org"
+	@echo "  make e2e              - run api e2e tests"
+	@echo "  make smoke            - run smoke script (auth & no-auth)"
+	@echo "  make smoke.auth       - run smoke with EMAIL/PASS"
+
+.PHONY: api.build
+api.build:
+	cd $(API_DIR) && pnpm build
+
+.PHONY: api.start
+api.start:
+	cd $(API_DIR) && node dist/src/main.js
+
+.PHONY: api.stop
+api.stop:
+	- lsof -ti :4000 | xargs kill -9 2>/dev/null || true
+
+.PHONY: prisma.push
+prisma.push:
+	cd $(API_DIR) && pnpm prisma db push
+
+.PHONY: prisma.seed
+prisma.seed:
+	cd $(API_DIR) && ORG=$(ORG) API_EMAIL=$(EMAIL) API_PASS=$(PASS) pnpm prisma db seed
+
+.PHONY: e2e
+e2e:
+	cd $(API_DIR) && mkdir -p .tmp/jest-cache && TMPDIR=$$(pwd)/.tmp pnpm -F @repo/api test:e2e --cacheDirectory $$(pwd)/.tmp/jest-cache
+
+.PHONY: smoke
+smoke:
+	cd $(API_DIR) && BASE=$(BASE) ORG=$(ORG) ./scripts/smoke.sh
+
+.PHONY: smoke.auth
+smoke.auth:
+	cd $(API_DIR) && BASE=$(BASE) ORG=$(ORG) EMAIL=$(EMAIL) PASS=$(PASS) ./scripts/smoke.sh

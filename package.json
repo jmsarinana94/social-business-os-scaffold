@@ -1,21 +1,32 @@
 {
-  "name": "social-business-os-scaffold",
+  "name": "social-business-os-scaffold-v0.2",
+  "version": "0.1.0",
   "private": true,
-  "packageManager": "pnpm@9.12.2",
   "scripts": {
-    "db:generate": "pnpm -F @repo/api prisma generate",
-    "db:push": "pnpm -F @repo/api prisma db push",
-    "seed": "pnpm -F @repo/api seed",
-    "test:e2e": "pnpm -F @repo/api test:e2e"
+    "build": "turbo run build",
+    "dev": "turbo run dev --parallel",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "format": "prettier --write .",
+    "api:dev": "pnpm -C apps/api start",
+    "api:build": "pnpm -C apps/api build",
+    "api:smoke": "./apps/api/scripts/smoke.sh",
+    "api:e2e": "pnpm -C apps/api run e2e:quick",
+    "api:reset": "./apps/api/scripts/prisma-reset.sh && ./apps/api/scripts/prisma-seed-demo.sh",
+    "prisma:generate": "pnpm -C apps/api prisma generate",
+    "prisma:studio": "pnpm -C apps/api prisma studio",
+    "prisma:migrate": "pnpm -C apps/api prisma migrate dev"
+  },
+  "devDependencies": {
+    "prettier": "^3.3.3",
+    "turbo": "^2.1.1"
   },
   "workspaces": [
     "apps/*",
     "packages/*"
   ],
-  "devDependencies": {
-    "prisma": "^6.14.0"
-  },
-  "dependencies": {
-    "@prisma/client": "^6.14.0"
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
   }
 }

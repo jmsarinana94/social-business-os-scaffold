@@ -18,3 +18,13 @@ A starter monorepo scaffold for building a robust, modular Business OS with:
    corepack enable
    corepack prepare pnpm@latest --activate
    ```
+## Running E2E tests locally
+
+Make sure you have Postgres running and `.env` contains a valid `DATABASE_URL`.  
+The tests expect a demo user: `tester@example.com / password123`.
+
+### Quick start
+```bash
+# Seed demo user + run e2e tests
+pnpm -F @repo/api db:seed:demo
+pnpm -F @repo/api e2e:quick
