@@ -1,42 +1,88 @@
-import { PartialType } from '@nestjs/mapped-types';
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import {
+  IsEnum,
+  IsInt,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsPositive,
+  IsString,
+  Min,
+} from 'class-validator';
 
-const PRODUCT_TYPES = ['PHYSICAL', 'DIGITAL'] as const;
-const PRODUCT_STATUSES = ['ACTIVE', 'INACTIVE'] as const;
+export enum ProductType {
+  PHYSICAL = 'PHYSICAL',
+  DIGITAL = 'DIGITAL',
+}
+
+export enum ProductStatus {
+  ACTIVE = 'ACTIVE',
+  INACTIVE = 'INACTIVE',
+}
 
 export class CreateProductDto {
   @IsString()
-  sku!: string;
+  @IsNotEmpty()
+  title!: string;
+
+  @IsEnum(ProductType)
+  type!: ProductType;
+
+  @IsEnum(ProductStatus)
+  status!: ProductStatus;
+
+  @Type(() => Number)
+  @IsNumber()
+  @IsPositive()
+  price!: number;
 
   @IsString()
-  title!: string;
+  @IsNotEmpty()
+  sku!: string;
 
   @IsOptional()
   @IsString()
   description?: string;
 
-  // keep as string enums to match your current schema
-  @IsString()
-  @IsIn(PRODUCT_TYPES as unknown as string[])
-  type!: (typeof PRODUCT_TYPES)[number];
-
-  @IsString()
-  @IsIn(PRODUCT_STATUSES as unknown as string[])
-  status!: (typeof PRODUCT_STATUSES)[number];
-
-  // price comes in as JSON number; coerce & validate
-  @Type(() => Number)
-  @IsNumber()
-  @Min(0)
-  price!: number;
-
-  // optional; defaulted to 0 in service if omitted
-  @Type(() => Number)
   @IsOptional()
+  @Type(() => Number)
   @IsInt()
   @Min(0)
   inventoryQty?: number;
 }
 
-export class UpdateProductDto extends PartialType(CreateProductDto) {}
+export class UpdateProductDto {
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  title?: string;
+
+  @IsOptional()
+  @IsEnum(ProductType)
+  type?: ProductType;
+
+  @IsOptional()
+  @IsEnum(ProductStatus)
+  status?: ProductStatus;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @IsPositive()
+  price?: number;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  sku?: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  inventoryQty?: number;
+}
