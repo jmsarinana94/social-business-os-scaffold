@@ -1,0 +1,111 @@
+// apps/api/prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+  // optionally:
+  // previewFeatures = ["extendedWhereUnique", "postgresqlExtensions"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Organizations / Tenancy
+model Organization {
+  id           String        @id @default(cuid())
+  slug         String        @unique
+  name         String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  users        User[]
+  products     Product[]
+  orders       Order[]
+  memberships  Membership[]
+}
+
+/// Users
+model User {
+  id         String        @id @default(cuid())
+  email      String        @unique
+  password   String
+  name       String?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  orgId      String
+  org        Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  memberships Membership[]
+}
+
+/// Optional: explicit membership table for roles
+model Membership {
+  id        String        @id @default(cuid())
+  role      String        @default("member")
+  createdAt DateTime      @default(now())
+
+  userId String
+  orgId  String
+
+  user   User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  org    Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, orgId])
+}
+
+/// Products
+model Product {
+  id              String        @id @default(cuid())
+  orgId           String
+  org             Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  sku             String        @unique
+  title           String
+  description     String?       @db.Text
+  type            String        // "PHYSICAL" | "DIGITAL" (kept as string for simplicity)
+  status          String        // "ACTIVE" | ...
+  price           Decimal       @db.Decimal(10, 2)
+  inventoryQty    Int?          @default(0)
+  lastPurchasedAt DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  orderItems      OrderItem[]
+}
+
+/// Orders (new)
+model Order {
+  id          String        @id @default(cuid())
+  orgId       String
+  org         Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  totalQty    Int
+  totalPrice  Decimal       @db.Decimal(10, 2)
+
+  createdAt   DateTime      @default(now())
+
+  // Optional metadata (add fields if your service expects them later)
+  // currency     String?     // if you add, also update service
+  // customerEmail String?    // same note
+
+  items       OrderItem[]
+}
+
+/// Order line items (new)
+model OrderItem {
+  id         String   @id @default(cuid())
+
+  orderId    String
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  qty        Int
+  unitPrice  Decimal  @db.Decimal(10, 2)
+
+  @@index([orderId])
+  @@index([productId])
+}

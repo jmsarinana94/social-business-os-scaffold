@@ -1,14 +1,20 @@
-import {
-  Injectable,
-  NotFoundException,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import * as bcrypt from 'bcrypt';
+import { Prisma } from '@prisma/client';
+import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../prisma/prisma.service';
 
-type Creds = { org: string; email: string; password: string };
-type Signup = Creds;
+type SignupDto = {
+  email: string;
+  password: string;
+  orgSlug?: string;
+  orgName?: string;
+};
+
+type LoginDto = {
+  email: string;
+  password: string;
+};
 
 @Injectable()
 export class AuthService {
@@ -17,120 +23,111 @@ export class AuthService {
     private readonly jwt: JwtService,
   ) {}
 
-  private jwtSecret() {
-    return process.env.JWT_SECRET ?? 'dev-super-secret';
-  }
-  private jwtExpires() {
-    return process.env.JWT_EXPIRES_IN ?? '1d';
-  }
+  // ---- Helpers ----
 
-  private async ensureOrg(slug: string) {
-    const s = slug.toLowerCase();
-    return this.prisma.organization.upsert({
-      where: { slug: s },
-      update: {},
-      create: { slug: s, name: s },
-    });
+  private async hashPassword(plain: string): Promise<string> {
+    const salt = await bcrypt.genSalt(10);
+    return bcrypt.hash(plain, salt);
   }
 
-  private signToken(payload: { sub: string; email: string; orgId?: string }) {
-    return this.jwt.signAsync(payload, {
-      secret: this.jwtSecret(),
-      expiresIn: this.jwtExpires(),
-    });
+  private async signToken(user: { id: string; email: string; orgId: string | null }) {
+    // Include orgId so downstream services can resolve org context
+    const payload = { sub: user.id, email: user.email, orgId: user.orgId ?? undefined };
+    return { access_token: await this.jwt.signAsync(payload) };
   }
 
-  async signup({ org, email, password }: Signup) {
-    const orgRow = await this.ensureOrg(org);
+  // ---- API methods ----
 
-    const existing = await this.prisma.user.findUnique({ where: { email } });
-    if (existing) {
-      const token = await this.signToken({
-        sub: existing.id,
-        email: existing.email,
-        orgId: orgRow.id,
-      });
-      await this.prisma.orgMember.upsert({
-        where: { userId_orgId: { userId: existing.id, orgId: orgRow.id } },
-        update: {},
-        create: { userId: existing.id, orgId: orgRow.id, role: 'MEMBER' },
-      });
-      return token;
+  async signup(dto: SignupDto) {
+    const { email, password, orgSlug, orgName } = dto;
+
+    if (!email || !password) {
+      throw new BadRequestException('email and password are required');
     }
 
-    const saltRounds = Number(process.env.BCRYPT_SALT_ROUNDS ?? 10);
-    const hash = await bcrypt.hash(password, saltRounds);
+    let orgId: string | null = null;
 
-    const user = await this.prisma.user.create({
-      data: { email, password: hash },
-    });
-
-    await this.prisma.orgMember.upsert({
-      where: { userId_orgId: { userId: user.id, orgId: orgRow.id } },
-      update: {},
-      create: { userId: user.id, orgId: orgRow.id, role: 'MEMBER' },
-    });
-
-    return this.signToken({ sub: user.id, email: user.email, orgId: orgRow.id });
-  }
-
-  async login({ org, email, password }: Creds) {
-    const orgRow = await this.ensureOrg(org);
-
-    let user = await this.prisma.user.findUnique({ where: { email } });
-
-    // If user not found, but creds match seed env, create the seed user on the fly.
-    const seedEmail = process.env.API_EMAIL || '';
-    const seedPass = process.env.API_PASS || '';
-    if (!user && email === seedEmail && password === seedPass) {
-      const saltRounds = Number(process.env.BCRYPT_SALT_ROUNDS ?? 10);
-      const hash = await bcrypt.hash(password, saltRounds);
-      user = await this.prisma.user.create({ data: { email, password: hash } });
+    if (orgSlug) {
+      // Ensure org exists (create if missing)
+      const org = await this.prisma.organization.upsert({
+        where: { slug: orgSlug },
+        update: { updatedAt: new Date() },
+        create: { slug: orgSlug, name: orgName ?? orgSlug },
+        select: { id: true },
+      });
+      orgId = org.id;
     }
 
+    const hashed = await this.hashPassword(password);
+
+    try {
+      const user = await this.prisma.user.create({
+        data: {
+          email,
+          password: hashed,
+          ...(orgId ? { org: { connect: { id: orgId } } } : {}),
+        } as Prisma.UserCreateInput,
+        select: { id: true, email: true, orgId: true },
+      });
+
+      if (orgId) {
+        await this.ensureMembership(user.id, orgId, 'OWNER');
+      }
+
+      return this.signToken(user);
+    } catch (err: unknown) {
+      // Handle unique(email) conflict — return a token for the existing user
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        const existing = await this.prisma.user.findUnique({
+          where: { email },
+          select: { id: true, email: true, orgId: true },
+        });
+        if (existing) return this.signToken(existing);
+      }
+      throw err;
+    }
+  }
+
+  async login(dto: LoginDto) {
+    const { email, password } = dto;
+
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      select: { id: true, email: true, password: true, orgId: true },
+    });
     if (!user) throw new UnauthorizedException('Invalid credentials');
 
     const ok = await bcrypt.compare(password, user.password);
     if (!ok) throw new UnauthorizedException('Invalid credentials');
 
-    await this.prisma.orgMember.upsert({
-      where: { userId_orgId: { userId: user.id, orgId: orgRow.id } },
-      update: {},
-      create: { userId: user.id, orgId: orgRow.id, role: 'MEMBER' },
-    });
-
-    return this.signToken({ sub: user.id, email: user.email, orgId: orgRow.id });
+    return this.signToken(user);
   }
 
-  async me({
-    org,
-    userId,
-    email,
-  }: {
-    org: string;
-    userId?: string;
-    email?: string;
-  }) {
-    const where =
-      userId != null
-        ? { id: userId }
-        : email != null
-        ? { email }
-        : null;
+  async me() {
+    return { ok: true };
+  }
 
-    if (!where) throw new UnauthorizedException('No user in JWT');
+  // ---- Internal ----
 
-    const user = await this.prisma.user.findUnique({
-      where,
-      select: { id: true, email: true },
-    });
-    if (!user) throw new NotFoundException('User not found');
-
-    const orgRow = await this.ensureOrg(org);
-    await this.prisma.orgMember.findUniqueOrThrow({
-      where: { userId_orgId: { userId: user.id, orgId: orgRow.id } },
+  private async ensureMembership(
+    userId: string,
+    orgId: string,
+    role: 'OWNER' | 'ADMIN' | 'MEMBER' = 'OWNER',
+  ) {
+    // Works whether or not you have @@unique([userId, orgId]) on Membership
+    const existing = await this.prisma.membership.findFirst({
+      where: { userId, orgId },
+      select: { id: true },
     });
 
-    return user;
+    if (!existing) {
+      await this.prisma.membership.create({
+        data: {
+          user: { connect: { id: userId } },
+          org: { connect: { id: orgId } },
+          role,
+        },
+      });
+    }
   }
 }

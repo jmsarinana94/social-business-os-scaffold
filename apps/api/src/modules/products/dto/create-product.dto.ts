@@ -1,14 +1,7 @@
-import { Type } from 'class-transformer';
-import {
-  IsDefined,
-  IsEnum,
-  IsNotEmpty,
-  IsNumber,
-  IsOptional,
-  IsString,
-  Min,
-} from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
+import { IsEnum, IsNumber, IsOptional, IsPositive, IsString, Length, Min } from 'class-validator';
 
+// Keep these enums aligned with your Prisma schema
 export enum ProductType {
   PHYSICAL = 'PHYSICAL',
   DIGITAL = 'DIGITAL',
@@ -20,37 +13,39 @@ export enum ProductStatus {
 }
 
 export class CreateProductDto {
-  @IsDefined()
+  @ApiProperty({ example: 'TSHIRT-BLK-M' })
   @IsString()
-  @IsNotEmpty()
-  title!: string;
-
-  @IsDefined()
-  @IsString()
-  @IsNotEmpty()
+  @Length(1, 120)
   sku!: string;
 
-  @IsDefined()
+  @ApiProperty({ example: 'T-Shirt Black (M)' })
+  @IsString()
+  @Length(1, 255)
+  title!: string;
+
+  @ApiProperty({ enum: ProductType, example: ProductType.PHYSICAL })
   @IsEnum(ProductType)
   type!: ProductType;
 
+  @ApiProperty({ enum: ProductStatus, example: ProductStatus.ACTIVE })
   @IsEnum(ProductStatus)
-  @IsOptional()
-  status: ProductStatus = ProductStatus.ACTIVE;
+  status!: ProductStatus;
 
-  @IsDefined()
-  @Type(() => Number)
+  @ApiProperty({
+    description: 'Price as number (supports integer cents or decimal).',
+    example: 24.0,
+  })
   @IsNumber()
-  @Min(0)
+  @IsPositive()
   price!: number;
 
+  @ApiProperty({
+    description: 'Starting inventory for PHYSICAL goods (optional).',
+    required: false,
+    example: 10,
+  })
   @IsOptional()
-  @Type(() => Number)
   @IsNumber()
   @Min(0)
   inventoryQty?: number;
-
-  @IsString()
-  @IsOptional()
-  description?: string;
 }

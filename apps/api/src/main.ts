@@ -1,62 +1,38 @@
-import { ValidationPipe, VersioningType } from '@nestjs/common';
-import { NestFactory } from '@nestjs/core';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import cookieParser from 'cookie-parser';
-import * as rateLimit from 'express-rate-limit';
-import 'reflect-metadata';
+import { ValidationPipe } from '@nestjs/common';
+import { HttpAdapterHost, NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { DecimalToNumberInterceptor } from './common/interceptors/decimal-to-number.interceptor';
+import { PrismaEchoFilter } from './filters/prisma-echo.filter';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { cors: true });
+  const app = await NestFactory.create(AppModule);
 
-  // Versioning -> /v1/**
-  app.enableVersioning({
-    type: VersioningType.URI,
-    defaultVersion: '1',
-  });
+  // Global API prefix (controllers should NOT include /v1 themselves)
+  app.setGlobalPrefix('v1');
 
-  // Middlewares
-  app.use(cookieParser());
-  app.use(
-    rateLimit.default({
-      windowMs: 60_000,
-      limit: 200,
-      standardHeaders: true,
-      legacyHeaders: false,
-    }) as any,
-  );
-
-  // Validation
+  // CORS & validation
+  app.enableCors();
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
-      forbidNonWhitelisted: true,
       transform: true,
-      transformOptions: { enableImplicitConversion: true },
+      forbidUnknownValues: false,
+      // stopAtFirstError keeps error payloads smaller
+      stopAtFirstError: true,
     }),
   );
 
-  // Convert Prisma Decimal -> number on all responses
-  app.useGlobalInterceptors(new DecimalToNumberInterceptor());
+  // Safe global exception filter (covers Prisma + HttpExceptions)
+  const httpAdapterHost = app.get(HttpAdapterHost);
+  app.useGlobalFilters(new PrismaEchoFilter(httpAdapterHost));
 
-  // Swagger
-  const cfg = new DocumentBuilder()
-    .setTitle('Social Business OS – API')
-    .setDescription('Public API (v1)')
-    .setVersion('1.0.0')
-    .addBearerAuth(
-      { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
-      'bearer',
-    )
-    .addSecurityRequirements('bearer')
-    .build();
-  const doc = SwaggerModule.createDocument(app, cfg);
-  SwaggerModule.setup('/docs', app, doc);
-
-  const port = Number(process.env.PORT ?? 4000);
-  await app.listen(port, '0.0.0.0');
-  console.log(`[Bootstrap] API listening on http://0.0.0.0:${port}`);
-  console.log(`[Bootstrap] Swagger UI available at http://localhost:${port}/docs`);
+  const port = Number(process.env.PORT || 4010);
+  await app.listen(port);
+   
+  console.log(`API listening on http://localhost:${port}/v1`);
+  // Optional: log resolved org for quick sanity
+  if (process.env.ORG_SLUG) {
+     
+    console.log(`ORG slug: ${process.env.ORG_SLUG}`);
+  }
 }
 bootstrap();

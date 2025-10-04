@@ -1,6 +1,6 @@
-import { IsInt } from 'class-validator';
+import { IsNumber } from 'class-validator';
 
 export class AdjustInventoryDto {
-  @IsInt()
-  delta!: number; // positive or negative
+  @IsNumber()
+  delta!: number;
 }

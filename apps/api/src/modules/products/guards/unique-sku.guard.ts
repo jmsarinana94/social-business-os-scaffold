@@ -1,29 +1,29 @@
 import {
+  BadRequestException,
   CanActivate,
   ExecutionContext,
   Injectable,
 } from '@nestjs/common';
-import { PrismaService } from '../../../infra/prisma/prisma.service';
+import { PrismaService } from '../../../prisma/prisma.service';
 
 @Injectable()
 export class UniqueSkuGuard implements CanActivate {
   constructor(private readonly prisma: PrismaService) {}
 
-  async canActivate(context: ExecutionContext): Promise<boolean> {
-    const req = context.switchToHttp().getRequest();
-    const orgSlug: string | undefined =
-      req.headers['x-org'] || req.headers['X-Org'];
+  async canActivate(ctx: ExecutionContext): Promise<boolean> {
+    const req = ctx.switchToHttp().getRequest();
 
-    // If no SKU in body, skip
-    const sku: string | undefined = req.body?.sku;
-    if (!sku) return true;
+    // Only enforce on writes
+    if (!['POST', 'PUT', 'PATCH'].includes(req.method)) return true;
 
-    // Ensure we scope by org slug
-    const existing = await this.prisma.product.findFirst({
-      where: { sku, org: { slug: String(orgSlug) } },
-      select: { id: true },
-    });
+    const orgId = String(req.headers['x-org-id'] ?? '').trim().toLowerCase();
+    if (!orgId) throw new BadRequestException('Missing x-org-id');
 
-    return !existing;
-  }
+    const sku = String(req.body?.sku ?? '').trim();
+    if (!sku) return true; // not changing SKU
+
+    const exists = await this.prisma.product.findFirst({ where: { orgId, sku } });
+    if (exists) throw new BadRequestException(`SKU ${sku} already exists in org ${orgId}`);
+    return true;
+    }
 }

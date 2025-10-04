@@ -1,73 +1,86 @@
- 
-import { Prisma, PrismaClient } from '@prisma/client';
-import * as bcrypt from 'bcrypt';
+// apps/api/prisma/seed.ts
+import { PrismaClient, ProductStatus, ProductType } from '@prisma/client';
+import * as bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
-const env = (k: string, d?: string) => process.env[k] ?? d;
 
 async function main() {
-  const ORG_SLUG = env('ORG', env('SEED_ORG_SLUG', 'demo'))!;
-  const ORG_NAME = env('SEED_ORG_NAME', 'Demo Org')!;
-  const EMAIL    = env('API_EMAIL', env('SEED_EMAIL', 'tester@example.com'))!;
-  const PASS     = env('API_PASS',  env('SEED_PASSWORD', 'secret123'))!;
+  const API_EMAIL = process.env.API_EMAIL ?? 'you@example.com';
+  const API_PASS  = process.env.API_PASS  ?? 'test1234';
 
-  console.log('🔧 Seeding with:', { ORG_SLUG, ORG_NAME, EMAIL });
-
-  // org by slug (don’t assume id="demo")
+  // 1) Organization (by slug 'org_demo')
   const org = await prisma.organization.upsert({
-    where: { slug: ORG_SLUG },
+    where: { slug: 'org_demo' },
     update: {},
-    create: { slug: ORG_SLUG, name: ORG_NAME },
+    create: { slug: 'org_demo', name: 'Demo Org' },
   });
-  console.log(`✓ Org slug=${org.slug} id=${org.id}`);
 
-  // user
-  const user = await prisma.user.upsert({
-    where: { email: EMAIL },
-    update: {},
-    create: { email: EMAIL, name: 'Seed User', passwordHash: await bcrypt.hash(PASS, 10) },
+  // 2) User (bcrypt hash in `password`)
+  const password = await bcrypt.hash(API_PASS, 10);
+  await prisma.user.upsert({
+    where: { email: API_EMAIL },
+    update: { password },
+    create: { email: API_EMAIL, password },
   });
-  console.log(`✓ User ${EMAIL}`);
 
-  // membership/orgUser (supports either table/enum naming)
-  await (prisma as any).membership?.upsert?.({
-    where: { orgId_userId: { orgId: org.id, userId: user.id } },
-    update: { role: 'OWNER' },
-    create: { orgId: org.id, userId: user.id, role: 'OWNER' },
-  }).catch(async () => {
-    await (prisma as any).orgUser?.upsert?.({
-      where: { orgId_userId: { orgId: org.id, userId: user.id } },
-      update: { role: 'admin' },
-      create: { orgId: org.id, userId: user.id, role: 'admin' },
+  // 3) Products for that org
+  const products = [
+    {
+      orgId: org.id,
+      sku: 'MUG-GREEN',
+      title: 'Green Mug',
+      price: 13.5,
+      type: ProductType.PHYSICAL,
+      status: ProductStatus.ACTIVE,
+      inventoryQty: 25,
+      description: '12oz ceramic mug in green.',
+    },
+    {
+      orgId: org.id,
+      sku: 'TSHIRT-BLK-M',
+      title: 'T-Shirt Black (M)',
+      price: 24.0,
+      type: ProductType.PHYSICAL,
+      status: ProductStatus.ACTIVE,
+      inventoryQty: 50,
+      description: 'Unisex tee, black, size M.',
+    },
+    {
+      orgId: org.id,
+      sku: 'EBOOK-START',
+      title: 'Starter eBook',
+      price: 9.99,
+      type: ProductType.DIGITAL,
+      status: ProductStatus.INACTIVE, // ARCHIVED is not in your DB enum
+      inventoryQty: 0,
+      description: 'PDF download.',
+    },
+  ] as const;
+
+  // IMPORTANT: use the generated @@unique selector name: Product_orgId_sku_key
+  for (const p of products) {
+    await prisma.product.upsert({
+      where: { Product_orgId_sku_key: { orgId: p.orgId, sku: p.sku } },
+      update: {
+        title: p.title,
+        price: p.price,
+        type: p.type,
+        status: p.status,
+        inventoryQty: p.inventoryQty,
+        description: p.description,
+      },
+      create: { ...p },
     });
-  });
-  console.log('✓ Membership');
+  }
 
-  // product with expected enum casing + required price
-  const productData: Prisma.ProductCreateInput = {
-    org: { connect: { id: org.id } },
-    sku: 'SKU-SEED',
-    title: 'Seed Widget',
-    type: 'PHYSICAL' as any,
-    status: 'ACTIVE' as any,
-    price: new Prisma.Decimal(25),
-    inventoryQty: 100,
-    description: 'Seeded product',
-  };
-
-  await (prisma as any).product.upsert({
-    where: { sku_orgId: { sku: productData.sku as string, orgId: org.id } },
-    update: {},
-    create: productData as any,
-  });
-
-  console.log('✓ Product SKU-SEED');
-  console.log('✅ Seed complete');
+  console.log('✅ Seed complete: org (org_demo), user, products');
 }
 
-main().catch((e) => {
-  console.error('Seed failed:', e);
-  process.exit(1);
-}).finally(async () => {
-  await prisma.$disconnect();
-});
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

@@ -1,18 +1,64 @@
-# apps/api/Makefile.local
-.PHONY: echo-db prisma-seed-demo prisma-reset e2e-mac e2e-all
+# Local developer Makefile overrides for apps/api
 
-echo-db:
-	@./scripts/echo-db.sh
+SHELL := /bin/bash
 
-prisma-seed-demo:
-	@./scripts/prisma-seed-demo.sh
+# ---- Targets ---------------------------------------------------------------
 
-prisma-reset:
-	@./scripts/prisma-reset.sh
+.PHONY: local-help headers smoke demo-once demo-loop demo-clean doctor guard
 
-# e2e with mac-safe TMPDIR (recommended on macOS)
-e2e-mac:
-	@./scripts/e2e-mac.sh
+local-help:
+	@echo "make headers"
+	@echo "make smoke"
+	@echo "make demo-once QTY=3 PRICE=24.99"
+	@echo "make demo-loop ITER=5 SLEEP_SEC=1"
+	@echo "make demo-clean"
+	@echo
+	@echo "Local commands:"
+	@echo "  make headers            → Show current API headers and env"
+	@echo "  make smoke              → Quick test call to /products"
+	@echo "  make demo-once          → Run run_demo_once.sh once (QTY=2 PRICE=19.99)"
+	@echo "  make demo-loop          → Run demo 5x sequentially with pauses"
+	@echo "  make demo-clean         → Reset demo product inventory to 25"
+	@echo "  make doctor             → Run basic checks (headers + smoke + demo-once + demo-loop + demo-clean)"
 
-# one-shot: generate, push, seed, and then e2e (good for clean runs)
-e2e-all: prisma-seed-demo e2e-mac
+guard:
+	@if [ -z "$(BASE)" ]; then echo "[error] BASE is not set (export it or put it in .envrc)"; exit 1; fi
+	@if [ -z "$(ORG_ID)" ]; then echo "[error] ORG_ID is not set (export it or put it in .envrc)"; exit 1; fi
+	@if [ -z "$(PASS)" ]; then echo "[error] PASS is not set (export it or put it in .envrc)"; exit 1; fi
+
+headers: guard
+	@echo "BASE=$(BASE)"
+	@echo "x-org-id=$(ORG_ID)"
+	@echo "x-org-slug=$(ORG_SLUG)"
+	@echo "Authorization=Bearer <set>"
+
+# Fix: /products may return an ARRAY; normalize to a single summary line.
+smoke: guard
+	@echo "GET $(BASE)/products"
+	@curl -sS \
+		-H "x-org-id: $(ORG_ID)" \
+		-H "Authorization: Bearer $(PASS)" \
+		"$(BASE)/products" \
+	| jq 'if type=="array" then .[0] else . end | {id, sku, status, inventoryQty}'
+
+# Defaults for demo
+QTY ?= 2
+PRICE ?= 19.99
+ITER ?= 5
+SLEEP_SEC ?= 1
+
+demo-once: guard
+	@echo "[OK] Running ./run_demo_once.sh (QTY=$(QTY) PRICE=$(PRICE))"
+	@./run_demo_once.sh "$(QTY)" "$(PRICE)"
+
+demo-loop: guard
+	@echo "==> Running demo $(ITER) times (sleep $(SLEEP_SEC)s)…"
+	@./run_demo_loop.sh "$(ITER)" "$(SLEEP_SEC)"
+
+demo-clean: guard
+	@./run_demo_once.sh 0 0 --reset-only
+
+doctor: headers smoke
+	@$(MAKE) demo-once QTY=$(QTY) PRICE=$(PRICE)
+	@$(MAKE) demo-loop ITER=$(ITER) SLEEP_SEC=$(SLEEP_SEC)
+	@$(MAKE) demo-clean

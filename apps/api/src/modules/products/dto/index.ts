@@ -1,2 +1,2 @@
-export * from './create-product.dto';
-export * from './update-product.dto';
+// apps/api/src/modules/products/dto/index.ts
+export * from './products.dto';

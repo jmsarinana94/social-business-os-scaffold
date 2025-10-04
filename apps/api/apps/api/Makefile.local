@@ -1,0 +1,36 @@
+# apps/api/Makefile.local
+SHELL := /bin/bash
+.ONESHELL:
+.PHONY: check-env
+check-env:
+	@echo "BASE=$(BASE)"
+	@echo "ORG_ID=$(ORG_ID)"
+	@echo "ORG_SLUG=$${ORG_SLUG:-<unset>}"
+	@echo "PASS=$${PASS:+<set>}"
+.PHONY: demo-once
+demo-once: check-env
+	@echo "[OK] Running ./run_demo_once.sh"
+	@chmod +x ./run_demo_once.sh || true
+	@./run_demo_once.sh
+.PHONY: demo-loop
+demo-loop: check-env
+	@for i in 1 2 3 4 5; do \
+		echo ""; echo "==> Run $$i"; \
+		./run_demo_once.sh || { echo "Failed on iteration $$i"; exit 1; }; \
+		sleep 1; \
+	done
+.PHONY: doctor
+doctor: check-env
+	@echo
+	@echo "GET $(BASE)/products"
+	@curl --http1.1 -sS -H "Accept: application/json" \
+		-H "Content-Type: application/json" \
+		-H "x-org-id: $(ORG_ID)" \
+		-H "x-org-slug: $(ORG_SLUG)" \
+		-H "Authorization: Bearer $(PASS)" \
+		"$(BASE)/products" \
+		| sed -e 's/},{/},\n{/g' | sed -n '1,3p'
+.PHONY: headers
+headers:
+	@printf "BASE=%s\nx-org-id=%s\nx-org-slug=%s\nAuthorization=%s\n" \
+		"$(BASE)" "$(ORG_ID)" "$${ORG_SLUG:-<unset>}" "$${PASS:+Bearer <set>}"

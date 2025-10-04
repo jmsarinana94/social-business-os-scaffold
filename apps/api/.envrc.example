@@ -1,0 +1,7 @@
+# Copy to .envrc and run: direnv allow
+export BASE=${BASE:-http://localhost:4010/v1}
+export EMAIL=${EMAIL:-tester@example.com}
+export PASS=${PASS:-Passw0rd!demo}
+# Use one of these:
+export ORG_ID=${ORG_ID:-cmg7h3o1j0000siron00aamg6}
+# export ORG_SLUG=${ORG_SLUG:-org_demo}

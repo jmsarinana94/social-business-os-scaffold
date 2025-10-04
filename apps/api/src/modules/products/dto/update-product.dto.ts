@@ -1,37 +1,5 @@
-import { Type } from 'class-transformer';
-import { IsEnum, IsNumber, IsOptional, IsString, Min } from 'class-validator';
-import { ProductStatus, ProductType } from './create-product.dto';
+import { PartialType } from '@nestjs/swagger';
+import { CreateProductDto } from './create-product.dto';
 
-export class UpdateProductDto {
-  @IsString()
-  @IsOptional()
-  title?: string;
-
-  @IsString()
-  @IsOptional()
-  sku?: string;
-
-  @IsEnum(ProductType)
-  @IsOptional()
-  type?: ProductType;
-
-  @IsEnum(ProductStatus)
-  @IsOptional()
-  status?: ProductStatus;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  @Min(0)
-  price?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  @Min(0)
-  inventoryQty?: number;
-
-  @IsString()
-  @IsOptional()
-  description?: string;
-}
+// Export name **must** be UpdateProductDto because products.service imports it by that name.
+export class UpdateProductDto extends PartialType(CreateProductDto) {}

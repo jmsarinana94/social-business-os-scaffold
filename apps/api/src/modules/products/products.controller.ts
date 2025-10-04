@@ -1,119 +1,114 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Delete,
   Get,
   Headers,
-  HttpCode,
-  HttpStatus,
   Param,
   Post,
   Put,
-  Query,
-  UseGuards,
+  Req,
 } from '@nestjs/common';
-import { TestOrJwtAuthGuard } from '../auth/guards/test-or-jwt.guard';
-import {
-  AdjustInventoryDto,
-  CreateProductDto,
-  UpdateProductDto,
-} from './products.dto';
-import { OrgRef, ProductsService } from './products.service';
+import { Request } from 'express';
+import { CreateProductDto, UpdateProductDto } from './dto/products.dto';
+import { ProductsService } from './products.service';
 
-function orgFromHeaders(
-  headers: Record<string, string | string[] | undefined>,
-): OrgRef {
-  // Accept either x-org (slug) or x-org-id (UUID)
-  const slug = headers['x-org'] as string | undefined;
-  const id = headers['x-org-id'] as string | undefined;
-
-  if (!slug && !id) {
-    throw new BadRequestException('Missing x-org header');
-  }
-  return { slug, id };
-}
-
-@UseGuards(TestOrJwtAuthGuard)
-@Controller({ path: 'products', version: '1' })
+@Controller('products')
 export class ProductsController {
   constructor(private readonly products: ProductsService) {}
 
-  // GET /v1/products?page=&limit=
+  /**
+   * Helper: resolve an orgId from headers or the current user.
+   * Order of precedence:
+   *   1) x-org-id
+   *   2) x-org-slug
+   *   3) req.user.orgId (from JWT)
+   */
+  private async resolveOrgId(
+    headers: Record<string, string | string[] | undefined>,
+    req: Request,
+  ): Promise<string> {
+    const orgId = (headers['x-org-id'] as string) || '';
+    const orgSlug = (headers['x-org-slug'] as string) || '';
+
+    if (orgId) return orgId;
+
+    if (orgSlug) {
+      const org = await this.products.findOrgBySlug(orgSlug);
+      if (!org) throw new Error(`Organization with slug "${orgSlug}" not found`);
+      return org.id;
+    }
+
+    // fall back to JWT user
+    const user = req.user as { sub: string; email: string; orgId?: string } | undefined;
+    if (user?.orgId) return user.orgId;
+
+    // If your JWT doesn't include orgId, resolve via DB:
+    if (user?.sub) {
+      const u = await this.products.findUserById(user.sub);
+      if (u?.orgId) return u.orgId;
+    }
+
+    throw new Error('Organization context not provided (x-org-id/x-org-slug missing and user has no org).');
+  }
+
+  // Small helper endpoint for debugging org resolution
+  @Get('_org')
+  async getOrgForToken(
+    @Headers() headers: Record<string, string>,
+    @Req() req: Request,
+  ) {
+    const orgId = await this.resolveOrgId(headers, req);
+    return { orgId };
+  }
+
   @Get()
   async list(
     @Headers() headers: Record<string, string>,
-    @Query('page') page = '1',
-    @Query('limit') limit = '10',
+    @Req() req: Request,
   ) {
-    const org = orgFromHeaders(headers);
-    const p = Math.max(parseInt(String(page), 10) || 1, 1);
-    const l = Math.min(Math.max(parseInt(String(limit), 10) || 10, 1), 100);
-    return this.products.findAll(org, p, l);
+    const orgId = await this.resolveOrgId(headers, req);
+    return this.products.list(orgId);
   }
 
-  // GET /v1/products/:id
   @Get(':id')
   async getOne(
-    @Headers() headers: Record<string, string>,
     @Param('id') id: string,
-  ) {
-    const org = orgFromHeaders(headers);
-    return this.products.findOne(org, id);
-  }
-
-  // POST /v1/products
-  @Post()
-  @HttpCode(HttpStatus.CREATED)
-  async create(
     @Headers() headers: Record<string, string>,
-    @Body() dto: CreateProductDto,
+    @Req() req: Request,
   ) {
-    const org = orgFromHeaders(headers);
-    return this.products.create(org, dto);
+    const orgId = await this.resolveOrgId(headers, req);
+    return this.products.getById(orgId, id);
   }
 
-  // PUT /v1/products/:id
+  @Post()
+  async create(
+    @Body() dto: CreateProductDto,
+    @Headers() headers: Record<string, string>,
+    @Req() req: Request,
+  ) {
+    const orgId = await this.resolveOrgId(headers, req);
+    return this.products.create(orgId, dto);
+  }
+
   @Put(':id')
   async update(
-    @Headers() headers: Record<string, string>,
     @Param('id') id: string,
     @Body() dto: UpdateProductDto,
+    @Headers() headers: Record<string, string>,
+    @Req() req: Request,
   ) {
-    const org = orgFromHeaders(headers);
-    return this.products.update(org, id, dto);
+    const orgId = await this.resolveOrgId(headers, req);
+    return this.products.update(orgId, id, dto);
   }
 
-  // DELETE /v1/products/:id
   @Delete(':id')
-  @HttpCode(HttpStatus.OK)
   async remove(
-    @Headers() headers: Record<string, string>,
     @Param('id') id: string,
-  ) {
-    const org = orgFromHeaders(headers);
-    return this.products.remove(org, id);
-  }
-
-  // GET /v1/products/:id/inventory
-  @Get(':id/inventory')
-  async getInventory(
     @Headers() headers: Record<string, string>,
-    @Param('id') id: string,
+    @Req() req: Request,
   ) {
-    const org = orgFromHeaders(headers);
-    return this.products.getInventory(org, id);
-  }
-
-  // POST /v1/products/:id/inventory  -> should be 200 OK (not 201)
-  @Post(':id/inventory')
-  @HttpCode(HttpStatus.OK)
-  async addInventory(
-    @Headers() headers: Record<string, string>,
-    @Param('id') id: string,
-    @Body() payload: AdjustInventoryDto,
-  ) {
-    const org = orgFromHeaders(headers);
-    return this.products.addInventory(org, id, payload);
+    const orgId = await this.resolveOrgId(headers, req);
+    return this.products.remove(orgId, id);
   }
 }
