@@ -1,79 +1,57 @@
 // apps/api/prisma/seed.ts
-import { PrismaClient, ProductStatus, ProductType } from '@prisma/client';
-import * as bcrypt from 'bcryptjs';
+import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcrypt';
+import 'dotenv/config';
 
 const prisma = new PrismaClient();
 
 async function main() {
-  const API_EMAIL = process.env.API_EMAIL ?? 'you@example.com';
-  const API_PASS  = process.env.API_PASS  ?? 'test1234';
+  const EMAIL = process.env.EMAIL || 'tester@example.com';
+  const API_PASS = process.env.PASS || 'Passw0rd!demo';
 
-  // 1) Organization (by slug 'org_demo')
-  const org = await prisma.organization.upsert({
-    where: { slug: 'org_demo' },
-    update: {},
-    create: { slug: 'org_demo', name: 'Demo Org' },
-  });
+  // Org inputs (use ID if given; fall back to slug; create sensible defaults)
+  const ORG_ID = process.env.ORG_ID || undefined;                 // e.g., 'cmg7h3o1j0000siron00aamg6'
+  const ORG_SLUG = (process.env.ORG_SLUG && process.env.ORG_SLUG.trim().length > 0)
+    ? process.env.ORG_SLUG!.trim()
+    : 'demo-org';
+  const ORG_NAME = 'Demo Org';
 
-  // 2) User (bcrypt hash in `password`)
-  const password = await bcrypt.hash(API_PASS, 10);
+  // 1) Upsert Organization
+  //    Prefer id for the unique "where" if provided; otherwise use slug.
+  const org = await (async () => {
+    if (ORG_ID) {
+      return prisma.organization.upsert({
+        where: { id: ORG_ID },
+        update: { slug: ORG_SLUG, name: ORG_NAME },
+        create: { id: ORG_ID, slug: ORG_SLUG, name: ORG_NAME },
+      });
+    } else {
+      // assumes slug is unique in your schema
+      return prisma.organization.upsert({
+        where: { slug: ORG_SLUG },
+        update: { name: ORG_NAME },
+        create: { slug: ORG_SLUG, name: ORG_NAME },
+      });
+    }
+  })();
+
+  // 2) Upsert User (with a bcrypt hash) and CONNECT to org
+  const passwordHash = await bcrypt.hash(API_PASS, 10);
+
   await prisma.user.upsert({
-    where: { email: API_EMAIL },
-    update: { password },
-    create: { email: API_EMAIL, password },
+    where: { email: EMAIL },
+    update: { password: passwordHash, org: { connect: { id: org.id } } },
+    create: {
+      email: EMAIL,
+      password: passwordHash,
+      org: { connect: { id: org.id } }, // <- the missing bit
+    },
   });
 
-  // 3) Products for that org
-  const products = [
-    {
-      orgId: org.id,
-      sku: 'MUG-GREEN',
-      title: 'Green Mug',
-      price: 13.5,
-      type: ProductType.PHYSICAL,
-      status: ProductStatus.ACTIVE,
-      inventoryQty: 25,
-      description: '12oz ceramic mug in green.',
-    },
-    {
-      orgId: org.id,
-      sku: 'TSHIRT-BLK-M',
-      title: 'T-Shirt Black (M)',
-      price: 24.0,
-      type: ProductType.PHYSICAL,
-      status: ProductStatus.ACTIVE,
-      inventoryQty: 50,
-      description: 'Unisex tee, black, size M.',
-    },
-    {
-      orgId: org.id,
-      sku: 'EBOOK-START',
-      title: 'Starter eBook',
-      price: 9.99,
-      type: ProductType.DIGITAL,
-      status: ProductStatus.INACTIVE, // ARCHIVED is not in your DB enum
-      inventoryQty: 0,
-      description: 'PDF download.',
-    },
-  ] as const;
+  // (Optional) seed any baseline products here if you want
+  // await prisma.product.createMany({ data: [...] });
 
-  // IMPORTANT: use the generated @@unique selector name: Product_orgId_sku_key
-  for (const p of products) {
-    await prisma.product.upsert({
-      where: { Product_orgId_sku_key: { orgId: p.orgId, sku: p.sku } },
-      update: {
-        title: p.title,
-        price: p.price,
-        type: p.type,
-        status: p.status,
-        inventoryQty: p.inventoryQty,
-        description: p.description,
-      },
-      create: { ...p },
-    });
-  }
-
-  console.log('✅ Seed complete: org (org_demo), user, products');
+  console.log(`Seeded org=${org.id} (${org.slug}) and user=${EMAIL}`);
 }
 
 main()
