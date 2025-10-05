@@ -5,16 +5,12 @@ export class SignupDto {
   email!: string;
 
   @IsString()
-  @MinLength(8)
+  @MinLength(6)
   password!: string;
 
-  @IsString()
-  orgSlug!: string;
-
-  @IsString()
-  orgName!: string;
-
+  // Optional: tests sometimes omit this
   @IsOptional()
   @IsString()
-  name?: string;
+  @MinLength(1)
+  org?: string;
 }

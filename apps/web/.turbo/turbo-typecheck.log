@@ -1,5 +1,0 @@
-
-
-> web@ typecheck /Users/mannysarinana/Downloads/social-business-os-scaffold-v0.2/apps/web
-> tsc -p tsconfig.json --noEmit
-

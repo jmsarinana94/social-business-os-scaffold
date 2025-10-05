@@ -1,24 +1,28 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Get, Headers, HttpCode, Post } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { LoginDto } from './dto/login.dto';
-import { SignupDto } from './dto/signup.dto';
 
-@Controller('auth') // ✅ rely on global prefix "v1"
+type SignupBody = { email: string; password: string; org?: string };
+type LoginBody = { email: string; password: string };
+
+@Controller('auth')
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
   @Post('signup')
-  async signup(@Body() dto: SignupDto) {
-    return this.auth.signup(dto);
+  async signup(@Body() body: SignupBody) {
+    const payload = { email: body.email, password: body.password, org: body.org ?? 'org' };
+    return this.auth.signup(payload);
   }
 
   @Post('login')
-  async login(@Body() dto: LoginDto) {
-    return this.auth.login(dto);
+  @HttpCode(200)
+  async login(@Body() { email, password }: LoginBody) {
+    return this.auth.login({ email, password });
   }
 
   @Get('me')
-  async me() {
-    return { ok: true };
+  @HttpCode(200)
+  async me(@Headers('authorization') authz?: string) {
+    return this.auth.meFromAuthorization(authz ?? '');
   }
 }

@@ -188,3 +188,58 @@ smoke:
 .PHONY: smoke.auth
 smoke.auth:
 	cd $(API_DIR) && BASE=$(BASE) ORG=$(ORG) EMAIL=$(EMAIL) PASS=$(PASS) ./scripts/smoke.sh
+
+API ?= http://localhost:4001/v1
+ORG ?= org_demo
+EMAIL ?= you@example.com
+PASS ?= test1234
+
+export API ORG EMAIL PASS
+
+.PHONY: login seed list
+login:
+	@scripts/demo.sh login
+
+seed:
+	@scripts/demo.sh seed
+
+list:
+	@scripts/demo.sh list
+
+# Run the full demo: login + seed demo products + list products
+demo: login
+	@echo "🚀 Running demo (login + seed + list)…"
+	./scripts/demo_seed.sh
+	$(MAKE) list
+
+.PHONY: orders.demo
+orders.demo:
+	@echo "Running demo checkout…"
+	@./scripts/demo_checkout.sh
+
+.PHONY: orders.list
+orders.list:
+	@./scripts/login.sh >/dev/null 2>&1 || true
+	@TOKEN=$$(cat .token 2>/dev/null || echo "") ;\
+	if [ -z "$$TOKEN" ]; then echo "No token. Run 'make login' first."; exit 1; fi ;\
+	curl -sS "$${API:-http://localhost:4001/v1}/orders" \
+	  -H "authorization: Bearer $$TOKEN" \
+	  -H "x-org-id: $${ORG:-org_demo}" | jq .
+
+orders.demo:
+	@echo "Running demo checkout…"
+	@API?=http://localhost:4001/v1 ORG?=org_demo EMAIL?=you@example.com PASS?=test1234 \
+	bash ./scripts/demo_checkout.sh
+
+db.reset:
+	@echo "⚠️  Dropping and recreating public schema (dev only)…"
+	docker compose exec -T db psql -U postgres -d sbo -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'
+
+prisma.deploy:
+	@echo "Running prisma deploy inside api container…"
+	docker compose exec -T api sh -lc '\
+	  corepack enable >/dev/null 2>&1 || true; \
+	  npx --yes prisma@6.14.0 migrate deploy --schema=prisma/schema.prisma || \
+	  npx --yes prisma@6.14.0 db push --schema=prisma/schema.prisma; \
+	  npx --yes prisma@6.14.0 generate --schema=prisma/schema.prisma \
+	'

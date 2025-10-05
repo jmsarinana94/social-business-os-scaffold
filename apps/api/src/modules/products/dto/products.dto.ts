@@ -7,29 +7,32 @@ import {
   IsOptional,
   IsPositive,
   IsString,
+  MaxLength,
   Min,
 } from 'class-validator';
 
-export enum ProductType {
+export enum ProductTypeDto {
   PHYSICAL = 'PHYSICAL',
   DIGITAL = 'DIGITAL',
 }
 
-export enum ProductStatus {
+export enum ProductStatusDto {
   ACTIVE = 'ACTIVE',
-  INACTIVE = 'INACTIVE',
+  DRAFT = 'DRAFT',
+  ARCHIVED = 'ARCHIVED',
 }
 
 export class CreateProductDto {
   @IsString()
   @IsNotEmpty()
+  @MaxLength(200)
   title!: string;
 
-  @IsEnum(ProductType)
-  type!: ProductType;
+  @IsEnum(ProductTypeDto)
+  type!: ProductTypeDto;
 
-  @IsEnum(ProductStatus)
-  status!: ProductStatus;
+  @IsEnum(ProductStatusDto)
+  status!: ProductStatusDto;
 
   @Type(() => Number)
   @IsNumber()
@@ -38,10 +41,12 @@ export class CreateProductDto {
 
   @IsString()
   @IsNotEmpty()
+  @MaxLength(120)
   sku!: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(2000)
   description?: string;
 
   @IsOptional()
@@ -54,16 +59,16 @@ export class CreateProductDto {
 export class UpdateProductDto {
   @IsOptional()
   @IsString()
-  @IsNotEmpty()
+  @MaxLength(200)
   title?: string;
 
   @IsOptional()
-  @IsEnum(ProductType)
-  type?: ProductType;
+  @IsEnum(ProductTypeDto)
+  type?: ProductTypeDto;
 
   @IsOptional()
-  @IsEnum(ProductStatus)
-  status?: ProductStatus;
+  @IsEnum(ProductStatusDto)
+  status?: ProductStatusDto;
 
   @IsOptional()
   @Type(() => Number)
@@ -73,11 +78,12 @@ export class UpdateProductDto {
 
   @IsOptional()
   @IsString()
-  @IsNotEmpty()
+  @MaxLength(120)
   sku?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(2000)
   description?: string;
 
   @IsOptional()

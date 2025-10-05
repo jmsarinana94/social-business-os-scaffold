@@ -1,25 +1,39 @@
-version: '3.9'
+# docker-compose.yml
 services:
   db:
     image: postgres:16-alpine
-    container_name: sbo-db
-    restart: unless-stopped
     environment:
-      POSTGRES_USER: sbo
-      POSTGRES_PASSWORD: sbo
       POSTGRES_DB: sbo
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
     ports:
-      - '5432:5432'
+      - "5432:5432"
     volumes:
-      - db_data:/var/lib/postgresql/data
+      - sbo_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d sbo"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
-  redis:
-    image: redis:7-alpine
-    container_name: sbo-redis
-    restart: unless-stopped
+  api:
+    image: sbo-api:0.2.3       # the image you’ve built with your NestJS app
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # JWT / App
+      JWT_SECRET: dev-super-secret
+      JWT_EXPIRES_IN: 1d
+      NODE_ENV: development
+      PORT: "4000"
+      # DB (use service name "db" as host)
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/sbo?schema=public
     ports:
-      - '6379:6379'
-    command: ["redis-server", "--appendonly", "yes"]
+      - "4001:4000"            # host:container
+    command: ["node", "/app/dist/src/main.js"]
+    # If you prefer to pass a .env file from apps/api, uncomment:
+    # env_file: apps/api/.env
 
 volumes:
-  db_data:
+  sbo_pgdata:

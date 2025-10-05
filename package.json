@@ -15,19 +15,22 @@
     "api:reset": "./apps/api/scripts/prisma-reset.sh && ./apps/api/scripts/prisma-seed-demo.sh",
     "prisma:generate": "pnpm -C apps/api prisma generate",
     "prisma:studio": "pnpm -C apps/api prisma studio",
-    "prisma:migrate": "pnpm -C apps/api prisma migrate dev"
+    "prisma:migrate": "pnpm -C apps/api prisma migrate dev",
+    "dev:web": "pnpm -C apps/web dev",
+    "dev:api": "pnpm -C apps/api start:dev",
+    "packageManager": "pnpm@10.17.0"
   },
   "devDependencies": {
     "prettier": "^3.3.3",
-    "turbo": "^2.1.1",
-    "prisma": "6.14.0"
+    "prisma": "6.14.0",
+    "turbo": "^2.1.1"
   },
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
   "engines": {
     "node": ">=20.0.0",
     "pnpm": ">=9.0.0"
-  }
+  },
+  "dependencies": {
+    "@prisma/client": "6.14.0"
+  },
+  "packageManager": "pnpm@9.12.2"
 }

@@ -1,98 +1,75 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Delete,
   Get,
   Headers,
+  HttpCode,
   Param,
-  Patch,
   Post,
-  Req,
+  Put,
 } from '@nestjs/common';
-import { Request } from 'express';
-import {
-  CreateProductDto,
-  UpdateProductDto,
-} from './dto/products.dto';
+import { CreateProductDto, UpdateProductDto } from './products.dto';
 import { ProductsService } from './products.service';
 
-type OrgRef = { orgId?: string; orgSlug?: string };
+const ORG_HEADER = 'x-org';
 
 @Controller('products')
 export class ProductsController {
   constructor(private readonly products: ProductsService) {}
 
-  private resolveOrg(req: Request, headers: Record<string, any>): OrgRef {
-    // Priority: explicit headers -> JWT (req.user) -> env -> demo fallback
-    const hdr = (k: string) => (headers[k] || headers[k.toLowerCase()]) as string | undefined;
-
-    const orgId =
-      hdr('x-org-id') ||
-      ((req.user as any)?.orgId as string | undefined) ||
-      process.env.ORG_ID ||
-      undefined;
-
-    const orgSlug =
-      hdr('x-org-slug') ||
-      process.env.ORG_SLUG ||
-      'demo-org';
-
-    if (!orgId && !orgSlug) {
-      throw new BadRequestException(
-        'Organization context required (x-org-id or x-org-slug)',
-      );
-    }
-    return { orgId, orgSlug };
+  private orgFromHeaders(h: Record<string, any>): string {
+    const v = (h?.[ORG_HEADER] ?? h?.[ORG_HEADER.toUpperCase()] ?? 'org') as string;
+    return v || 'org';
   }
 
   @Post()
-  async create(
-    @Req() req: Request,
-    @Headers() headers: Record<string, any>,
-    @Body() dto: CreateProductDto,
-  ) {
-    const org = this.resolveOrg(req, headers);
-    return this.products.create(org, dto);
+  async create(@Headers() headers: Record<string, any>, @Body() dto: CreateProductDto) {
+    const org = this.orgFromHeaders(headers);
+    const created = await this.products.create(org, dto);
+    return created;
   }
 
   @Get()
-  async list(
-    @Req() req: Request,
-    @Headers() headers: Record<string, any>,
-  ) {
-    const org = this.resolveOrg(req, headers);
+  async list(@Headers() headers: Record<string, any>) {
+    const org = this.orgFromHeaders(headers);
     return this.products.list(org);
   }
 
   @Get(':id')
-  async getOne(
-    @Req() req: Request,
-    @Headers() headers: Record<string, any>,
-    @Param('id') id: string,
-  ) {
-    const org = this.resolveOrg(req, headers);
-    return this.products.getOne(org, id);
+  async get(@Headers() headers: Record<string, any>, @Param('id') id: string) {
+    const org = this.orgFromHeaders(headers);
+    return this.products.get(org, id);
   }
 
-  @Patch(':id')
+  @Put(':id')
   async update(
-    @Req() req: Request,
     @Headers() headers: Record<string, any>,
     @Param('id') id: string,
     @Body() dto: UpdateProductDto,
   ) {
-    const org = this.resolveOrg(req, headers);
+    const org = this.orgFromHeaders(headers);
     return this.products.update(org, id, dto);
   }
 
-  @Delete(':id')
-  async remove(
-    @Req() req: Request,
+  // ✅ Make this 200 OK (not 201)
+  @Post(':id/inventory')
+  @HttpCode(200)
+  async adjustInventory(
     @Headers() headers: Record<string, any>,
     @Param('id') id: string,
+    @Body() body: { delta: number },
   ) {
-    const org = this.resolveOrg(req, headers);
-    return this.products.remove(org, id);
+    const org = this.orgFromHeaders(headers);
+    return this.products.adjustInventory(org, id, Number(body?.delta));
+  }
+
+  // ✅ Tests expect 200 on delete
+  @Delete(':id')
+  @HttpCode(200)
+  async remove(@Headers() headers: Record<string, any>, @Param('id') id: string) {
+    const org = this.orgFromHeaders(headers);
+    await this.products.remove(org, id);
+    return { ok: true };
   }
 }

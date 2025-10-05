@@ -1,51 +1,47 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsNumber, IsOptional, IsPositive, IsString, Length, Min } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsEnum, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 
-// Keep these enums aligned with your Prisma schema
-export enum ProductType {
+export enum ProductTypeDto {
   PHYSICAL = 'PHYSICAL',
   DIGITAL = 'DIGITAL',
 }
 
-export enum ProductStatus {
+export enum ProductStatusDto {
   ACTIVE = 'ACTIVE',
   INACTIVE = 'INACTIVE',
 }
 
 export class CreateProductDto {
-  @ApiProperty({ example: 'TSHIRT-BLK-M' })
   @IsString()
-  @Length(1, 120)
-  sku!: string;
-
-  @ApiProperty({ example: 'T-Shirt Black (M)' })
-  @IsString()
-  @Length(1, 255)
+  @IsNotEmpty()
+  @MaxLength(100)
   title!: string;
 
-  @ApiProperty({ enum: ProductType, example: ProductType.PHYSICAL })
-  @IsEnum(ProductType)
-  type!: ProductType;
+  @IsEnum(ProductTypeDto)
+  type!: ProductTypeDto;
 
-  @ApiProperty({ enum: ProductStatus, example: ProductStatus.ACTIVE })
-  @IsEnum(ProductStatus)
-  status!: ProductStatus;
+  @IsEnum(ProductStatusDto)
+  status!: ProductStatusDto;
 
-  @ApiProperty({
-    description: 'Price as number (supports integer cents or decimal).',
-    example: 24.0,
-  })
-  @IsNumber()
-  @IsPositive()
+  // E2E sends numbers (e.g., 12, 12.34). Transform to number and validate.
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
   price!: number;
 
-  @ApiProperty({
-    description: 'Starting inventory for PHYSICAL goods (optional).',
-    required: false,
-    example: 10,
-  })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(64)
+  sku!: string;
+
   @IsOptional()
-  @IsNumber()
+  @IsString()
+  @MaxLength(500)
+  description?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
   @Min(0)
   inventoryQty?: number;
 }
