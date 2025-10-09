@@ -1,46 +1,31 @@
-// src/common/prisma-exception.filter.ts
 import {
-    ArgumentsHost,
-    Catch,
-    ExceptionFilter,
-    HttpStatus,
+  ArgumentsHost,
+  Catch,
+  ExceptionFilter
 } from '@nestjs/common';
-import { Request, Response } from 'express';
+import { Prisma } from '@prisma/client';
 
-/**
- * Prisma v6-compatible exception filter.
- * Narrow by `.code` instead of using PrismaClientKnownRequestError class.
- */
-@Catch()
+@Catch(Prisma.PrismaClientKnownRequestError)
 export class PrismaExceptionFilter implements ExceptionFilter {
-  catch(exception: unknown, host: ArgumentsHost) {
+  catch(exception: Prisma.PrismaClientKnownRequestError, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
-    const res = ctx.getResponse<Response>();
-    const req = ctx.getRequest<Request>();
+    const response = ctx.getResponse();
 
-    if (isCode(exception, 'P2002')) {
-      return res.status(HttpStatus.CONFLICT).json({
-        statusCode: HttpStatus.CONFLICT,
+    // P2002 unique constraint
+    if (exception.code === 'P2002') {
+      const message = 'Duplicate value violates a unique constraint';
+      return response.status(409).json({
+        statusCode: 409,
+        message,
         error: 'Conflict',
-        message: 'Unique constraint violation',
-        path: req.url,
       });
     }
 
-    if (isCode(exception, 'P2025')) {
-      return res.status(HttpStatus.NOT_FOUND).json({
-        statusCode: HttpStatus.NOT_FOUND,
-        error: 'Not Found',
-        message: 'Record not found',
-        path: req.url,
-      });
-    }
-
-    // Pass through to Nest default handlers / other filters
-    throw exception;
+    // Fallback – don’t leak internals
+    return response.status(400).json({
+      statusCode: 400,
+      message: 'Invalid data for this operation',
+      error: 'Bad Request',
+    });
   }
-}
-
-function isCode(ex: unknown, code: string): ex is { code: string } {
-  return !!ex && typeof ex === 'object' && 'code' in ex && (ex as any).code === code;
 }

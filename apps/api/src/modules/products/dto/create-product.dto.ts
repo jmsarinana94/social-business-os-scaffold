@@ -1,56 +1,47 @@
-import { Type } from 'class-transformer';
-import {
-  IsDefined,
-  IsEnum,
-  IsNotEmpty,
-  IsNumber,
-  IsOptional,
-  IsString,
-  Min,
-} from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ProductStatus, ProductType } from '@prisma/client';
+import { IsEnum, IsNumber, IsOptional, IsString, Matches, Min } from 'class-validator';
 
-export enum ProductType {
-  PHYSICAL = 'PHYSICAL',
-  DIGITAL = 'DIGITAL',
-}
-
-export enum ProductStatus {
-  ACTIVE = 'ACTIVE',
-  INACTIVE = 'INACTIVE',
-}
+const SKU_RE = /^[A-Z0-9][A-Z0-9\-_.]{1,62}[A-Z0-9]$/;
 
 export class CreateProductDto {
-  @IsDefined()
+  @ApiProperty({
+    description: 'Stock keeping unit (unique within an org)',
+    example: 'SKU-ABC-123',
+  })
   @IsString()
-  @IsNotEmpty()
-  title!: string;
-
-  @IsDefined()
-  @IsString()
-  @IsNotEmpty()
+  @Matches(SKU_RE, { message: 'sku has invalid format' })
   sku!: string;
 
-  @IsDefined()
-  @IsEnum(ProductType)
-  type!: ProductType;
-
-  @IsEnum(ProductStatus)
+  @ApiPropertyOptional()
   @IsOptional()
-  status: ProductStatus = ProductStatus.ACTIVE;
+  @IsString()
+  title?: string;
 
-  @IsDefined()
-  @Type(() => Number)
+  @ApiPropertyOptional({ enum: ProductType })
+  @IsOptional()
+  @IsEnum(ProductType)
+  type?: ProductType;
+
+  @ApiPropertyOptional({ enum: ProductStatus })
+  @IsOptional()
+  @IsEnum(ProductStatus)
+  status?: ProductStatus;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
   @IsNumber()
   @Min(0)
-  price!: number;
+  price?: number;
 
+  @ApiPropertyOptional()
   @IsOptional()
-  @Type(() => Number)
   @IsNumber()
   @Min(0)
   inventoryQty?: number;
-
-  @IsString()
-  @IsOptional()
-  description?: string;
 }

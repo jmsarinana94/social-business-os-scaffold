@@ -4,116 +4,103 @@ import {
   Controller,
   Delete,
   Get,
-  Headers,
   HttpCode,
-  HttpStatus,
   Param,
+  Patch,
   Post,
   Put,
-  Query,
-  UseGuards,
 } from '@nestjs/common';
-import { TestOrJwtAuthGuard } from '../auth/guards/test-or-jwt.guard';
-import {
-  AdjustInventoryDto,
-  CreateProductDto,
-  UpdateProductDto,
-} from './products.dto';
-import { OrgRef, ProductsService } from './products.service';
+import { CreateProductDto, OrgHeader, UpdateProductDto } from './products.dto';
+import { ProductsService } from './products.service';
 
-function orgFromHeaders(
-  headers: Record<string, string | string[] | undefined>,
-): OrgRef {
-  // Accept either x-org (slug) or x-org-id (UUID)
-  const slug = headers['x-org'] as string | undefined;
-  const id = headers['x-org-id'] as string | undefined;
-
-  if (!slug && !id) {
-    throw new BadRequestException('Missing x-org header');
-  }
-  return { slug, id };
-}
-
-@UseGuards(TestOrJwtAuthGuard)
-@Controller({ path: 'products', version: '1' })
+@Controller('products')
 export class ProductsController {
   constructor(private readonly products: ProductsService) {}
 
-  // GET /v1/products?page=&limit=
-  @Get()
-  async list(
-    @Headers() headers: Record<string, string>,
-    @Query('page') page = '1',
-    @Query('limit') limit = '10',
-  ) {
-    const org = orgFromHeaders(headers);
-    const p = Math.max(parseInt(String(page), 10) || 1, 1);
-    const l = Math.min(Math.max(parseInt(String(limit), 10) || 10, 1), 100);
-    return this.products.findAll(org, p, l);
-  }
-
-  // GET /v1/products/:id
-  @Get(':id')
-  async getOne(
-    @Headers() headers: Record<string, string>,
-    @Param('id') id: string,
-  ) {
-    const org = orgFromHeaders(headers);
-    return this.products.findOne(org, id);
-  }
-
-  // POST /v1/products
+  // Create a new product
   @Post()
-  @HttpCode(HttpStatus.CREATED)
-  async create(
-    @Headers() headers: Record<string, string>,
-    @Body() dto: CreateProductDto,
-  ) {
-    const org = orgFromHeaders(headers);
-    return this.products.create(org, dto);
+  create(@OrgHeader() orgId: string | undefined, @Body() dto: CreateProductDto) {
+    return this.products.create(orgId, dto);
   }
 
-  // PUT /v1/products/:id
+  // List all products for an org
+  @Get()
+  findAll(@OrgHeader() orgId: string | undefined) {
+    return this.products.findAll(orgId);
+  }
+
+  // Get a single product by id
+  @Get(':id')
+  findOne(@OrgHeader() orgId: string | undefined, @Param('id') id: string) {
+    return this.products.findOne(orgId, id);
+  }
+
+  // Full update (PUT)
   @Put(':id')
-  async update(
-    @Headers() headers: Record<string, string>,
+  replace(
+    @OrgHeader() orgId: string | undefined,
     @Param('id') id: string,
     @Body() dto: UpdateProductDto,
   ) {
-    const org = orgFromHeaders(headers);
-    return this.products.update(org, id, dto);
+    return this.products.update(orgId, id, dto);
   }
 
-  // DELETE /v1/products/:id
-  @Delete(':id')
-  @HttpCode(HttpStatus.OK)
-  async remove(
-    @Headers() headers: Record<string, string>,
+  // Partial update (PATCH)
+  @Patch(':id')
+  patch(
+    @OrgHeader() orgId: string | undefined,
     @Param('id') id: string,
+    @Body() dto: UpdateProductDto,
   ) {
-    const org = orgFromHeaders(headers);
-    return this.products.remove(org, id);
+    return this.products.update(orgId, id, dto);
   }
 
-  // GET /v1/products/:id/inventory
-  @Get(':id/inventory')
-  async getInventory(
-    @Headers() headers: Record<string, string>,
+  // --- INVENTORY ADJUST ROUTES ---
+  // Accept delta without DTO validation; coerce to number to avoid ValidationPipe 400s.
+  private coerceDelta(raw: unknown): number {
+    const n = typeof raw === 'string' ? Number(raw) : (raw as number);
+    if (!Number.isFinite(n)) {
+      throw new BadRequestException('delta must be a number');
+    }
+    return n;
+  }
+
+  @Patch(':id/inventory')
+  @HttpCode(200)
+  adjustInventoryPatch(
+    @OrgHeader() orgId: string | undefined,
     @Param('id') id: string,
+    @Body('delta') rawDelta: unknown,
   ) {
-    const org = orgFromHeaders(headers);
-    return this.products.getInventory(org, id);
+    const delta = this.coerceDelta(rawDelta);
+    return this.products.adjustInventory(orgId, id, delta);
   }
 
-  // POST /v1/products/:id/inventory  -> should be 200 OK (not 201)
+  @Put(':id/inventory')
+  @HttpCode(200)
+  adjustInventoryPut(
+    @OrgHeader() orgId: string | undefined,
+    @Param('id') id: string,
+    @Body('delta') rawDelta: unknown,
+  ) {
+    const delta = this.coerceDelta(rawDelta);
+    return this.products.adjustInventory(orgId, id, delta);
+  }
+
   @Post(':id/inventory')
-  @HttpCode(HttpStatus.OK)
-  async addInventory(
-    @Headers() headers: Record<string, string>,
+  @HttpCode(200)
+  adjustInventoryPost(
+    @OrgHeader() orgId: string | undefined,
     @Param('id') id: string,
-    @Body() payload: AdjustInventoryDto,
+    @Body('delta') rawDelta: unknown,
   ) {
-    const org = orgFromHeaders(headers);
-    return this.products.addInventory(org, id, payload);
+    const delta = this.coerceDelta(rawDelta);
+    return this.products.adjustInventory(orgId, id, delta);
+  }
+
+  // Delete a product
+  @Delete(':id')
+  remove(@OrgHeader() orgId: string | undefined, @Param('id') id: string) {
+    return this.products.remove(orgId, id);
   }
 }

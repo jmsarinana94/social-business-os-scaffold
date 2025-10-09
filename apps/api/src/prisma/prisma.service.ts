@@ -1,37 +1,19 @@
-import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { Prisma, PrismaClient } from '@prisma/client';
+import { INestApplication, Injectable, OnModuleInit } from '@nestjs/common';
+import { PrismaClient } from '@prisma/client';
 
 @Injectable()
-export class PrismaService
-  extends PrismaClient<Prisma.PrismaClientOptions>
-  implements OnModuleInit, OnModuleDestroy
-{
-  constructor() {
-    super({
-      log: process.env.NODE_ENV === 'test' ? [] : ['warn', 'error'],
-    } as Prisma.PrismaClientOptions);
-
-    this.setupProcessListeners();
-  }
-
+export class PrismaService extends PrismaClient implements OnModuleInit {
   async onModuleInit() {
     await this.$connect();
   }
 
-  async onModuleDestroy() {
-    await this.$disconnect();
-  }
-
-  private setupProcessListeners() {
-    const disconnect = async () => {
-      try { await this.$disconnect(); } catch {}
-    };
-    process.on('beforeExit', disconnect);
-    process.on('SIGINT', disconnect);
-    process.on('SIGTERM', disconnect);
-    process.on('SIGUSR2', async () => {
-      await disconnect();
-      process.kill(process.pid, 'SIGUSR2');
+  /**
+   * Gracefully close Nest when the Node process is about to exit.
+   * Using process.on avoids Prisma $on typing differences across versions.
+   */
+  async enableShutdownHooks(app: INestApplication) {
+    process.on('beforeExit', async () => {
+      await app.close();
     });
   }
 }

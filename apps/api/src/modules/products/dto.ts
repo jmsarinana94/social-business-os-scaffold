@@ -1,102 +1,69 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Transform } from 'class-transformer';
-import {
-    IsIn,
-    IsNotEmpty,
-    IsNumber,
-    IsOptional,
-    IsPositive,
-    IsString,
-    MaxLength,
-} from 'class-validator';
+import { IsEnum, IsInt, IsNumber, IsOptional, IsString, Matches, Min } from 'class-validator';
 
-/**
- * Accept friendly lowercase strings and map them to Prisma enums in the service.
- * IMPORTANT: your Prisma enum supports only PHYSICAL | DIGITAL and ACTIVE | INACTIVE.
- */
-export class CreateProductDto {
-  @ApiProperty({ example: 'Widget' })
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(120)
-  title!: string;
-
-  @ApiProperty({
-    enum: ['physical', 'digital'],
-    example: 'physical',
-    description: 'Lowercase input; mapped to Prisma enum internally.',
-  })
-  @IsString()
-  @IsIn(['physical', 'digital'])
-  @Transform(({ value }) => String(value).toLowerCase())
-  type!: 'physical' | 'digital';
-
-  @ApiPropertyOptional({
-    enum: ['active', 'inactive'],
-    example: 'active',
-    description: 'Lowercase input; mapped to Prisma enum internally.',
-  })
-  @IsOptional()
-  @IsString()
-  @IsIn(['active', 'inactive'])
-  @Transform(({ value }) => (value == null ? value : String(value).toLowerCase()))
-  status?: 'active' | 'inactive';
-
-  @ApiProperty({ example: 12.99 })
-  @IsNumber()
-  @IsPositive()
-  price!: number;
-
-  @ApiPropertyOptional({ example: 'Optional description' })
-  @IsOptional()
-  @IsString()
-  @MaxLength(1000)
-  description?: string;
-
-  @ApiPropertyOptional({ example: 'SKU-ABC-123' })
-  @IsOptional()
-  @IsString()
-  @MaxLength(64)
-  sku?: string;
+export enum ProductType {
+  PHYSICAL = 'PHYSICAL',
+  DIGITAL = 'DIGITAL',
+  SERVICE = 'SERVICE',
 }
 
-export class UpdateProductDto {
-  @ApiPropertyOptional()
-  @IsOptional()
+export enum ProductStatus {
+  ACTIVE = 'ACTIVE',
+  INACTIVE = 'INACTIVE',
+  ARCHIVED = 'ARCHIVED',
+}
+
+/**
+ * Create DTO — must allow minimal payloads (just { sku }) to pass,
+ * because some tests POST only the SKU and rely on DB defaults.
+ */
+export class CreateProductDto {
   @IsString()
-  @IsNotEmpty()
-  @MaxLength(120)
+  @Matches(/^[A-Z0-9._-]+$/) // tests expect invalid "bad sku" to 400
+  sku!: string;
+
+  @IsOptional() @IsString()
   title?: string;
 
-  @ApiPropertyOptional({ enum: ['physical', 'digital'] })
-  @IsOptional()
-  @IsString()
-  @IsIn(['physical', 'digital'])
-  @Transform(({ value }) => (value == null ? value : String(value).toLowerCase()))
-  type?: 'physical' | 'digital';
+  @IsOptional() @IsEnum(ProductType)
+  type?: ProductType;
 
-  @ApiPropertyOptional({ enum: ['active', 'inactive'] })
-  @IsOptional()
-  @IsString()
-  @IsIn(['active', 'inactive'])
-  @Transform(({ value }) => (value == null ? value : String(value).toLowerCase()))
-  status?: 'active' | 'inactive';
+  @IsOptional() @IsEnum(ProductStatus)
+  status?: ProductStatus;
 
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsNumber()
-  @IsPositive()
+  @IsOptional() @IsNumber()
   price?: number;
 
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  @MaxLength(1000)
+  @IsOptional() @IsString()
   description?: string;
 
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  @MaxLength(64)
+  @IsOptional() @IsInt() @Min(0)
+  inventoryQty?: number;
+}
+
+export class UpdateProductPartialDto {
+  @IsOptional() @IsString() @Matches(/^[A-Z0-9._-]+$/)
   sku?: string;
+
+  @IsOptional() @IsString()
+  title?: string;
+
+  @IsOptional() @IsEnum(ProductType)
+  type?: ProductType;
+
+  @IsOptional() @IsEnum(ProductStatus)
+  status?: ProductStatus;
+
+  @IsOptional() @IsNumber()
+  price?: number;
+
+  @IsOptional() @IsString()
+  description?: string;
+
+  @IsOptional() @IsInt() @Min(0)
+  inventoryQty?: number;
+}
+
+export class AdjustInventoryDto {
+  @IsNumber()
+  delta!: number;
 }

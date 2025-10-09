@@ -1,37 +1,45 @@
-import { Type } from 'class-transformer';
-import { IsEnum, IsNumber, IsOptional, IsString, Min } from 'class-validator';
-import { ProductStatus, ProductType } from './create-product.dto';
+import { ApiPropertyOptional } from '@nestjs/swagger';
+import { ProductStatus, ProductType } from '@prisma/client';
+import { IsEnum, IsNumber, IsOptional, IsString, Matches, Min } from 'class-validator';
+
+const SKU_RE = /^[A-Z0-9][A-Z0-9\-_.]{1,62}[A-Z0-9]$/;
 
 export class UpdateProductDto {
-  @IsString()
+  @ApiPropertyOptional()
   @IsOptional()
-  title?: string;
-
   @IsString()
-  @IsOptional()
+  @Matches(SKU_RE, { message: 'sku has invalid format' })
   sku?: string;
 
-  @IsEnum(ProductType)
+  @ApiPropertyOptional()
   @IsOptional()
+  @IsString()
+  title?: string;
+
+  @ApiPropertyOptional({ enum: ProductType })
+  @IsOptional()
+  @IsEnum(ProductType)
   type?: ProductType;
 
-  @IsEnum(ProductStatus)
+  @ApiPropertyOptional({ enum: ProductStatus })
   @IsOptional()
+  @IsEnum(ProductStatus)
   status?: ProductStatus;
 
+  @ApiPropertyOptional()
   @IsOptional()
-  @Type(() => Number)
+  @IsString()
+  description?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
   @IsNumber()
   @Min(0)
   price?: number;
 
+  @ApiPropertyOptional()
   @IsOptional()
-  @Type(() => Number)
   @IsNumber()
   @Min(0)
   inventoryQty?: number;
-
-  @IsString()
-  @IsOptional()
-  description?: string;
 }

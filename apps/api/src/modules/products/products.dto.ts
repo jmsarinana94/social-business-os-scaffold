@@ -1,39 +1,63 @@
-import { IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { createParamDecorator, ExecutionContext } from '@nestjs/common';
+import {
+    IsEnum,
+    IsNumber,
+    IsOptional,
+    IsString,
+    Matches,
+    Min,
+} from 'class-validator';
 
-export enum ProductType {
+export const ORG_HEADER = 'x-org';
+
+export const OrgHeader = createParamDecorator(
+  (_: unknown, ctx: ExecutionContext): string | undefined => {
+    const req = ctx.switchToHttp().getRequest();
+    const v =
+      req.headers[ORG_HEADER] ||
+      req.headers[ORG_HEADER.toUpperCase()] ||
+      req.headers['x-org-id'] ||
+      req.headers['X-Org-Id'];
+    return typeof v === 'string' ? v : undefined;
+  },
+);
+
+export enum ProductTypeDto {
   PHYSICAL = 'PHYSICAL',
-  DIGITAL = 'DIGITAL',
+  SERVICE = 'SERVICE',
 }
 
-export enum ProductStatus {
+export enum ProductStatusDto {
   ACTIVE = 'ACTIVE',
   INACTIVE = 'INACTIVE',
 }
 
 export class CreateProductDto {
   @IsString()
-  @IsNotEmpty()
+  // allow upper/lower letters, digits, -, _, . ; 3–64 chars
+  @Matches(/^[A-Za-z0-9._-]{3,64}$/)
   sku!: string;
 
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  title!: string;
+  title?: string;
+
+  @IsOptional()
+  @IsEnum(ProductTypeDto)
+  type?: ProductTypeDto;
+
+  @IsOptional()
+  @IsEnum(ProductStatusDto)
+  status?: ProductStatusDto;
+
+  @IsOptional()
+  @IsNumber()
+  price?: number;
 
   @IsOptional()
   @IsString()
   description?: string | null;
 
-  @IsEnum(ProductType)
-  type!: ProductType;
-
-  @IsEnum(ProductStatus)
-  status!: ProductStatus;
-
-  @IsNumber()
-  @Min(0)
-  price!: number;
-
-  // Some e2e tests include this in the payload; allow it but validate.
   @IsOptional()
   @IsNumber()
   @Min(0)
@@ -43,31 +67,31 @@ export class CreateProductDto {
 export class UpdateProductDto {
   @IsOptional()
   @IsString()
-  sku?: string;
+  title?: string;
 
   @IsOptional()
-  @IsString()
-  title?: string;
+  @IsEnum(ProductTypeDto)
+  type?: ProductTypeDto;
+
+  @IsOptional()
+  @IsEnum(ProductStatusDto)
+  status?: ProductStatusDto;
+
+  @IsOptional()
+  @IsNumber()
+  price?: number;
 
   @IsOptional()
   @IsString()
   description?: string | null;
 
   @IsOptional()
-  @IsEnum(ProductType)
-  type?: ProductType;
-
-  @IsOptional()
-  @IsEnum(ProductStatus)
-  status?: ProductStatus;
-
-  @IsOptional()
   @IsNumber()
   @Min(0)
-  price?: number;
-}
+  inventoryQty?: number;
 
-export class AdjustInventoryDto {
-  @IsNumber()
-  delta!: number;
+  @IsOptional()
+  @IsString()
+  @Matches(/^[A-Za-z0-9._-]{3,64}$/)
+  sku?: string;
 }

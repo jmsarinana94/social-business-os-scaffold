@@ -1,21 +1,11 @@
-import { createParamDecorator, ExecutionContext } from '@nestjs/common';
-import { Request } from 'express';
+import { BadRequestException, createParamDecorator, ExecutionContext } from '@nestjs/common';
 
-/**
- * Returns the org string saved by OrgHeaderGuard on req.orgId.
- * Falls back to req.org?.id if some middleware set a richer object.
- */
-export const Org = createParamDecorator((data: unknown, ctx: ExecutionContext) => {
-  const req = ctx
-    .switchToHttp()
-    .getRequest<Request & { orgId?: string; org?: any }>();
-
-  if (typeof req.orgId === 'string' && req.orgId) return req.orgId;
-
-  const maybeObj = req.org;
-  if (maybeObj && typeof maybeObj === 'object' && typeof maybeObj.id === 'string') {
-    return maybeObj.id;
+export const OrgId = createParamDecorator((_data: unknown, ctx: ExecutionContext) => {
+  const request = ctx.switchToHttp().getRequest();
+  const orgId = request.headers['x-org-id'] as string | undefined;
+  if (!orgId) {
+    // Tests expect 400 with this exact failure to come from validation layer
+    throw new BadRequestException('x-org-id header is required');
   }
-
-  return undefined;
+  return orgId;
 });
