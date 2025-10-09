@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   CanActivate,
   ExecutionContext,
   Injectable,
@@ -9,21 +10,20 @@ import { PrismaService } from '../../../infra/prisma/prisma.service';
 export class UniqueSkuGuard implements CanActivate {
   constructor(private readonly prisma: PrismaService) {}
 
-  async canActivate(context: ExecutionContext): Promise<boolean> {
-    const req = context.switchToHttp().getRequest();
-    const orgSlug: string | undefined =
-      req.headers['x-org'] || req.headers['X-Org'];
-
-    // If no SKU in body, skip
-    const sku: string | undefined = req.body?.sku;
+  async canActivate(ctx: ExecutionContext): Promise<boolean> {
+    const req = ctx.switchToHttp().getRequest();
+    const orgSlug: string = req.headers['x-org'] || 'demo';
+    const { sku } = req.body || {};
     if (!sku) return true;
 
-    // Ensure we scope by org slug
-    const existing = await this.prisma.product.findFirst({
-      where: { sku, org: { slug: String(orgSlug) } },
+    const exists = await this.prisma.product.findFirst({
+      where: { sku, organization: { slug: String(orgSlug) } },
       select: { id: true },
     });
 
-    return !existing;
+    if (exists) {
+      throw new BadRequestException('SKU already exists in this org');
+    }
+    return true;
   }
 }

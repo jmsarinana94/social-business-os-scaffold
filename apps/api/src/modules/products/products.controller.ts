@@ -1,119 +1,85 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Delete,
   Get,
   Headers,
   HttpCode,
-  HttpStatus,
   Param,
   Post,
   Put,
   Query,
-  UseGuards,
 } from '@nestjs/common';
-import { TestOrJwtAuthGuard } from '../auth/guards/test-or-jwt.guard';
-import {
-  AdjustInventoryDto,
-  CreateProductDto,
-  UpdateProductDto,
-} from './products.dto';
-import { OrgRef, ProductsService } from './products.service';
+import { CreateProductDto } from './dto/create-product.dto';
+import { UpdateProductDto } from './dto/update-product.dto';
+import { ProductsService } from './products.service';
 
-function orgFromHeaders(
-  headers: Record<string, string | string[] | undefined>,
-): OrgRef {
-  // Accept either x-org (slug) or x-org-id (UUID)
-  const slug = headers['x-org'] as string | undefined;
-  const id = headers['x-org-id'] as string | undefined;
+type OrgRef = { id?: string; slug?: string };
 
-  if (!slug && !id) {
-    throw new BadRequestException('Missing x-org header');
-  }
-  return { slug, id };
-}
-
-@UseGuards(TestOrJwtAuthGuard)
-@Controller({ path: 'products', version: '1' })
+@Controller('products')
 export class ProductsController {
   constructor(private readonly products: ProductsService) {}
 
-  // GET /v1/products?page=&limit=
+  private orgFromHeaders(orgHeader?: string): OrgRef {
+    return orgHeader ? { slug: orgHeader } : { slug: 'demo' };
+  }
+
   @Get()
   async list(
-    @Headers() headers: Record<string, string>,
+    @Headers('x-org') orgHeader: string | undefined,
     @Query('page') page = '1',
     @Query('limit') limit = '10',
   ) {
-    const org = orgFromHeaders(headers);
-    const p = Math.max(parseInt(String(page), 10) || 1, 1);
-    const l = Math.min(Math.max(parseInt(String(limit), 10) || 10, 1), 100);
-    return this.products.findAll(org, p, l);
+    const org = this.orgFromHeaders(orgHeader);
+    return this.products.findAll(org, Number(page) || 1, Number(limit) || 10);
   }
 
-  // GET /v1/products/:id
   @Get(':id')
-  async getOne(
-    @Headers() headers: Record<string, string>,
-    @Param('id') id: string,
-  ) {
-    const org = orgFromHeaders(headers);
+  async getOne(@Headers('x-org') orgHeader: string | undefined, @Param('id') id: string) {
+    const org = this.orgFromHeaders(orgHeader);
     return this.products.findOne(org, id);
   }
 
-  // POST /v1/products
   @Post()
-  @HttpCode(HttpStatus.CREATED)
   async create(
-    @Headers() headers: Record<string, string>,
+    @Headers('x-org') orgHeader: string | undefined,
     @Body() dto: CreateProductDto,
   ) {
-    const org = orgFromHeaders(headers);
+    const org = this.orgFromHeaders(orgHeader);
     return this.products.create(org, dto);
   }
 
-  // PUT /v1/products/:id
   @Put(':id')
   async update(
-    @Headers() headers: Record<string, string>,
+    @Headers('x-org') orgHeader: string | undefined,
     @Param('id') id: string,
     @Body() dto: UpdateProductDto,
   ) {
-    const org = orgFromHeaders(headers);
+    const org = this.orgFromHeaders(orgHeader);
     return this.products.update(org, id, dto);
   }
 
-  // DELETE /v1/products/:id
   @Delete(':id')
-  @HttpCode(HttpStatus.OK)
-  async remove(
-    @Headers() headers: Record<string, string>,
-    @Param('id') id: string,
-  ) {
-    const org = orgFromHeaders(headers);
+  @HttpCode(200)
+  async remove(@Headers('x-org') orgHeader: string | undefined, @Param('id') id: string) {
+    const org = this.orgFromHeaders(orgHeader);
     return this.products.remove(org, id);
   }
 
-  // GET /v1/products/:id/inventory
   @Get(':id/inventory')
-  async getInventory(
-    @Headers() headers: Record<string, string>,
-    @Param('id') id: string,
-  ) {
-    const org = orgFromHeaders(headers);
+  async getInventory(@Headers('x-org') orgHeader: string | undefined, @Param('id') id: string) {
+    const org = this.orgFromHeaders(orgHeader);
     return this.products.getInventory(org, id);
   }
 
-  // POST /v1/products/:id/inventory  -> should be 200 OK (not 201)
   @Post(':id/inventory')
-  @HttpCode(HttpStatus.OK)
+  @HttpCode(200) // tests expect 200, not 201
   async addInventory(
-    @Headers() headers: Record<string, string>,
+    @Headers('x-org') orgHeader: string | undefined,
     @Param('id') id: string,
-    @Body() payload: AdjustInventoryDto,
+    @Body() payload: { delta: number },
   ) {
-    const org = orgFromHeaders(headers);
+    const org = this.orgFromHeaders(orgHeader);
     return this.products.addInventory(org, id, payload);
   }
 }

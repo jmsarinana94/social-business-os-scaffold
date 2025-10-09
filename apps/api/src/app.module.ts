@@ -1,17 +1,22 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+
 import { AuthModule } from './modules/auth/auth.module';
-import { HealthModule } from './modules/health/health.module';
 import { ProductsModule } from './modules/products/products.module';
-import { PrismaModule } from './shared/prisma/prisma.module';
+import { PrismaModule } from './prisma/prisma.module';
 
 @Module({
   imports: [
-    PrismaModule,   // global PrismaService provider
+    // Load env for the API at runtime (global)
+    // First try the Prisma .env used in this repo, then root .env as a fallback.
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: ['apps/api/prisma/.env', '.env'],
+    }),
+
+    PrismaModule,
     AuthModule,
     ProductsModule,
-    HealthModule,
-    // NOTE: If you later re-add your OpenAPI docs module,
-    // import it here once the file exists again.
   ],
 })
 export class AppModule {}
