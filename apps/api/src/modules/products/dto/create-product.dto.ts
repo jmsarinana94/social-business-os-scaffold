@@ -1,56 +1,31 @@
 import { Type } from 'class-transformer';
-import {
-  IsDefined,
-  IsEnum,
-  IsNotEmpty,
-  IsNumber,
-  IsOptional,
-  IsString,
-  Min,
-} from 'class-validator';
+import { IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
 
-export enum ProductType {
-  PHYSICAL = 'PHYSICAL',
-  DIGITAL = 'DIGITAL',
-}
+const TYPES = ['PHYSICAL', 'DIGITAL'] as const;
+const STATUSES = ['ACTIVE', 'INACTIVE'] as const;
 
-export enum ProductStatus {
-  ACTIVE = 'ACTIVE',
-  INACTIVE = 'INACTIVE',
-}
+export type ProductType = typeof TYPES[number];
+export type ProductStatus = typeof STATUSES[number];
 
 export class CreateProductDto {
-  @IsDefined()
-  @IsString()
-  @IsNotEmpty()
+  @IsString() @IsNotEmpty()
   title!: string;
 
-  @IsDefined()
-  @IsString()
-  @IsNotEmpty()
-  sku!: string;
-
-  @IsDefined()
-  @IsEnum(ProductType)
+  @IsIn(TYPES as readonly string[])
   type!: ProductType;
 
-  @IsEnum(ProductStatus)
-  @IsOptional()
-  status: ProductStatus = ProductStatus.ACTIVE;
+  @IsIn(STATUSES as readonly string[])
+  status!: ProductStatus;
 
-  @IsDefined()
-  @Type(() => Number)
-  @IsNumber()
-  @Min(0)
+  @Type(() => Number) @IsNumber()
   price!: number;
 
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  @Min(0)
-  inventoryQty?: number;
+  @IsString() @IsNotEmpty()
+  sku!: string;
 
-  @IsString()
-  @IsOptional()
-  description?: string;
+  @IsOptional() @IsString()
+  description?: string | null;
+
+  @IsOptional() @Type(() => Number) @IsInt()
+  inventoryQty?: number = 0;
 }

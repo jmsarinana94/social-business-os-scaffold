@@ -1,44 +1,30 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Headers,
-  HttpCode,
-  Post,
-  Req,
-  UseGuards,
-} from '@nestjs/common';
-import { Request } from 'express';
+import { BadRequestException, Body, Controller, Get, HttpCode, Post, Req, UseGuards } from '@nestjs/common';
+import { Org } from '../../common/org.decorator';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt.guard';
 
-type SignupDto = { email: string; password: string; org?: string };
-type LoginDto = { email: string; password: string };
-
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly auth: AuthService) {}
+  constructor(private auth: AuthService) {}
 
   @Post('signup')
-  async signup(@Body() body: SignupDto, @Headers('x-org') orgHeader?: string) {
-    const org = body.org || orgHeader || 'demo';
-    return this.auth.signup({ email: body.email, password: body.password, org });
+  async signup(@Body() body: any, @Org() org?: { slug: string }) {
+    const orgSlug = (org && org.slug) || body.org;
+    if (!orgSlug) {
+      throw new BadRequestException('org required (X-Org header or body.org)');
+    }
+    return this.auth.signup({ email: body.email, password: body.password, org: orgSlug });
   }
 
   @Post('login')
   @HttpCode(200)
-  async login(@Body() body: LoginDto, @Headers('x-org') orgHeader?: string) {
-    const org = orgHeader || 'demo';
-    return this.auth.login({ email: body.email, password: body.password, org });
+  async login(@Body() body: any) {
+    return this.auth.login({ email: body.email, password: body.password });
   }
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
-  @HttpCode(200)
-  async me(@Req() req: Request) {
-    // Read from JWT payload set by the guard/strategy
-    const anyReq = req as any;
-    const user = anyReq?.user || {};
-    return { id: user.sub || user.id, email: user.email };
+  async me(@Req() req: any) {
+    return this.auth.me({ userId: req.user.userId, email: req.user.email });
   }
 }
