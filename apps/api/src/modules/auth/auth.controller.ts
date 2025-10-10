@@ -1,30 +1,35 @@
-import { BadRequestException, Body, Controller, Get, HttpCode, Post, Req, UseGuards } from '@nestjs/common';
-import { Org } from '../../common/org.decorator';
+import { Body, Controller, Get, HttpCode, Post, Req, UseGuards } from '@nestjs/common';
+import { Request } from 'express';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt.guard';
 
+type SignupLoginBody = { email: string; password: string; org?: string };
+
 @Controller('auth')
 export class AuthController {
-  constructor(private auth: AuthService) {}
+  constructor(private readonly auth: AuthService) {}
 
+  // POST /auth/signup -> 201 (default)
   @Post('signup')
-  async signup(@Body() body: any, @Org() org?: { slug: string }) {
-    const orgSlug = (org && org.slug) || body.org;
-    if (!orgSlug) {
-      throw new BadRequestException('org required (X-Org header or body.org)');
-    }
-    return this.auth.signup({ email: body.email, password: body.password, org: orgSlug });
+  async signup(@Body() body: SignupLoginBody, @Req() req: Request & { orgSlug?: string }) {
+    const org = body.org || req.orgSlug;
+    return this.auth.signup(body.email, body.password, org);
   }
 
-  @Post('login')
+  // POST /auth/login -> 200 (tests expect OK, not Created)
   @HttpCode(200)
-  async login(@Body() body: any) {
-    return this.auth.login({ email: body.email, password: body.password });
+  @Post('login')
+  async login(@Body() body: SignupLoginBody, @Req() req: Request & { orgSlug?: string }) {
+    const org = body.org || req.orgSlug;
+    return this.auth.login(body.email, body.password, org);
   }
 
-  @Get('me')
+  // GET /auth/me -> return info straight from the verified JWT
   @UseGuards(JwtAuthGuard)
-  async me(@Req() req: any) {
-    return this.auth.me({ userId: req.user.userId, email: req.user.email });
+  @Get('me')
+  @HttpCode(200)
+  me(@Req() req: any) {
+    const { sub, email } = req.user ?? {};
+    return { id: sub, email };
   }
 }

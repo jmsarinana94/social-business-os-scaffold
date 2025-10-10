@@ -1,73 +1,38 @@
- 
-import { Prisma, PrismaClient } from '@prisma/client';
-import * as bcrypt from 'bcrypt';
-
+import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
-const env = (k: string, d?: string) => process.env[k] ?? d;
 
 async function main() {
-  const ORG_SLUG = env('ORG', env('SEED_ORG_SLUG', 'demo'))!;
-  const ORG_NAME = env('SEED_ORG_NAME', 'Demo Org')!;
-  const EMAIL    = env('API_EMAIL', env('SEED_EMAIL', 'tester@example.com'))!;
-  const PASS     = env('API_PASS',  env('SEED_PASSWORD', 'secret123'))!;
-
-  console.log('🔧 Seeding with:', { ORG_SLUG, ORG_NAME, EMAIL });
-
-  // org by slug (don’t assume id="demo")
+  // Org
   const org = await prisma.organization.upsert({
-    where: { slug: ORG_SLUG },
+    where: { slug: 'acme' },
     update: {},
-    create: { slug: ORG_SLUG, name: ORG_NAME },
+    create: { slug: 'acme', name: 'Acme Inc' },
   });
-  console.log(`✓ Org slug=${org.slug} id=${org.id}`);
 
-  // user
+  // User (email unique across DB; membership implied by slug use in your flows)
+  const email = 'a@b.com';
   const user = await prisma.user.upsert({
-    where: { email: EMAIL },
+    where: { email },
     update: {},
-    create: { email: EMAIL, name: 'Seed User', passwordHash: await bcrypt.hash(PASS, 10) },
+    create: { email, passwordHash: '$2a$10$K0wWIZX41o0hZcXxEKOI2egy02bZQJ2U7bMZ5bW8hZtS4QYJ6y0bS' }, // "pw"
   });
-  console.log(`✓ User ${EMAIL}`);
 
-  // membership/orgUser (supports either table/enum naming)
-  await (prisma as any).membership?.upsert?.({
-    where: { orgId_userId: { orgId: org.id, userId: user.id } },
-    update: { role: 'OWNER' },
-    create: { orgId: org.id, userId: user.id, role: 'OWNER' },
-  }).catch(async () => {
-    await (prisma as any).orgUser?.upsert?.({
-      where: { orgId_userId: { orgId: org.id, userId: user.id } },
-      update: { role: 'admin' },
-      create: { orgId: org.id, userId: user.id, role: 'admin' },
-    });
-  });
-  console.log('✓ Membership');
-
-  // product with expected enum casing + required price
-  const productData: Prisma.ProductCreateInput = {
-    org: { connect: { id: org.id } },
-    sku: 'SKU-SEED',
-    title: 'Seed Widget',
-    type: 'PHYSICAL' as any,
-    status: 'ACTIVE' as any,
-    price: new Prisma.Decimal(25),
-    inventoryQty: 100,
-    description: 'Seeded product',
-  };
-
-  await (prisma as any).product.upsert({
-    where: { sku_orgId: { sku: productData.sku as string, orgId: org.id } },
+  // Product
+  await prisma.product.upsert({
+    where: { id: 'seed-acme-w1' },
     update: {},
-    create: productData as any,
+    create: {
+      id: 'seed-acme-w1',
+      title: 'Widget',
+      type: 'PHYSICAL',
+      status: 'ACTIVE',
+      price: 12.5,
+      sku: 'W-1',
+      organizationId: org.id,
+    },
   });
 
-  console.log('✓ Product SKU-SEED');
-  console.log('✅ Seed complete');
+  console.log('Seeded:', { org: org.slug, user: user.email });
 }
 
-main().catch((e) => {
-  console.error('Seed failed:', e);
-  process.exit(1);
-}).finally(async () => {
-  await prisma.$disconnect();
-});
+main().finally(() => prisma.$disconnect());

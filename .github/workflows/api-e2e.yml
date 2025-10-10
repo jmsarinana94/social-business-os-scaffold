@@ -1,87 +1,48 @@
-name: API e2e
+name: api-e2e
 
 on:
-  pull_request:
-    paths:
-      - "apps/api/**"
-      - "prisma/**"
-      - "openapi.yaml"
-      - ".github/workflows/api-e2e.yml"
   push:
-    branches: [ main ]
-    paths:
-      - "apps/api/**"
-      - "prisma/**"
-      - "openapi.yaml"
-      - ".github/workflows/api-e2e.yml"
+  pull_request:
 
 jobs:
-  e2e:
+  test:
     runs-on: ubuntu-latest
-
     services:
       postgres:
         image: postgres:16
-        ports: ["5432:5432"]
         env:
-          POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: sbo
+          POSTGRES_USER: postgres
+          POSTGRES_DB: socialos
+        ports: [ "5432:5432" ]
         options: >-
-          --health-cmd="pg_isready -U postgres -d sbo"
-          --health-interval=5s
-          --health-timeout=5s
-          --health-retries=20
-
-    env:
-      NODE_ENV: test
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sbo?schema=public
-      JWT_SECRET: ci-secret
-      JWT_EXPIRES_IN: 1d
-      ORG: demo
-      API_EMAIL: tester@example.com
-      API_PASS: secret123
-      CORS_ORIGIN: http://localhost:5173
-      REQUEST_LOGGING: "0"
-      RATE_LIMIT_ENABLED: "0"
+          --health-cmd="pg_isready -U postgres -d socialos"
+          --health-interval=10s --health-timeout=5s --health-retries=5
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node (LTS)
-        uses: actions/setup-node@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+
+      - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: 20
+          cache: 'pnpm'
 
-      - name: Enable corepack + set pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Prepare Prisma env
+        working-directory: apps/api
         run: |
-          corepack enable
-          corepack install -g pnpm@10.17.0
-
-      - name: Install deps (root)
-        run: pnpm install --frozen-lockfile
-
-      - name: Install deps (apps/api)
-        run: pnpm -C apps/api install --frozen-lockfile
-
-      - name: Prisma generate
-        run: pnpm -C apps/api prisma generate
-
-      - name: Migrate DB fresh (reset)
-        run: pnpm -C apps/api prisma migrate deploy
-
-      - name: Optional seed (demo org/user)
-        run: |
-          ORG=$ORG \
-          SEED_ORG_SLUG=$ORG \
-          SEED_ORG_NAME="Demo Org" \
-          SEED_EMAIL=$API_EMAIL \
-          SEED_PASSWORD=$API_PASS \
-          pnpm -C apps/api prisma db seed
+          cp prisma/.env.example prisma/.env
+          echo 'DATABASE_URL=postgresql://postgres:postgres@localhost:5432/socialos?schema=public' > prisma/.env
+          echo 'JWT_SECRET=ci_jwt_secret' >> prisma/.env
+          pnpm dlx prisma generate --schema prisma/schema.prisma
+          pnpm dlx prisma migrate deploy --schema prisma/schema.prisma
 
       - name: Build API
-        run: pnpm -C apps/api build
+        run: pnpm -F @repo/api build
 
-      - name: Run e2e tests
-        run: pnpm -C apps/api test:e2e
+      - name: Run e2e
+        run: pnpm -F @repo/api test:e2e

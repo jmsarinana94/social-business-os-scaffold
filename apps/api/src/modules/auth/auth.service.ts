@@ -1,56 +1,55 @@
-import {
-  BadRequestException,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
-import * as jwt from 'jsonwebtoken';
-import { PrismaService } from '../../prisma/prisma.service';
+
+import { PrismaService } from '../../common/prisma.service';
 
 @Injectable()
 export class AuthService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly jwt: JwtService,
+  ) {}
 
-  private sign(user: { id: string; email: string }) {
-    const token = jwt.sign(
-      { sub: user.id, email: user.email },
-      process.env.JWT_SECRET || 'dev-secret',
-      { expiresIn: '1h' },
-    );
-    return { access_token: token, token };
-  }
-
-  async signup({ email, password, org }: { email: string; password: string; org: string }) {
-    if (!email || !password || !org) {
-      throw new BadRequestException('email, password, org required');
+  async signup(email: string, password: string, org?: string) {
+    if (!email || !password) {
+      throw new BadRequestException('email and password are required');
     }
-    // idempotent org upsert by slug
-    await this.prisma.organization.upsert({
-      where: { slug: org },
-      update: {},
-      create: { slug: org, name: org },
+
+    const exists = await this.prisma.user.findUnique({ where: { email } });
+    if (exists) {
+      // idempotent: if user exists, just return a token via login
+      return this.login(email, password);
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const user = await this.prisma.user.create({
+      data: { email, passwordHash },
     });
 
-    const existing = await this.prisma.user.findUnique({ where: { email } });
-    if (existing) {
-      // let tests treat signup as idempotent – just log them in
-      return this.sign(existing);
-    }
-
-    const passwordHash = await bcrypt.hash(password, 8);
-    const user = await this.prisma.user.create({ data: { email, passwordHash } });
-    return this.sign(user);
+    const access_token = await this.sign(user.id, user.email, org);
+    return { access_token, token: access_token };
   }
 
-  async login({ email, password }: { email: string; password: string }) {
+  async login(email: string, password: string, org?: string) {
     const user = await this.prisma.user.findUnique({ where: { email } });
     if (!user) throw new UnauthorizedException('Invalid credentials');
-    const ok = await bcrypt.compare(password, user.passwordHash);
+
+    const ok = await bcrypt.compare(password, user.passwordHash ?? '');
     if (!ok) throw new UnauthorizedException('Invalid credentials');
-    return this.sign(user);
+
+    const access_token = await this.sign(user.id, user.email, org);
+    return { access_token, token: access_token };
   }
 
-  async me({ userId, email }: { userId: string; email: string }) {
-    return { id: userId, email };
+  async me(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new UnauthorizedException();
+    return { id: user.id, email: user.email };
+  }
+
+  private async sign(sub: string, email: string, org?: string) {
+    // keep payload minimal; org is optional hint, not required by strategy
+    return this.jwt.signAsync({ sub, email, org });
   }
 }
