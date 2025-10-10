@@ -15,7 +15,8 @@
     "api:reset": "./apps/api/scripts/prisma-reset.sh && ./apps/api/scripts/prisma-seed-demo.sh",
     "prisma:generate": "pnpm -C apps/api prisma generate",
     "prisma:studio": "pnpm -C apps/api prisma studio",
-    "prisma:migrate": "pnpm -C apps/api prisma migrate dev"
+    "prisma:migrate": "pnpm -C apps/api prisma migrate dev",
+    "smoke": "bash scripts/smoke.sh"
   },
   "devDependencies": {
     "prettier": "^3.3.3",
