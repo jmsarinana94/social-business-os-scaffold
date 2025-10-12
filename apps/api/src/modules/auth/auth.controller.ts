@@ -1,28 +1,35 @@
-import { Body, Controller, Get, Headers, HttpCode, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Post, Req, UseGuards } from '@nestjs/common';
+import { Request } from 'express';
 import { AuthService } from './auth.service';
+import { JwtAuthGuard } from './jwt.guard';
 
-type SignupBody = { email: string; password: string; org?: string };
-type LoginBody = { email: string; password: string };
+type SignupLoginBody = { email: string; password: string; org?: string };
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
+  // POST /auth/signup -> 201 (default)
   @Post('signup')
-  async signup(@Body() body: SignupBody) {
-    const payload = { email: body.email, password: body.password, org: body.org ?? 'org' };
-    return this.auth.signup(payload);
+  async signup(@Body() body: SignupLoginBody, @Req() req: Request & { orgSlug?: string }) {
+    const org = body.org || req.orgSlug;
+    return this.auth.signup(body.email, body.password, org);
   }
 
-  @Post('login')
+  // POST /auth/login -> 200 (tests expect OK, not Created)
   @HttpCode(200)
-  async login(@Body() { email, password }: LoginBody) {
-    return this.auth.login({ email, password });
+  @Post('login')
+  async login(@Body() body: SignupLoginBody, @Req() req: Request & { orgSlug?: string }) {
+    const org = body.org || req.orgSlug;
+    return this.auth.login(body.email, body.password, org);
   }
 
+  // GET /auth/me -> return info straight from the verified JWT
+  @UseGuards(JwtAuthGuard)
   @Get('me')
   @HttpCode(200)
-  async me(@Headers('authorization') authz?: string) {
-    return this.auth.meFromAuthorization(authz ?? '');
+  me(@Req() req: any) {
+    const { sub, email } = req.user ?? {};
+    return { id: sub, email };
   }
 }

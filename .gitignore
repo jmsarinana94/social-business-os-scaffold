@@ -43,18 +43,13 @@ prisma/*.sqlite
 
 # OS Trash
 Thumbs.db
+# Local Prisma dev files
+apps/api/prisma/.env
+apps/api/prisma/dev.db
 
-# build caches
-.next/
-.turbo/
-apps/api/.tmp/
-dist/
-node_modules/
+# Local Prisma dev files
+apps/api/prisma/.env
+apps/api/prisma/dev.db
 
-# env
-.env
-.env.*
-!.env.example
-
-# logs
-*.log
+# Local SQLite DB
+apps/api/prisma/dev.db

@@ -22,7 +22,11 @@
   },
   "devDependencies": {
     "prettier": "^3.3.3",
+<<<<<<< HEAD
     "prisma": "6.14.0",
+=======
+    "prisma": "6.17.1",
+>>>>>>> chore/prisma-local-works
     "turbo": "^2.1.1"
   },
   "engines": {

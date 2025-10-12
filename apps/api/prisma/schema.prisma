@@ -1,91 +1,114 @@
+// apps/api/prisma/schema.prisma
+
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite" // uses DATABASE_URL from .env
   url      = env("DATABASE_URL")
 }
 
-/// Organizations / Tenancy
-model Organization {
-  id          String       @id @default(cuid())
-  slug        String       @unique
-  name        String
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  memberships Membership[]
-  orders      Order[]
-  products    Product[]
-  users       User[]
+//
+// Enums
+//
+enum ProductType {
+  PHYSICAL
+  DIGITAL
 }
 
-/// Users
+enum ProductStatus {
+  ACTIVE
+  INACTIVE
+}
+
+//
+// Models
+//
 model User {
-  id          String       @id @default(cuid())
-  email       String       @unique
-  password    String
-  name        String?
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  orgId       String
-  memberships Membership[]
-  org         Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  id            String      @id @default(cuid())
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  email         String      @unique
+  passwordHash  String      @map("passwordHash")
+  lastLoginAt   DateTime?
+
+  memberships   OrgMember[]
+
+  @@map("User")
 }
 
-/// Optional: explicit membership table for roles
-model Membership {
-  id        String       @id @default(cuid())
-  role      String       @default("member")
-  createdAt DateTime     @default(now())
-  userId    String
-  orgId     String
-  updatedAt DateTime     @default(now()) @db.Timestamp(6)
-  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+model Organization {
+  id        String      @id @default(cuid())
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
 
-  @@unique([userId, orgId])
+  slug      String      @unique
+  name      String
+
+  members   OrgMember[]
+  products  Product[]
+  categories Category[]
+
+  @@map("Org")
 }
 
-/// Products
+model OrgMember {
+  id             String        @id @default(cuid())
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  organizationId String
+  userId         String
+  role           String        @default("MEMBER")
+
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@map("OrgMember")
+}
+
+model Category {
+  id             String       @id @default(cuid())
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organizationId String
+  name           String
+  description    String?      // <-- this line must exist
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  products       Product[]
+
+  @@unique([organizationId, name])
+  @@map("Category")
+}
+
 model Product {
-  id              String       @id @default(cuid())
-  orgId           String
-  sku             String       @unique
+  id              String         @id @default(cuid())
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  organizationId  String
+  organization    Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Optional link to Category (same org)
+  categoryId      String?
+  category        Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
   title           String
+  sku             String
+
   description     String?
-  type            String
-  status          String
-  price           Decimal      @db.Decimal(10, 2)
-  inventoryQty    Int?         @default(0)
+  type            ProductType
+  status          ProductStatus
+
+  price           Decimal
+
+  inventoryQty    Int            @default(0)
   lastPurchasedAt DateTime?
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-  orderItems      OrderItem[]
-  org             Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
-}
 
-/// Orders (new)
-model Order {
-  id         String       @id @default(cuid())
-  orgId      String
-  totalQty   Int
-  totalPrice Decimal      @db.Decimal(10, 2)
-  createdAt  DateTime     @default(now())
-  org        Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  items      OrderItem[]
-}
-
-/// Order line items (new)
-model OrderItem {
-  id        String  @id @default(cuid())
-  orderId   String
-  productId String
-  qty       Int
-  unitPrice Decimal @db.Decimal(10, 2)
-  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product   Product @relation(fields: [productId], references: [id])
-
-  @@index([orderId])
-  @@index([productId])
+  @@unique([organizationId, sku])
+  @@map("Product")
 }

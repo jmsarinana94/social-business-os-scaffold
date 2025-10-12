@@ -3,73 +3,70 @@ import {
   Controller,
   Delete,
   Get,
-  Headers,
   HttpCode,
   Param,
   Post,
   Put,
+  UseGuards,
 } from '@nestjs/common';
-import { CreateProductDto, UpdateProductDto } from './products.dto';
+import { Org } from '../../common/org.decorator';
+import { OrgGuard } from '../../common/org.guard';
+import { JwtAuthGuard } from '../auth/jwt.guard';
+import { CreateProductDto, UpdateProductDto } from './dto';
+import { AdjustInventoryDto } from './dto/adjust-inventory.dto';
 import { ProductsService } from './products.service';
 
-const ORG_HEADER = 'x-org';
-
 @Controller('products')
+@UseGuards(OrgGuard) // X-Org header required for ALL product routes
 export class ProductsController {
-  constructor(private readonly products: ProductsService) {}
-
-  private orgFromHeaders(h: Record<string, any>): string {
-    const v = (h?.[ORG_HEADER] ?? h?.[ORG_HEADER.toUpperCase()] ?? 'org') as string;
-    return v || 'org';
-  }
-
-  @Post()
-  async create(@Headers() headers: Record<string, any>, @Body() dto: CreateProductDto) {
-    const org = this.orgFromHeaders(headers);
-    const created = await this.products.create(org, dto);
-    return created;
-  }
+  constructor(private products: ProductsService) {}
 
   @Get()
-  async list(@Headers() headers: Record<string, any>) {
-    const org = this.orgFromHeaders(headers);
-    return this.products.list(org);
+  async list(@Org() org: { slug: string }) {
+    return this.products.findAll(org.slug);
   }
 
   @Get(':id')
-  async get(@Headers() headers: Record<string, any>, @Param('id') id: string) {
-    const org = this.orgFromHeaders(headers);
-    return this.products.get(org, id);
+  async getOne(@Org() org: { slug: string }, @Param('id') id: string) {
+    return this.products.findOne(org.slug, id);
+  }
+
+  @Post()
+  @UseGuards(JwtAuthGuard)
+  async create(@Org() org: { slug: string }, @Body() dto: CreateProductDto) {
+    return this.products.create(org.slug, dto);
   }
 
   @Put(':id')
+  @UseGuards(JwtAuthGuard)
   async update(
-    @Headers() headers: Record<string, any>,
+    @Org() org: { slug: string },
     @Param('id') id: string,
     @Body() dto: UpdateProductDto,
   ) {
-    const org = this.orgFromHeaders(headers);
-    return this.products.update(org, id, dto);
+    return this.products.update(org.slug, id, dto);
   }
 
-  // ✅ Make this 200 OK (not 201)
-  @Post(':id/inventory')
-  @HttpCode(200)
-  async adjustInventory(
-    @Headers() headers: Record<string, any>,
-    @Param('id') id: string,
-    @Body() body: { delta: number },
-  ) {
-    const org = this.orgFromHeaders(headers);
-    return this.products.adjustInventory(org, id, Number(body?.delta));
-  }
-
-  // ✅ Tests expect 200 on delete
   @Delete(':id')
-  @HttpCode(200)
-  async remove(@Headers() headers: Record<string, any>, @Param('id') id: string) {
-    const org = this.orgFromHeaders(headers);
-    await this.products.remove(org, id);
-    return { ok: true };
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(200) // tests expect 200 (not 204)
+  async remove(@Org() org: { slug: string }, @Param('id') id: string) {
+    return this.products.remove(org.slug, id);
+  }
+
+  @Get(':id/inventory')
+  async getInventory(@Org() org: { slug: string }, @Param('id') id: string) {
+    return this.products.getInventory(org.slug, id);
+  }
+
+  @Post(':id/inventory')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(200) // tests expect 200
+  async addInventory(
+    @Org() org: { slug: string },
+    @Param('id') id: string,
+    @Body() payload: AdjustInventoryDto,
+  ) {
+    return this.products.addInventory(org.slug, id, payload.delta);
   }
 }

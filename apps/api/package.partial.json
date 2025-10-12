@@ -1,0 +1,14 @@
+{
+  "scripts": {
+    "seed": "ts-node --transpile-only prisma/seed.ts",
+    "dev:pg:up": "docker compose -f ../../docker-compose.postgres.yml up -d",
+    "dev:pg:reset": "bash ../../scripts/dev-postgres-reset.sh",
+    "test:e2e:pg": "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/socialos?schema=public pnpm test:e2e"
+  },
+  "prisma": {
+    "seed": "ts-node --transpile-only prisma/seed.ts"
+  },
+  "devDependencies": {
+    "ts-node": "^10.9.2"
+  }
+}

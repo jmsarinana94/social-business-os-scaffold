@@ -1,3 +1,6 @@
+[![API Smoke](https://github.com/jmsarinana94/social-business-os-scaffold/actions/workflows/api-smoke.yml/badge.svg)](https://github.com/jmsarinana94/social-business-os-scaffold/actions/workflows/api-smoke.yml)
+[![API E2E Tests](https://github.com/jmsarinana94/social-business-os-scaffold/actions/workflows/api-e2e.yml/badge.svg)](https://github.com/jmsarinana94/social-business-os-scaffold/actions/workflows/api-e2e.yml)
+
 # Social Media Business OS — Monorepo Scaffold (v0.2)
 
 A starter monorepo scaffold for building a robust, modular Business OS with:

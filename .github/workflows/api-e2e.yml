@@ -1,87 +1,51 @@
-name: API e2e
+name: API E2E Tests
 
 on:
-  pull_request:
-    paths:
-      - "apps/api/**"
-      - "prisma/**"
-      - "openapi.yaml"
-      - ".github/workflows/api-e2e.yml"
   push:
-    branches: [ main ]
-    paths:
-      - "apps/api/**"
-      - "prisma/**"
-      - "openapi.yaml"
-      - ".github/workflows/api-e2e.yml"
+    branches:
+      - main
+      - chore/prisma-local-works
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   e2e:
     runs-on: ubuntu-latest
-
-    services:
-      postgres:
-        image: postgres:16
-        ports: ["5432:5432"]
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: sbo
-        options: >-
-          --health-cmd="pg_isready -U postgres -d sbo"
-          --health-interval=5s
-          --health-timeout=5s
-          --health-retries=20
-
-    env:
-      NODE_ENV: test
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sbo?schema=public
-      JWT_SECRET: ci-secret
-      JWT_EXPIRES_IN: 1d
-      ORG: demo
-      API_EMAIL: tester@example.com
-      API_PASS: secret123
-      CORS_ORIGIN: http://localhost:5173
-      REQUEST_LOGGING: "0"
-      RATE_LIMIT_ENABLED: "0"
-
+    defaults:
+      run:
+        working-directory: apps/api
     steps:
-      - name: Checkout
+      - name: 🛠️ Checkout repo
         uses: actions/checkout@v4
 
-      - name: Setup Node (LTS)
+      - name: 🧩 Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: 20
+          cache: 'pnpm'
 
-      - name: Enable corepack + set pnpm
+      - name: 📦 Install dependencies
         run: |
           corepack enable
-          corepack install -g pnpm@10.17.0
+          pnpm install --frozen-lockfile
 
-      - name: Install deps (root)
-        run: pnpm install --frozen-lockfile
+      - name: 🔨 Build API
+        run: pnpm build
 
-      - name: Install deps (apps/api)
-        run: pnpm -C apps/api install --frozen-lockfile
+      - name: 🧪 Run Jest E2E tests
+        run: pnpm test:e2e
 
-      - name: Prisma generate
-        run: pnpm -C apps/api prisma generate
-
-      - name: Migrate DB fresh (reset)
-        run: pnpm -C apps/api prisma migrate deploy
-
-      - name: Optional seed (demo org/user)
-        run: |
-          ORG=$ORG \
-          SEED_ORG_SLUG=$ORG \
-          SEED_ORG_NAME="Demo Org" \
-          SEED_EMAIL=$API_EMAIL \
-          SEED_PASSWORD=$API_PASS \
-          pnpm -C apps/api prisma db seed
-
-      - name: Build API
-        run: pnpm -C apps/api build
-
-      - name: Run e2e tests
-        run: pnpm -C apps/api test:e2e
+      - name: 🧾 Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results
+          path: apps/api/test-results/

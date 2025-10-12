@@ -1,47 +1,37 @@
-import { Type } from 'class-transformer';
-import { IsEnum, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, MaxLength, Min } from 'class-validator';
-
-export enum ProductTypeDto {
-  PHYSICAL = 'PHYSICAL',
-  DIGITAL = 'DIGITAL',
-}
-
-export enum ProductStatusDto {
-  ACTIVE = 'ACTIVE',
-  INACTIVE = 'INACTIVE',
-}
+import {
+  IsDecimal,
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+} from 'class-validator';
+import { ProductStatus, ProductType } from './product.dto';
 
 export class CreateProductDto {
   @IsString()
   @IsNotEmpty()
-  @MaxLength(100)
   title!: string;
-
-  @IsEnum(ProductTypeDto)
-  type!: ProductTypeDto;
-
-  @IsEnum(ProductStatusDto)
-  status!: ProductStatusDto;
-
-  // E2E sends numbers (e.g., 12, 12.34). Transform to number and validate.
-  @Type(() => Number)
-  @IsNumber({ maxDecimalPlaces: 2 })
-  @Min(0)
-  price!: number;
 
   @IsString()
   @IsNotEmpty()
-  @MaxLength(64)
   sku!: string;
 
   @IsOptional()
   @IsString()
-  @MaxLength(500)
   description?: string;
 
+  @IsEnum(ProductType) // "PHYSICAL" | "DIGITAL"
+  type!: ProductType;
+
+  @IsEnum(ProductStatus) // "ACTIVE" | "INACTIVE"
+  status!: ProductStatus;
+
+  // decimal string like "19.99"
+  @IsDecimal({ force_decimal: true }, { message: 'price must be a decimal string (e.g. "19.99")' })
+  price!: string;
+
+  // optional category on create
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  inventoryQty?: number;
+  @IsString()
+  categoryId?: string;
 }

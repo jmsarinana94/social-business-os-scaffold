@@ -1,6 +1,7 @@
-import { IsNumber } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsInt } from 'class-validator';
 
 export class AdjustInventoryDto {
-  @IsNumber()
+  @Type(() => Number) @IsInt()
   delta!: number;
 }

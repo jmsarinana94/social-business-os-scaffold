@@ -1,44 +1,51 @@
 import {
+  BadRequestException,
   CanActivate,
   ExecutionContext,
   Injectable,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { Request } from 'express';
 
+/**
+ * Reads org slug from:
+ *   1) X-Org header (primary)
+ *   2) body.org (fallback)
+ *
+ * Skips guard entirely for /auth routes to allow signup/login to work
+ * while still letting the controller read org from body.
+ */
 @Injectable()
 export class OrgHeaderGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}
 
-  private isAuthRoute(req: any) {
-    // Allow all auth routes (signup, login, me) to bypass org guard
-    const method = (req.method || '').toUpperCase();
-    const path = (req.path || req.url || '') as string;
-    if (!path) return false;
-    if (path.startsWith('/auth')) return true;
-    // You can add other health/docs endpoints here if needed.
-    return false;
-  }
-
   canActivate(context: ExecutionContext): boolean {
-    const ctx = context.switchToHttp();
-    const req = ctx.getRequest();
+    const req: Request & { orgSlug?: string } = context.switchToHttp().getRequest();
 
-    if (this.isAuthRoute(req)) {
+    const url = req.url || '';
+    // Allow auth routes to pass without enforcing X-Org
+    if (url.startsWith('/auth')) {
+      // If body has org, attach for downstream convenience
+      const bodyOrg =
+        (req.body && (req.body.org || req.body.slug || req.body.organization)) || undefined;
+      if (typeof bodyOrg === 'string' && bodyOrg.trim()) {
+        req.orgSlug = bodyOrg.trim().toLowerCase();
+      }
       return true;
     }
 
-    const orgId = req.headers['x-org-id'];
-    const orgSlug = req.headers['x-org-slug'];
+    const headerOrg = (req.headers['x-org'] as string | undefined)?.trim();
+    const bodyOrg =
+      (req.body && (req.body.org || req.body.slug || req.body.organization)) || undefined;
+    const candidate = headerOrg || (typeof bodyOrg === 'string' ? bodyOrg.trim() : undefined);
 
-    // We only require one of them. Tests set x-org-id.
-    if (!orgId && !orgSlug) {
-      // Let controllers/services throw a clean 400 message;
-      // returning false would become 403. We prefer consistency:
-      throw new Error(
-        'Organization context not provided (x-org-id or x-org-slug required).',
+    if (!candidate) {
+      throw new BadRequestException(
+        'Missing organization. Provide header "X-Org: <slug>" or body.org.',
       );
     }
 
+    req.orgSlug = candidate.toLowerCase();
     return true;
   }
 }

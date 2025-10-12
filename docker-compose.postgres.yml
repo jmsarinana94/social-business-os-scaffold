@@ -1,0 +1,21 @@
+# docker-compose.postgres.yml
+version: "3.9"
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: sbos_pg
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: sbos
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d sbos"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    volumes:
+      - sbos_pg_data:/var/lib/postgresql/data
+volumes:
+  sbos_pg_data:

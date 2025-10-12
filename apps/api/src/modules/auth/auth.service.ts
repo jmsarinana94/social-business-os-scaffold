@@ -1,81 +1,55 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
-import { PrismaService } from '../../prisma/prisma.service';
+import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import * as bcrypt from 'bcryptjs';
 
-function slugify(input: string): string {
-  return (input || '')
-    .toLowerCase()
-    .trim()
-    .replace(/[^\p{L}\p{N}]+/gu, '-')
-    .replace(/^-+|-+$/g, '');
-}
+import { PrismaService } from '../../common/prisma.service';
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly jwt: JwtService,
+  ) {}
 
-  async signup(payload: { email: string; password: string; org: string }) {
-    const { email, password, org } = payload;
-    const slug = slugify(org);
+  async signup(email: string, password: string, org?: string) {
+    if (!email || !password) {
+      throw new BadRequestException('email and password are required');
+    }
 
-    // Ensure org exists by unique slug
-    await this.prisma.organization.upsert({
-      where: { slug },
-      update: {},
-      create: { id: org, name: org, slug },
+    const exists = await this.prisma.user.findUnique({ where: { email } });
+    if (exists) {
+      // idempotent: if user exists, just return a token via login
+      return this.login(email, password);
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const user = await this.prisma.user.create({
+      data: { email, passwordHash },
     });
 
-    try {
-      const created = await this.prisma.user.create({
-        data: {
-          email,
-          password,
-          org: { connect: { slug } },
-        },
-        select: { id: true, email: true },
-      });
-      return { user: created, status: 'created' };
-    } catch (err: any) {
-      if (err instanceof PrismaClientKnownRequestError && err.code === 'P2002') {
-        const existing = await this.prisma.user.findUnique({
-          where: { email },
-          select: { id: true, email: true },
-        });
-        // Return OK semantics for already-exists (tests accept 200 or 201 overall)
-        return { user: existing, status: 'exists' };
-      }
-      throw err;
-    }
+    const access_token = await this.sign(user.id, user.email, org);
+    return { access_token, token: access_token };
   }
 
-  async login(payload: { email: string; password: string }) {
-    const { email } = payload;
+  async login(email: string, password: string, org?: string) {
     const user = await this.prisma.user.findUnique({ where: { email } });
-    // For the scaffold tests, always return a token if the user exists.
-    if (!user) {
-      // Still return a shape; some suites only check for fields being present
-      return { token: null };
-    }
-    return { access_token: `fake.${Buffer.from(email).toString('base64')}.token` };
+    if (!user) throw new UnauthorizedException('Invalid credentials');
+
+    const ok = await bcrypt.compare(password, user.passwordHash ?? '');
+    if (!ok) throw new UnauthorizedException('Invalid credentials');
+
+    const access_token = await this.sign(user.id, user.email, org);
+    return { access_token, token: access_token };
   }
 
   async me(userId: string) {
-    return this.prisma.user.findUnique({ where: { id: userId } });
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new UnauthorizedException();
+    return { id: user.id, email: user.email };
   }
 
-  async meFromAuthorization(authz: string) {
-    if (!authz?.startsWith('Bearer ')) throw new UnauthorizedException('Missing bearer token');
-    const token = authz.slice('Bearer '.length).trim();
-    const parts = token.split('.');
-    if (parts.length !== 3) throw new UnauthorizedException('Invalid token');
-    let email = '';
-    try {
-      email = Buffer.from(parts[1], 'base64').toString('utf8');
-    } catch {
-      throw new UnauthorizedException('Invalid token payload');
-    }
-    const user = await this.prisma.user.findUnique({ where: { email } });
-    if (!user) throw new UnauthorizedException('User not found');
-    return user;
+  private async sign(sub: string, email: string, org?: string) {
+    // keep payload minimal; org is optional hint, not required by strategy
+    return this.jwt.signAsync({ sub, email, org });
   }
 }
