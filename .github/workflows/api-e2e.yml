@@ -2,41 +2,45 @@ name: API E2E Tests
 
 on:
   push:
-    branches: [ main, chore/**, feat/**, fix/** ]
+    branches:
+      - main
+      - chore/prisma-local-works
+    tags:
+      - 'v*'
   pull_request:
-    branches: [ main ]
+    branches:
+      - main
 
 jobs:
   e2e:
     runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        node-version: [20.x]
-
+    defaults:
+      run:
+        working-directory: apps/api
     steps:
-      - name: 🧱 Checkout repository
+      - name: 🛠️ Checkout repo
         uses: actions/checkout@v4
 
-      - name: 🧰 Setup Node.js ${{ matrix.node-version }}
+      - name: 🧩 Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: 20
           cache: 'pnpm'
 
-      - name: 📦 Install pnpm
-        run: npm install -g pnpm
-
       - name: 📦 Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: ⚙️ Generate Prisma Client (SQLite local)
-        working-directory: apps/api
         run: |
-          printf 'DATABASE_URL="file:./dev.db"\n' > prisma/.env
-          pnpm prisma generate --schema prisma/schema.prisma
-          pnpm prisma db push --schema prisma/schema.prisma
+          corepack enable
+          pnpm install --frozen-lockfile
 
-      - name: 🧪 Run E2E Tests
-        working-directory: apps/api
+      - name: 🔨 Build API
+        run: pnpm build
+
+      - name: 🧪 Run e2e tests
         run: pnpm test:e2e
+
+      - name: 🧾 Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results
+          path: apps/api/test-results/
