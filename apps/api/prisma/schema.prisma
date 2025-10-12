@@ -25,21 +25,15 @@ enum ProductStatus {
 //
 // Models
 //
-
 model User {
-  id          String       @id @default(cuid())
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  email       String       @unique
+  id            String      @id @default(cuid())
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  email         String      @unique
+  passwordHash  String      @map("passwordHash")
+  lastLoginAt   DateTime?
 
-  // Expose as `passwordHash` in Prisma Client (your code selects this),
-  // and also store in the db column `passwordHash`.
-  passwordHash String      @map("passwordHash")
-
-  lastLoginAt DateTime?
-
-  // memberships to organizations
-  memberships OrgMember[]
+  memberships   OrgMember[]
 
   @@map("User")
 }
@@ -49,20 +43,20 @@ model Organization {
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
 
-  // your guards/tests resolve x-org to this slug
   slug      String      @unique
   name      String
 
   members   OrgMember[]
   products  Product[]
+  categories Category[]
 
   @@map("Org")
 }
 
 model OrgMember {
-  id        String        @id @default(cuid())
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  id             String        @id @default(cuid())
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
   organizationId String
   userId         String
@@ -75,19 +69,35 @@ model OrgMember {
   @@map("OrgMember")
 }
 
+model Category {
+  id             String       @id @default(cuid())
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organizationId String
+  name           String
+  description    String?      // <-- this line must exist
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  products       Product[]
+
+  @@unique([organizationId, name])
+  @@map("Category")
+}
+
 model Product {
   id              String         @id @default(cuid())
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 
-  // relation expected by code as `product.organization`
   organizationId  String
   organization    Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  // tests and services use `title`
-  title           String
+  // Optional link to Category (same org)
+  categoryId      String?
+  category        Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
-  // SKU unique within an org
+  title           String
   sku             String
 
   description     String?
@@ -96,7 +106,6 @@ model Product {
 
   price           Decimal
 
-  // inventory helpers used in e2e/services
   inventoryQty    Int            @default(0)
   lastPurchasedAt DateTime?
 

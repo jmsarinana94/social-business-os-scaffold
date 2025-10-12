@@ -50,3 +50,6 @@ apps/api/prisma/dev.db
 # Local Prisma dev files
 apps/api/prisma/.env
 apps/api/prisma/dev.db
+
+# Local SQLite DB
+apps/api/prisma/dev.db
