@@ -12,9 +12,8 @@ import {
 import { Org } from '../../common/org.decorator';
 import { OrgGuard } from '../../common/org.guard';
 import { JwtAuthGuard } from '../auth/jwt.guard';
+import { CreateProductDto, UpdateProductDto } from './dto';
 import { AdjustInventoryDto } from './dto/adjust-inventory.dto';
-import { CreateProductDto } from './dto/create-product.dto';
-import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductsService } from './products.service';
 
 @Controller('products')

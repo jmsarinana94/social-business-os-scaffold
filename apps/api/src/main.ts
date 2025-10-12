@@ -1,29 +1,47 @@
-import { Logger, ValidationPipe } from '@nestjs/common';
+// apps/api/src/main.ts
+import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { snapshot: true });
+  const app = await NestFactory.create(AppModule, { cors: true });
 
-  // CORS for local dev/tools
-  app.enableCors();
-
-  // Validation behavior expected by e2e tests
+  // Global pipes (strict validation like you use in tests)
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: true,              // strip unknown props
-      forbidNonWhitelisted: true,   // 400 on extra props
-      transform: true,              // transform primitives (e.g., params)
-      transformOptions: { enableImplicitConversion: true },
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
     }),
   );
 
-  // If you want a global prefix later: app.setGlobalPrefix('api');
+  // Swagger/OpenAPI
+  const config = new DocumentBuilder()
+    .setTitle('Social Business OS – API')
+    .setDescription('Auth, Orgs, Categories, Products, Inventory')
+    .setVersion('0.3.0')
+    .addBearerAuth(
+      { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
+      'JWT',
+    )
+    .addApiKey(
+      {
+        type: 'apiKey',
+        in: 'header',
+        name: 'X-Org',
+        description: 'Organization slug for multi-tenant scoping',
+      },
+      'X-Org',
+    )
+    .build();
 
-  const port = parseInt(process.env.PORT ?? '3000', 10);
+  const doc = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('docs', app, doc);
+
+  const port = process.env.PORT ?? 3000;
   await app.listen(port);
-
-  const logger = new Logger('NestApplication');
-  logger.log(`✅ API listening on http://localhost:${port}`);
+  console.log(`✅ API listening on http://localhost:${port}`);
+  console.log(`📘 Swagger docs at       http://localhost:${port}/docs`);
 }
 bootstrap();

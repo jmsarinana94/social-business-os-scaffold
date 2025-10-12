@@ -1,117 +1,149 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
-import { CreateProductDto } from './dto/create-product.dto';
-import { UpdateProductDto } from './dto/update-product.dto';
+// apps/api/src/modules/products/products.service.ts
 
-const toApiProduct = (p: any) => {
-  if (!p) return p;
-  const price =
-    p.price && typeof p.price === 'object' && typeof p.price.toNumber === 'function'
-      ? p.price.toNumber()
-      : typeof p.price === 'string'
-        ? Number(p.price)
-        : p.price;
-
-  const createdAt =
-    p.createdAt instanceof Date ? p.createdAt.toISOString() : new Date(p.createdAt).toISOString();
-  const updatedAt =
-    p.updatedAt instanceof Date ? p.updatedAt.toISOString() : new Date(p.updatedAt).toISOString();
-
-  return { ...p, price, createdAt, updatedAt };
-};
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../../common/prisma.service';
+import { CreateProductDto, UpdateProductDto } from './dto';
 
 @Injectable()
 export class ProductsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  // ---------- Helpers ----------
+
+  private async getOrgBySlugOrThrow(orgSlug: string) {
+    const org = await this.prisma.organization.findUnique({ where: { slug: orgSlug } });
+    if (!org) throw new NotFoundException('Org not found');
+    return org;
+  }
+
+  private async getProductOrThrow(orgId: string, id: string) {
+    const prod = await this.prisma.product.findFirst({
+      where: { id, organizationId: orgId },
+    });
+    if (!prod) throw new NotFoundException('Product not found');
+    return prod;
+  }
+
+  private async ensureCategoryInOrg(orgId: string, categoryId: string) {
+    const cat = await this.prisma.category.findFirst({
+      where: { id: categoryId, organizationId: orgId },
+    });
+    if (!cat) throw new BadRequestException('Category does not belong to this org');
+    return cat;
+  }
+
+  // ---------- Queries ----------
+
   async findAll(orgSlug: string) {
-    const list = await this.prisma.product.findMany({
-      where: { organization: { slug: orgSlug } },
+    const org = await this.getOrgBySlugOrThrow(orgSlug);
+    return this.prisma.product.findMany({
+      where: { organizationId: org.id },
       orderBy: { createdAt: 'desc' },
     });
-    return list.map(toApiProduct);
   }
 
   async findOne(orgSlug: string, id: string) {
-    const p = await this.prisma.product.findFirst({
-      where: { id, organization: { slug: orgSlug } },
+    const org = await this.getOrgBySlugOrThrow(orgSlug);
+    const prod = await this.prisma.product.findFirst({
+      where: { id, organizationId: org.id },
     });
-    if (!p) throw new NotFoundException('Product not found');
-    return toApiProduct(p);
+    if (!prod) throw new NotFoundException('Product not found');
+    return prod;
   }
 
-  async create(orgSlug: string, dto: CreateProductDto) {
-    const exists = await this.prisma.product.findFirst({
-      where: { sku: dto.sku, organization: { slug: orgSlug } },
-    });
-    if (exists) throw new ConflictException('SKU already exists in this org');
+  // ---------- Mutations ----------
 
-    const created = await this.prisma.product.create({
+  async create(orgSlug: string, dto: CreateProductDto) {
+    const org = await this.getOrgBySlugOrThrow(orgSlug);
+
+    // Optional: if categoryId provided, validate it belongs to org
+    if (dto.categoryId) {
+      await this.ensureCategoryInOrg(org.id, dto.categoryId);
+    }
+
+    return this.prisma.product.create({
       data: {
+        organizationId: org.id,
+        categoryId: dto.categoryId ?? null,
         title: dto.title,
-        type: dto.type,
-        status: dto.status,
-        price: dto.price,
         sku: dto.sku,
         description: dto.description ?? null,
-        inventoryQty: dto.inventoryQty ?? 0,
-        organization: { connect: { slug: orgSlug } },
+        type: dto.type,
+        status: dto.status,
+        // Prisma Decimal accepts number | string | Decimal
+        price: dto.price as any,
+        // inventory fields defaulted by schema
       },
     });
-    return toApiProduct(created);
   }
 
   async update(orgSlug: string, id: string, dto: UpdateProductDto) {
-    const exists = await this.prisma.product.findFirst({
-      where: { id, organization: { slug: orgSlug } },
-    });
-    if (!exists) throw new NotFoundException('Product not found');
+    const org = await this.getOrgBySlugOrThrow(orgSlug);
+    await this.getProductOrThrow(org.id, id);
 
-    const updated = await this.prisma.product.update({
+    // If categoryId is explicitly present:
+    // - string => validate belongs to org and set it
+    // - null   => clear the category
+    // - undefined => leave unchanged
+    if (dto.categoryId !== undefined && dto.categoryId !== null) {
+      await this.ensureCategoryInOrg(org.id, dto.categoryId);
+    }
+
+    return this.prisma.product.update({
       where: { id },
       data: {
-        ...(dto.title !== undefined ? { title: dto.title } : {}),
-        ...(dto.type !== undefined ? { type: dto.type } : {}),
-        ...(dto.status !== undefined ? { status: dto.status } : {}),
-        ...(dto.price !== undefined ? { price: dto.price } : {}),
-        ...(dto.sku !== undefined ? { sku: dto.sku } : {}),
-        ...(dto.description !== undefined ? { description: dto.description } : {}),
+        title: dto.title ?? undefined,
+        sku: dto.sku ?? undefined,
+        description: dto.description ?? undefined,
+        type: dto.type ?? undefined,
+        status: dto.status ?? undefined,
+        price: dto.price ?? undefined,
+        categoryId:
+          dto.categoryId === undefined
+            ? undefined // no change
+            : dto.categoryId, // string or null (clear)
       },
     });
-    return toApiProduct(updated);
   }
 
   async remove(orgSlug: string, id: string) {
-    const exists = await this.prisma.product.findFirst({
-      where: { id, organization: { slug: orgSlug } },
-    });
-    if (!exists) throw new NotFoundException('Product not found');
-
-    const deleted = await this.prisma.product.delete({ where: { id } });
-    return toApiProduct(deleted); // tests expect 200 + body
+    const org = await this.getOrgBySlugOrThrow(orgSlug);
+    await this.getProductOrThrow(org.id, id);
+    await this.prisma.product.delete({ where: { id } });
+    return { ok: true };
   }
 
+  // ---------- Inventory ----------
+
   async getInventory(orgSlug: string, id: string) {
-    const p = await this.prisma.product.findFirst({
-      where: { id, organization: { slug: orgSlug } },
+    const org = await this.getOrgBySlugOrThrow(orgSlug);
+    const prod = await this.prisma.product.findFirst({
+      where: { id, organizationId: org.id },
+      select: { id: true, inventoryQty: true },
     });
-    if (!p) throw new NotFoundException('Product not found');
-    return { id: p.id, inventoryQty: p.inventoryQty };
+    if (!prod) throw new NotFoundException('Product not found');
+    return { productId: prod.id, inventoryQty: prod.inventoryQty };
   }
 
   async addInventory(orgSlug: string, id: string, delta: number) {
-    const p = await this.prisma.product.findFirst({
-      where: { id, organization: { slug: orgSlug } },
-    });
-    if (!p) throw new NotFoundException('Product not found');
+    if (!Number.isFinite(delta) || Math.trunc(delta) !== delta) {
+      throw new BadRequestException('delta must be an integer');
+    }
 
-    const next = p.inventoryQty + delta;
-    if (next < 0) throw new BadRequestException('Inventory cannot go below zero');
+    const org = await this.getOrgBySlugOrThrow(orgSlug);
+    const prod = await this.getProductOrThrow(org.id, id);
+
+    const nextQty = prod.inventoryQty + delta;
+    if (nextQty < 0) {
+      throw new BadRequestException('Inventory cannot go below zero');
+    }
 
     const updated = await this.prisma.product.update({
-      where: { id },
-      data: { inventoryQty: next },
+      where: { id: prod.id },
+      data: { inventoryQty: nextQty },
+      select: { id: true, inventoryQty: true },
     });
-    return toApiProduct(updated);
+
+    return { productId: updated.id, inventoryQty: updated.inventoryQty };
   }
 }

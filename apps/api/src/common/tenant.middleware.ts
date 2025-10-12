@@ -1,14 +1,20 @@
 import { Injectable, NestMiddleware } from '@nestjs/common';
-import { NextFunction, Request, Response } from 'express';
-import { TenantContext } from './tenant.context';
+import type { NextFunction, Request, Response } from 'express';
+import { PrismaService } from './prisma.service';
 
 @Injectable()
 export class TenantMiddleware implements NestMiddleware {
-  use(req: Request, _res: Response, next: NextFunction) {
-    const header = (req.header('x-org') || req.header('x-org-id') || '').trim();
-    const orgId = header.length ? header : undefined;
+  constructor(private readonly prisma: PrismaService) {}
 
-    // Bind this request to the tenant context
-    TenantContext.runWithOrg(orgId, () => next());
+  async use(req: Request, _res: Response, next: NextFunction) {
+    const slug = (req.header('x-org') || req.header('X-Org') || '').trim();
+    if (slug) {
+      const org = await this.prisma.organization.findUnique({ where: { slug } });
+      if (org) {
+        // @ts-ignore - augmented in tenant.context.ts
+        req.tenant = { orgId: org.id, orgSlug: slug };
+      }
+    }
+    next();
   }
 }

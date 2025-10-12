@@ -1,31 +1,37 @@
-import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
-
-const TYPES = ['PHYSICAL', 'DIGITAL'] as const;
-const STATUSES = ['ACTIVE', 'INACTIVE'] as const;
-
-export type ProductType = typeof TYPES[number];
-export type ProductStatus = typeof STATUSES[number];
+import {
+  IsDecimal,
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+} from 'class-validator';
+import { ProductStatus, ProductType } from './product.dto';
 
 export class CreateProductDto {
-  @IsString() @IsNotEmpty()
+  @IsString()
+  @IsNotEmpty()
   title!: string;
 
-  @IsIn(TYPES as readonly string[])
-  type!: ProductType;
-
-  @IsIn(STATUSES as readonly string[])
-  status!: ProductStatus;
-
-  @Type(() => Number) @IsNumber()
-  price!: number;
-
-  @IsString() @IsNotEmpty()
+  @IsString()
+  @IsNotEmpty()
   sku!: string;
 
-  @IsOptional() @IsString()
-  description?: string | null;
+  @IsOptional()
+  @IsString()
+  description?: string;
 
-  @IsOptional() @Type(() => Number) @IsInt()
-  inventoryQty?: number = 0;
+  @IsEnum(ProductType) // "PHYSICAL" | "DIGITAL"
+  type!: ProductType;
+
+  @IsEnum(ProductStatus) // "ACTIVE" | "INACTIVE"
+  status!: ProductStatus;
+
+  // decimal string like "19.99"
+  @IsDecimal({ force_decimal: true }, { message: 'price must be a decimal string (e.g. "19.99")' })
+  price!: string;
+
+  // optional category on create
+  @IsOptional()
+  @IsString()
+  categoryId?: string;
 }
