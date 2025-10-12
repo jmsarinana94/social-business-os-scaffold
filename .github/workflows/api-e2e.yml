@@ -10,6 +10,11 @@ on:
   pull_request:
     branches:
       - main
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   e2e:
@@ -35,7 +40,7 @@ jobs:
       - name: 🔨 Build API
         run: pnpm build
 
-      - name: 🧪 Run e2e tests
+      - name: 🧪 Run Jest E2E tests
         run: pnpm test:e2e
 
       - name: 🧾 Upload test results
