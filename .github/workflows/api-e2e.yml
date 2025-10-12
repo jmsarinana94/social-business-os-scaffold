@@ -1,48 +1,42 @@
-name: api-e2e
+name: API E2E Tests
 
 on:
   push:
+    branches: [ main, chore/**, feat/**, fix/** ]
   pull_request:
+    branches: [ main ]
 
 jobs:
-  test:
+  e2e:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_USER: postgres
-          POSTGRES_DB: socialos
-        ports: [ "5432:5432" ]
-        options: >-
-          --health-cmd="pg_isready -U postgres -d socialos"
-          --health-interval=10s --health-timeout=5s --health-retries=5
+
+    strategy:
+      matrix:
+        node-version: [20.x]
 
     steps:
-      - uses: actions/checkout@v4
+      - name: 🧱 Checkout repository
+        uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-        with: { version: 9 }
-
-      - uses: actions/setup-node@v4
+      - name: 🧰 Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ matrix.node-version }}
           cache: 'pnpm'
 
-      - run: pnpm install --frozen-lockfile
+      - name: 📦 Install pnpm
+        run: npm install -g pnpm
 
-      - name: Prepare Prisma env
+      - name: 📦 Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: ⚙️ Generate Prisma Client (SQLite local)
         working-directory: apps/api
         run: |
-          cp prisma/.env.example prisma/.env
-          echo 'DATABASE_URL=postgresql://postgres:postgres@localhost:5432/socialos?schema=public' > prisma/.env
-          echo 'JWT_SECRET=ci_jwt_secret' >> prisma/.env
-          pnpm dlx prisma generate --schema prisma/schema.prisma
-          pnpm dlx prisma migrate deploy --schema prisma/schema.prisma
+          printf 'DATABASE_URL="file:./dev.db"\n' > prisma/.env
+          pnpm prisma generate --schema prisma/schema.prisma
+          pnpm prisma db push --schema prisma/schema.prisma
 
-      - name: Build API
-        run: pnpm -F @repo/api build
-
-      - name: Run e2e
-        run: pnpm -F @repo/api test:e2e
+      - name: 🧪 Run E2E Tests
+        working-directory: apps/api
+        run: pnpm test:e2e
