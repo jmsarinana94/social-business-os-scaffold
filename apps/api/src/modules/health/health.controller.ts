@@ -1,28 +1,26 @@
-import { Controller, Get } from '@nestjs/common';
-const startedAt = Date.now();
+import { Controller, Get, HttpCode } from '@nestjs/common';
 
-@Controller('health')
+@Controller()
 export class HealthController {
-  @Get()
-  basic() {
-    return { ok: true, service: 'api', time: new Date().toISOString() };
+  @Get('health')
+  @HttpCode(200)
+  health() {
+    return {
+      status: 'ok',
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString(),
+    };
   }
 
-  @Get('z')
-  healthz() {
-    let version = '0.0.0';
-    try {
-      // Resolve from the app’s working dir (apps/api)
-       
-      const pkg = require(process.cwd() + '/package.json');
-      version = pkg?.version ?? version;
-    } catch {}
-    return {
-      ok: true,
-      service: 'api',
-      version,
-      uptimeSec: Math.round((Date.now() - startedAt) / 1000),
-      now: new Date().toISOString(),
-    };
+  @Get('ready')
+  @HttpCode(200)
+  ready() {
+    return { status: 'ready' };
+  }
+
+  @Get('live')
+  @HttpCode(200)
+  live() {
+    return { status: 'live' };
   }
 }
