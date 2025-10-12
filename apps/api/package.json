@@ -1,6 +1,6 @@
 {
   "name": "@repo/api",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "private": true,
   "type": "commonjs",
   "main": "dist/src/main.js",
@@ -8,15 +8,21 @@
     "start": "node dist/src/main.js",
     "start:dev": "nest start --watch",
     "build": "nest build",
+    "dev": "bash ./scripts/dev.sh",
+
     "test": "jest --config jest.config.ts",
     "test:e2e": "jest --config jest.config.ts --selectProjects=e2e --runInBand",
     "test:e2e:products": "jest --config jest.config.ts --selectProjects=e2e --runInBand -- test/e2e/products.validation.e2e-spec.ts",
     "inv:test": "bash ./scripts/inventory-test.sh",
+
     "prisma:generate": "prisma generate --schema=prisma/schema.prisma",
     "prisma:migrate:dev": "prisma migrate dev --schema=prisma/schema.prisma",
     "prisma:reset": "bash ./scripts/prisma-reset.sh",
     "seed:demo": "bash ./scripts/prisma-seed-demo.sh",
-    "dev": "bash ./scripts/dev.sh"
+
+    "smoke": "./scripts/smoke.sh",
+    "swagger:open": "echo 'Swagger UI available at http://localhost:3000/docs'",
+    "prisma:gen": "prisma generate --schema=prisma/schema.prisma"
   },
   "dependencies": {
     "@nestjs/common": "10.4.20",
