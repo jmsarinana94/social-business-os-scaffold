@@ -1,13 +1,15 @@
-name: API Smoke
+name: API Smoke Test
 
 on:
   push:
-    paths:
-      - 'apps/api/**'
-      - '.github/workflows/api-smoke.yml'
+    branches:
+      - main
+      - chore/prisma-local-works
+    tags:
+      - 'v*'
   pull_request:
-    paths:
-      - 'apps/api/**'
+    branches:
+      - main
 
 jobs:
   smoke:
@@ -15,57 +17,30 @@ jobs:
     defaults:
       run:
         working-directory: apps/api
-
     steps:
-      - uses: actions/checkout@v4
+      - name: 🛠️ Checkout repo
+        uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9
-
-      - name: Setup Node
+      - name: 🧩 Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'pnpm'
-          cache-dependency-path: 'apps/api/pnpm-lock.yaml'
 
-      - name: Install deps
-        run: pnpm install --frozen-lockfile
-
-      - name: Start Postgres
+      - name: 📦 Install dependencies
         run: |
-          sudo systemctl start postgresql || true
-          psql --version
-          sudo -u postgres psql -c "CREATE USER runner WITH SUPERUSER PASSWORD 'runner';" || true
-          sudo -u postgres psql -c "CREATE DATABASE socialos OWNER runner;" || true
+          corepack enable
+          pnpm install --frozen-lockfile
 
-      - name: Prepare Prisma
-        env:
-          DATABASE_URL: postgresql://runner:runner@localhost:5432/socialos
-        run: |
-          pnpm prisma generate
-          pnpm prisma migrate dev --name ci_init --create-only || true
-          pnpm prisma migrate deploy
+      - name: 🔨 Build API
+        run: pnpm build
 
-      - name: Build & start API (background)
-        env:
-          DATABASE_URL: postgresql://runner:runner@localhost:5432/socialos
-        run: |
-          pnpm build
-          nohup pnpm start >/tmp/api.log 2>&1 &
-          for i in {1..30}; do
-            curl -fsS http://127.0.0.1:4000/health && break
-            sleep 1
-          done
-          curl -fsS http://127.0.0.1:4000/health
-
-      - name: Smoke
-        env:
-          BASE: http://127.0.0.1:4000
-          ORG: demo
+      - name: 🚦 Run smoke test
         run: pnpm smoke
 
-      - name: Show API logs on failure
+      - name: 🧾 Upload logs on failure
         if: failure()
-        run: cat /tmp/api.log || true
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-log
+          path: apps/api/api.log
