@@ -1,6 +1,5 @@
-// apps/api/src/modules/products/products.service.ts
-
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { $Enums } from '@prisma/client';
 import { PrismaService } from '../../common/prisma.service';
 import { CreateProductDto, UpdateProductDto } from './dto';
 
@@ -8,142 +7,146 @@ import { CreateProductDto, UpdateProductDto } from './dto';
 export class ProductsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  // ---------- Helpers ----------
-
-  private async getOrgBySlugOrThrow(orgSlug: string) {
-    const org = await this.prisma.organization.findUnique({ where: { slug: orgSlug } });
-    if (!org) throw new NotFoundException('Org not found');
-    return org;
-  }
-
-  private async getProductOrThrow(orgId: string, id: string) {
-    const prod = await this.prisma.product.findFirst({
-      where: { id, organizationId: orgId },
-    });
-    if (!prod) throw new NotFoundException('Product not found');
-    return prod;
-  }
-
-  private async ensureCategoryInOrg(orgId: string, categoryId: string) {
-    const cat = await this.prisma.category.findFirst({
-      where: { id: categoryId, organizationId: orgId },
-    });
-    if (!cat) throw new BadRequestException('Category does not belong to this org');
-    return cat;
-  }
-
-  // ---------- Queries ----------
-
+  // List all products for an org
   async findAll(orgSlug: string) {
-    const org = await this.getOrgBySlugOrThrow(orgSlug);
+    const org = await this.prisma.organization.findUnique({
+      where: { slug: orgSlug },
+      select: { id: true },
+    });
+    if (!org) throw new NotFoundException('Organization not found');
+
     return this.prisma.product.findMany({
       where: { organizationId: org.id },
       orderBy: { createdAt: 'desc' },
+      include: { category: true },
     });
   }
 
+  // One product (scoped to org)
   async findOne(orgSlug: string, id: string) {
-    const org = await this.getOrgBySlugOrThrow(orgSlug);
+    const org = await this.prisma.organization.findUnique({
+      where: { slug: orgSlug },
+      select: { id: true },
+    });
+    if (!org) throw new NotFoundException('Organization not found');
+
     const prod = await this.prisma.product.findFirst({
       where: { id, organizationId: org.id },
+      include: { category: true },
     });
     if (!prod) throw new NotFoundException('Product not found');
     return prod;
   }
 
-  // ---------- Mutations ----------
-
+  // Create product (use simple categoryId field to satisfy UncheckedCreateInput)
   async create(orgSlug: string, dto: CreateProductDto) {
-    const org = await this.getOrgBySlugOrThrow(orgSlug);
-
-    // Optional: if categoryId provided, validate it belongs to org
-    if (dto.categoryId) {
-      await this.ensureCategoryInOrg(org.id, dto.categoryId);
-    }
+    const org = await this.prisma.organization.findUnique({
+      where: { slug: orgSlug },
+      select: { id: true },
+    });
+    if (!org) throw new NotFoundException('Organization not found');
 
     return this.prisma.product.create({
       data: {
-        organizationId: org.id,
-        categoryId: dto.categoryId ?? null,
         title: dto.title,
-        sku: dto.sku,
         description: dto.description ?? null,
-        type: dto.type,
-        status: dto.status,
-        // Prisma Decimal accepts number | string | Decimal
-        price: dto.price as any,
-        // inventory fields defaulted by schema
+        price: dto.price,
+        sku: dto.sku,
+        status: dto.status as $Enums.ProductStatus,
+        type: dto.type as $Enums.ProductType,
+        organizationId: org.id,
+        inventoryQty: dto.inventoryQty ?? 0,
+        // use the scalar field instead of nested connect to avoid XOR conflict
+        categoryId: dto.categoryId ?? null,
       },
+      include: { category: true },
     });
   }
 
+  // Update product
   async update(orgSlug: string, id: string, dto: UpdateProductDto) {
-    const org = await this.getOrgBySlugOrThrow(orgSlug);
-    await this.getProductOrThrow(org.id, id);
+    const org = await this.prisma.organization.findUnique({
+      where: { slug: orgSlug },
+      select: { id: true },
+    });
+    if (!org) throw new NotFoundException('Organization not found');
 
-    // If categoryId is explicitly present:
-    // - string => validate belongs to org and set it
-    // - null   => clear the category
-    // - undefined => leave unchanged
-    if (dto.categoryId !== undefined && dto.categoryId !== null) {
-      await this.ensureCategoryInOrg(org.id, dto.categoryId);
-    }
+    // ensure in-org
+    await this.prisma.product.findFirstOrThrow({
+      where: { id, organizationId: org.id },
+      select: { id: true },
+    });
 
     return this.prisma.product.update({
       where: { id },
       data: {
         title: dto.title ?? undefined,
-        sku: dto.sku ?? undefined,
         description: dto.description ?? undefined,
-        type: dto.type ?? undefined,
-        status: dto.status ?? undefined,
         price: dto.price ?? undefined,
-        categoryId:
-          dto.categoryId === undefined
-            ? undefined // no change
-            : dto.categoryId, // string or null (clear)
+        sku: dto.sku ?? undefined,
+        status: (dto.status as $Enums.ProductStatus | undefined) ?? undefined,
+        type: (dto.type as $Enums.ProductType | undefined) ?? undefined,
+        inventoryQty: dto.inventoryQty ?? undefined,
+        // only touch categoryId if present (including null to clear)
+        ...(Object.prototype.hasOwnProperty.call(dto, 'categoryId')
+          ? { categoryId: dto.categoryId ?? null }
+          : {}),
       },
+      include: { category: true },
     });
   }
 
+  // Delete product
   async remove(orgSlug: string, id: string) {
-    const org = await this.getOrgBySlugOrThrow(orgSlug);
-    await this.getProductOrThrow(org.id, id);
-    await this.prisma.product.delete({ where: { id } });
-    return { ok: true };
+    const org = await this.prisma.organization.findUnique({
+      where: { slug: orgSlug },
+      select: { id: true },
+    });
+    if (!org) throw new NotFoundException('Organization not found');
+
+    // ensure in-org
+    await this.prisma.product.findFirstOrThrow({
+      where: { id, organizationId: org.id },
+      select: { id: true },
+    });
+
+    return this.prisma.product.delete({ where: { id } });
   }
 
-  // ---------- Inventory ----------
-
+  // Read inventory
   async getInventory(orgSlug: string, id: string) {
-    const org = await this.getOrgBySlugOrThrow(orgSlug);
+    const org = await this.prisma.organization.findUnique({
+      where: { slug: orgSlug },
+      select: { id: true },
+    });
+    if (!org) throw new NotFoundException('Organization not found');
+
     const prod = await this.prisma.product.findFirst({
       where: { id, organizationId: org.id },
       select: { id: true, inventoryQty: true },
     });
     if (!prod) throw new NotFoundException('Product not found');
-    return { productId: prod.id, inventoryQty: prod.inventoryQty };
+    return prod;
   }
 
+  // Adjust inventory by delta
   async addInventory(orgSlug: string, id: string, delta: number) {
-    if (!Number.isFinite(delta) || Math.trunc(delta) !== delta) {
-      throw new BadRequestException('delta must be an integer');
-    }
+    const org = await this.prisma.organization.findUnique({
+      where: { slug: orgSlug },
+      select: { id: true },
+    });
+    if (!org) throw new NotFoundException('Organization not found');
 
-    const org = await this.getOrgBySlugOrThrow(orgSlug);
-    const prod = await this.getProductOrThrow(org.id, id);
-
-    const nextQty = prod.inventoryQty + delta;
-    if (nextQty < 0) {
-      throw new BadRequestException('Inventory cannot go below zero');
-    }
-
-    const updated = await this.prisma.product.update({
-      where: { id: prod.id },
-      data: { inventoryQty: nextQty },
-      select: { id: true, inventoryQty: true },
+    // ensure in-org
+    await this.prisma.product.findFirstOrThrow({
+      where: { id, organizationId: org.id },
+      select: { id: true },
     });
 
-    return { productId: updated.id, inventoryQty: updated.inventoryQty };
+    return this.prisma.product.update({
+      where: { id },
+      data: { inventoryQty: { increment: delta } },
+      select: { id: true, inventoryQty: true },
+    });
   }
 }

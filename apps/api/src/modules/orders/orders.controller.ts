@@ -1,38 +1,27 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Headers,
-  Param,
-  Post,
-} from '@nestjs/common';
-import { CreateOrderDto } from './dto/create-order.dto';
+import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Org } from '../../common/org.decorator';
 import { OrdersService } from './orders.service';
 
-type OrgHeaders = {
-  'x-org-id'?: string;
-  'x-org-slug'?: string;
-};
-
-@Controller('orders') // <-- IMPORTANT: no /v1 here
+@Controller('orders')
 export class OrdersController {
   constructor(private readonly orders: OrdersService) {}
 
+  private ctx(org: any) {
+    return { orgId: org?.id ?? org?.orgId, orgSlug: org?.slug ?? org?.orgSlug };
+  }
+
   @Get()
-  list(@Headers() headers: OrgHeaders) {
-    const ctx = { orgId: headers['x-org-id'], orgSlug: headers['x-org-slug'] };
-    return this.orders.list(ctx);
+  list(@Org() org: any) {
+    return this.orders.list(this.ctx(org));
   }
 
   @Get(':id')
-  getOne(@Param('id') id: string, @Headers() headers: OrgHeaders) {
-    const ctx = { orgId: headers['x-org-id'], orgSlug: headers['x-org-slug'] };
-    return this.orders.getOne(ctx, id);
+  getOne(@Org() org: any, @Param('id') id: string) {
+    return this.orders.getOne(this.ctx(org), id);
   }
 
   @Post()
-  create(@Body() dto: CreateOrderDto, @Headers() headers: OrgHeaders) {
-    const ctx = { orgId: headers['x-org-id'], orgSlug: headers['x-org-slug'] };
-    return this.orders.create(ctx, dto);
+  create(@Org() org: any, @Body() dto: any) {
+    return this.orders.create(this.ctx(org), dto);
   }
 }
