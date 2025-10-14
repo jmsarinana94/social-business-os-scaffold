@@ -112,8 +112,11 @@ importers:
         specifier: ^1.4.9
         version: 1.4.9(@types/express@4.17.23)
       '@types/express':
-        specifier: ^4.17.21
+        specifier: ^4.17.23
         version: 4.17.23
+      '@types/express-serve-static-core':
+        specifier: ^5.1.0
+        version: 5.1.0
       '@types/jest':
         specifier: ^29.5.12
         version: 29.5.14
@@ -129,6 +132,9 @@ importers:
       '@types/supertest':
         specifier: ^6.0.3
         version: 6.0.3
+      cross-env:
+        specifier: ^7.0.3
+        version: 7.0.3
       jest:
         specifier: ^29.7.0
         version: 29.7.0(@types/node@20.19.13)(ts-node@10.9.2(@types/node@20.19.13)(typescript@5.9.2))
@@ -1176,6 +1182,9 @@ packages:
   '@types/express-serve-static-core@4.19.6':
     resolution: {integrity: sha512-N4LZ2xG7DatVqhCZzOGb1Yi5lMbXSZcmdLDe9EzSndPV2HpWYWzRbaerl2n27irrm94EPpprqa8KpskPT085+A==}
 
+  '@types/express-serve-static-core@5.1.0':
+    resolution: {integrity: sha512-jnHMsrd0Mwa9Cf4IdOzbz543y4XJepXrbia2T4b6+spXC2We3t1y6K44D3mR8XMFSXMCf3/l7rCgddfx7UNVBA==}
+
   '@types/express@4.17.23':
     resolution: {integrity: sha512-Crp6WY9aTYP3qPi2wGDo9iUe/rceX01UMhnF1jmwDcKCFM6cx7YhGP/Mpr3y9AASpfHixIG0E6azCcL5OcDHsQ==}
 
@@ -1798,6 +1807,11 @@ packages:
   cron-parser@4.9.0:
     resolution: {integrity: sha512-p0SaNjrHOnQeR8/VnfGbmg9te2kfyYSQ7Sc/j/6DtPL3JQvKxmjO9TSjNFpujqV3vEYYBvNNvXSxzyksBWAx1Q==}
     engines: {node: '>=12.0.0'}
+
+  cross-env@7.0.3:
+    resolution: {integrity: sha512-+/HKd6EgcQCJGh2PSjZuUitQBQynKor4wrFbRg4DtAgS1aWO+gU52xpH7M9ScGgXSYmAVS9bIJ8EzuaGw0oNAw==}
+    engines: {node: '>=10.14', npm: '>=6', yarn: '>=1'}
+    hasBin: true
 
   cross-spawn@7.0.6:
     resolution: {integrity: sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==}
@@ -4891,6 +4905,13 @@ snapshots:
       '@types/range-parser': 1.2.7
       '@types/send': 0.17.5
 
+  '@types/express-serve-static-core@5.1.0':
+    dependencies:
+      '@types/node': 20.19.13
+      '@types/qs': 6.14.0
+      '@types/range-parser': 1.2.7
+      '@types/send': 0.17.5
+
   '@types/express@4.17.23':
     dependencies:
       '@types/body-parser': 1.19.6
@@ -5639,6 +5660,10 @@ snapshots:
   cron-parser@4.9.0:
     dependencies:
       luxon: 3.7.2
+
+  cross-env@7.0.3:
+    dependencies:
+      cross-spawn: 7.0.6
 
   cross-spawn@7.0.6:
     dependencies:
