@@ -3,20 +3,18 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
+  HttpCode,
   Param,
+  Patch,
   Post,
   Put,
 } from '@nestjs/common';
-import { Type } from 'class-transformer';
-import { IsInt } from 'class-validator';
-import { Org } from '../../common/org.decorator';
-import { CreateProductDto, UpdateProductDto } from './dto';
-import { ProductsService } from './products.service';
+import { CreateProductDto, PatchProductDto, ProductsService } from './products.service';
 
-class AdjustInventoryDto {
-  @Type(() => Number)
-  @IsInt()
-  delta!: number;
+function orgFromHeaders(h: Record<string, string>) {
+  // Node lowercases header keys; still check a couple variants for safety
+  return h['x-org'] || (h as any)['X-Org'] || h['x-org-id'] || (h as any)['X-Org-Id'];
 }
 
 @Controller('products')
@@ -24,45 +22,51 @@ export class ProductsController {
   constructor(private readonly products: ProductsService) {}
 
   @Get()
-  list(@Org() org: { slug: string }) {
-    return this.products.findAll(org.slug);
+  findAll(@Headers() headers: Record<string, string>) {
+    return this.products.findAll(orgFromHeaders(headers));
   }
 
   @Get(':id')
-  getOne(@Org() org: { slug: string }, @Param('id') id: string) {
-    return this.products.findOne(org.slug, id);
+  findOne(@Headers() headers: Record<string, string>, @Param('id') id: string) {
+    return this.products.findOne(orgFromHeaders(headers), id);
   }
 
   @Post()
-  create(@Org() org: { slug: string }, @Body() dto: CreateProductDto) {
-    return this.products.create(org.slug, dto);
+  create(@Headers() headers: Record<string, string>, @Body() dto: CreateProductDto) {
+    return this.products.create(orgFromHeaders(headers), dto);
   }
 
+  // Tests call PUT ... provide a PUT alias that delegates to patch()
   @Put(':id')
-  update(
-    @Org() org: { slug: string },
+  put(
+    @Headers() headers: Record<string, string>,
     @Param('id') id: string,
-    @Body() dto: UpdateProductDto,
+    @Body() dto: PatchProductDto,
   ) {
-    return this.products.update(org.slug, id, dto);
+    return this.products.patch(orgFromHeaders(headers), id, dto);
   }
 
-  @Delete(':id')
-  remove(@Org() org: { slug: string }, @Param('id') id: string) {
-    return this.products.remove(org.slug, id);
-  }
-
-  @Get(':id/inventory')
-  getInventory(@Org() org: { slug: string }, @Param('id') id: string) {
-    return this.products.getInventory(org.slug, id);
+  @Patch(':id')
+  patch(
+    @Headers() headers: Record<string, string>,
+    @Param('id') id: string,
+    @Body() dto: PatchProductDto,
+  ) {
+    return this.products.patch(orgFromHeaders(headers), id, dto);
   }
 
   @Post(':id/inventory')
+  @HttpCode(200) // tests expect 200 instead of Nest's default 201
   adjustInventory(
-    @Org() org: { slug: string },
+    @Headers() headers: Record<string, string>,
     @Param('id') id: string,
-    @Body() payload: AdjustInventoryDto,
+    @Body() body: { delta: number },
   ) {
-    return this.products.addInventory(org.slug, id, payload.delta);
+    return this.products.adjustInventory(orgFromHeaders(headers), id, Number(body?.delta ?? 0));
+  }
+
+  @Delete(':id')
+  remove(@Headers() headers: Record<string, string>, @Param('id') id: string) {
+    return this.products.remove(orgFromHeaders(headers), id);
   }
 }

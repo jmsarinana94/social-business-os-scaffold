@@ -1,84 +1,56 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../common/prisma.service';
-import { CreateOrgDto } from './dto/create-org.dto';
-import { UpdateOrgDto } from './dto/update-org.dto';
+import { Prisma } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class OrgsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /**
-   * Create a new organization.
-   */
-  async create(dto: CreateOrgDto) {
-    return this.prisma.organization.create({
-      data: {
-        slug: dto.slug,
-        name: dto.name,
-      },
-    });
-  }
-
-  /**
-   * List all orgs (useful for admin/debug).
-   */
   async findAll() {
-    return this.prisma.organization.findMany({
-      orderBy: { createdAt: 'desc' },
-    });
+    return this.prisma.organization.findMany({ orderBy: { createdAt: 'desc' } });
   }
 
-  /**
-   * Find an org by primary id.
-   */
-  async findOne(id: string) {
-    const org = await this.prisma.organization.findUnique({
-      where: { id },
-    });
+  async findById(id: string) {
+    const org = await this.prisma.organization.findUnique({ where: { id } });
     if (!org) throw new NotFoundException('Organization not found');
     return org;
   }
 
-  /**
-   * Find an org by slug (used for multi-tenant lookups).
-   */
   async findBySlug(slug: string) {
-    const org = await this.prisma.organization.findUnique({
-      where: { slug },
-    });
-    if (!org) throw new NotFoundException(`Organization with slug '${slug}' not found`);
+    const org = await this.prisma.organization.findUnique({ where: { slug } });
+    if (!org) throw new NotFoundException('Organization not found');
     return org;
   }
 
-  /**
-   * Convenience used by /orgs/me — same as findBySlug but named for route intent.
-   */
-  async getCurrentOrg(slug: string) {
-    return this.findBySlug(slug);
+  async create(data: { name: string; slug?: string }) {
+    // prisma type requires slug, but schema often has slug unique & required
+    // if slug omitted, derive a simple one
+    const payload: Prisma.OrganizationCreateInput = {
+      name: data.name,
+      slug:
+        (data.slug ?? data.name ?? 'org')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/(^-|-$)/g, '') || 'org',
+    };
+    return this.prisma.organization.create({ data: payload });
   }
 
-  /**
-   * Update an org's mutable fields.
-   */
-  async update(id: string, dto: UpdateOrgDto) {
-    // ensure it exists (and throw 404 if not)
-    await this.findOne(id);
-    return this.prisma.organization.update({
-      where: { id },
-      data: {
-        ...(dto.name !== undefined ? { name: dto.name } : {}),
-      },
-    });
+  async update(id: string, data: Partial<{ name: string; slug: string }>) {
+    const existing = await this.prisma.organization.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('Organization not found');
+
+    const payload: Prisma.OrganizationUpdateInput = {};
+    if (data.name !== undefined) payload.name = data.name;
+    if (data.slug !== undefined) payload.slug = data.slug;
+
+    return this.prisma.organization.update({ where: { id }, data: payload });
   }
 
-  /**
-   * Delete an org.
-   */
   async remove(id: string) {
-    // ensure it exists (and throw 404 if not)
-    await this.findOne(id);
-    return this.prisma.organization.delete({
-      where: { id },
-    });
+    const existing = await this.prisma.organization.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('Organization not found');
+    await this.prisma.organization.delete({ where: { id } });
+    return { deleted: true };
   }
 }

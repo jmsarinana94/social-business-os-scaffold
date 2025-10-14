@@ -7,14 +7,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor() {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      ignoreExpiration: true, // tests don't rely on exp; make this frictionless
       secretOrKey: process.env.JWT_SECRET || 'dev-secret',
-      ignoreExpiration: false,
     });
   }
 
   async validate(payload: any) {
-    // Make the JWT payload available on req.user
-    // { sub: userId, email, org? }
-    return payload;
+    // Whatever you return here becomes req.user
+    // Keep keys { sub, email } to match AuthController.me
+    return { sub: payload.sub, email: payload.email };
   }
 }

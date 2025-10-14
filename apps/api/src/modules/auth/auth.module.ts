@@ -1,26 +1,19 @@
+// apps/api/src/modules/auth/auth.module.ts
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
-import { PassportModule } from '@nestjs/passport';
-
-import { OrgsModule } from '../orgs/orgs.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1h';
-
 @Module({
   imports: [
-    OrgsModule, // for org lookups or future cross-module use
-    PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.register({
-      secret: JWT_SECRET,
-      signOptions: { expiresIn: JWT_EXPIRES_IN },
+      secret: process.env.JWT_SECRET || 'dev-secret',
+      signOptions: { expiresIn: '7d' },
     }),
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy],
-  exports: [AuthService, JwtModule],
+  exports: [AuthService],
 })
 export class AuthModule {}
