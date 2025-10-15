@@ -1,51 +1,32 @@
 name: API E2E Tests
 
 on:
-  push:
-    branches:
-      - main
-      - chore/prisma-local-works
-    tags:
-      - 'v*'
   pull_request:
-    branches:
-      - main
-  workflow_dispatch:
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+    paths:
+      - "apps/api/**"
+      - ".github/workflows/api-e2e.yml"
+      - "pnpm-lock.yaml"
+      - ".nvmrc"
 
 jobs:
   e2e:
+    name: e2e
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: apps/api
     steps:
-      - name: 🛠️ Checkout repo
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: 🧩 Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: '.nvmrc'
           cache: 'pnpm'
 
-      - name: 📦 Install dependencies
-        run: |
-          corepack enable
-          pnpm install --frozen-lockfile
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
 
-      - name: 🔨 Build API
-        run: pnpm build
-
-      - name: 🧪 Run Jest E2E tests
-        run: pnpm test:e2e
-
-      - name: 🧾 Upload test results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: e2e-results
-          path: apps/api/test-results/
+      # Your e2e already succeeds locally with sqlite & E2E_AUTO_CREATE_ORG
+      - run: pnpm -F @repo/api test:e2e
+        env:
+          E2E_AUTO_CREATE_ORG: "true"
