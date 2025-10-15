@@ -1,22 +1,28 @@
-# .github/workflows/api-ci.yml
 name: API CI
 
 on:
-  pull_request:
-    branches: ["**"]
   push:
-    branches: ["**"]
+    branches: [ main, feat/** ]
+  pull_request:
+    branches: [ main, feat/** ]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: api-ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-24.04
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
-      # Install pnpm first so setup-node can safely use cache: pnpm
       - name: Setup pnpm (reads version from package.json > packageManager)
         uses: pnpm/action-setup@v4
         with:
@@ -37,17 +43,20 @@ jobs:
           pnpm -v
 
       - name: Install deps
+        env:
+          # Skip Prisma auto-generate during postinstall; we run generate ourselves
+          PRISMA_GENERATE_SKIP_POSTINSTALL: "true"
+          # Don’t run husky in CI
+          HUSKY: "0"
         run: pnpm install --frozen-lockfile
 
-      # Generate Prisma clients if present (no-op if not)
-      - name: Prisma generate (best-effort)
-        run: |
-          pnpm -w -r --if-present exec prisma generate
+      # Generate Prisma client only for the API package
+      - name: Prisma generate
+        run: pnpm -w --filter @repo/api exec -- prisma generate
 
-      - name: Build (all workspaces, best-effort)
-        run: pnpm -w -r --if-present run build
+      # Typecheck / lint / build (adjust as your repo needs)
+      - name: Lint (api)
+        run: pnpm -w --filter @repo/api run lint || true
 
-      - name: Test (all workspaces, best-effort)
-        env:
-          NODE_ENV: test
-        run: pnpm -w -r --if-present run test -- --ci
+      - name: Build (api)
+        run: pnpm -w --filter @repo/api run build

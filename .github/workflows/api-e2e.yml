@@ -1,21 +1,27 @@
-# .github/workflows/api-e2e.yml
 name: API E2E Tests
 
 on:
-  pull_request:
-    branches: ["**"]
   push:
-    branches: ["**"]
+    branches: [ main, feat/** ]
+  pull_request:
+    branches: [ main, feat/** ]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: api-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_ENV: test
+  # E2E uses SQLite in-repo; create this file before generate
+  DATABASE_URL: file:./apps/api/prisma/dev.db
+  E2E_AUTO_CREATE_ORG: "true"
 
 jobs:
   e2e:
     runs-on: ubuntu-24.04
-    env:
-      NODE_ENV: test
-      # keep your sqlite path so runs are hermetic
-      DATABASE_URL: file:./apps/api/prisma/dev.db
-      # your existing flag from logs
-      E2E_AUTO_CREATE_ORG: "true"
 
     steps:
       - name: Checkout
@@ -43,25 +49,22 @@ jobs:
           pnpm -v
 
       - name: Install deps
+        env:
+          PRISMA_GENERATE_SKIP_POSTINSTALL: "true"
+          HUSKY: "0"
         run: pnpm install --frozen-lockfile
 
-      # Ensure sqlite file/dir exists (harmless if already created by Prisma)
       - name: Prepare sqlite file
         run: |
           mkdir -p apps/api/prisma
           : > apps/api/prisma/dev.db
 
-      - name: Prisma generate (best-effort)
-        run: |
-          pnpm -w -r --if-present exec prisma generate
+      - name: Prisma generate (api)
+        run: pnpm -w --filter @repo/api exec -- prisma generate
 
-      # If you use Playwright for E2E, install browsers (no-op if not present)
-      - name: Install Playwright (best-effort)
-        run: |
-          pnpm -w -r --if-present exec playwright install --with-deps
+      # If your e2e creates schema via migrations instead, add:
+      # - name: Prisma migrate (dev)
+      #   run: pnpm -w --filter @repo/api exec -- prisma migrate deploy
 
       - name: Run E2E tests
-        run: |
-          # try common script names, succeed if any exists
-          pnpm -w -r --if-present run e2e || \
-          pnpm -w -r --if-present run test:e2e
+        run: pnpm -w --filter @repo/api run test:e2e
