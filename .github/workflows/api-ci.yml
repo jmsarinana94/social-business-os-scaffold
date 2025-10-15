@@ -2,24 +2,24 @@ name: API CI
 
 on:
   pull_request:
-    paths:
-      - "apps/api/**"
-      - "pnpm-lock.yaml"
-      - ".github/workflows/api-ci.yml"
+  push:
+    branches:
+      - feat/**
+      - fix/**
+      - chore/**
+      - ci/**
+      - refactor/**
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    name: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Setup Node 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: "pnpm"
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -27,8 +27,14 @@ jobs:
           version: 9
           run_install: false
 
-      - name: Install deps
-        run: pnpm install --frozen-lockfile
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install deps (workspace)
+        run: pnpm -w install --frozen-lockfile
 
       - name: Build API
         run: pnpm -F @repo/api build

@@ -2,31 +2,26 @@ name: API E2E Tests
 
 on:
   pull_request:
-    paths:
-      - "apps/api/**"
-      - "pnpm-lock.yaml"
-      - ".github/workflows/api-e2e.yml"
+  push:
+    branches:
+      - feat/**
+      - fix/**
+      - ci/**
+      - refactor/**
 
 jobs:
   e2e:
-    runs-on: ubuntu-latest
+    name: e2e
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     env:
       NODE_ENV: test
-      # sqlite path for CI (kept inside repo to avoid permission issues)
-      DATABASE_URL: file:./apps/api/prisma/ci.db
-      JWT_SECRET: testsecret
-      # your e2e script already sets this via cross-env, but keeping here is harmless & explicit
-      E2E_AUTO_CREATE_ORG: "true"
+      E2E_AUTO_CREATE_ORG: true
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Setup Node 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: "pnpm"
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -34,19 +29,17 @@ jobs:
           version: 9
           run_install: false
 
-      - name: Install deps
-        run: pnpm install --frozen-lockfile
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
 
-      # Ensure prisma client is generated relative to apps/api
-      - name: Generate Prisma Client
-        working-directory: apps/api
-        run: pnpm prisma generate
+      - name: Install deps (workspace)
+        run: pnpm -w install --frozen-lockfile
 
-      # Make sure the sqlite file exists and dir is writable
-      - name: Prepare sqlite DB
-        run: |
-          mkdir -p apps/api/prisma
-          : > apps/api/prisma/ci.db
+      - name: Build API
+        run: pnpm -F @repo/api build
 
-      - name: Run E2E
+      - name: Run E2E tests
         run: pnpm -F @repo/api test:e2e
