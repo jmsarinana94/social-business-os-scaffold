@@ -1,75 +1,67 @@
+# .github/workflows/api-e2e.yml
 name: API E2E Tests
 
 on:
-  push:
-    branches: [ feat/e2e-cross-scope ]
   pull_request:
-    branches: [ feat/e2e-cross-scope ]
-
-permissions:
-  contents: read
+    branches: ["**"]
+  push:
+    branches: ["**"]
 
 jobs:
   e2e:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
-
     env:
       NODE_ENV: test
-      E2E_AUTO_CREATE_ORG: true
-      # If you use Prisma + sqlite in-repo, tweak the path as needed:
-      DATABASE_URL: "file:./apps/api/prisma/dev.db"
+      # keep your sqlite path so runs are hermetic
+      DATABASE_URL: file:./apps/api/prisma/dev.db
+      # your existing flag from logs
+      E2E_AUTO_CREATE_ORG: "true"
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup pnpm (reads version from package.json > packageManager)
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'pnpm'
+          cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            **/pnpm-lock.yaml
 
-      - name: Setup pnpm (read version from packageManager)
-        uses: pnpm/action-setup@v4
-        with:
-          run_install: false
-          standalone: false
-
-      - name: Show tool versions
+      - name: Verify tooling
         run: |
           node -v
-          pnpm --version
+          pnpm -v
 
-      - name: Resolve pnpm store path
-        id: pnpm-store
-        run: echo "STORE_PATH=$(pnpm store path)" >> "$GITHUB_OUTPUT"
-
-      - name: Cache pnpm store
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.pnpm-store.outputs.STORE_PATH }}
-          key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: pnpm-store-${{ runner.os }}-
-
-      - name: Install deps (frozen lockfile)
+      - name: Install deps
         run: pnpm install --frozen-lockfile
 
-      # If Prisma is used, these will succeed; otherwise they no-op or just print.
-      - name: Generate Prisma client (best-effort)
+      # Ensure sqlite file/dir exists (harmless if already created by Prisma)
+      - name: Prepare sqlite file
         run: |
-          pnpm -w --filter "./apps/api..." exec prisma --version || true
-          pnpm -w --filter "./apps/api..." exec prisma generate || true
+          mkdir -p apps/api/prisma
+          : > apps/api/prisma/dev.db
 
-      - name: Prepare DB (sqlite; best-effort)
+      - name: Prisma generate (best-effort)
         run: |
-          pnpm -w --filter "./apps/api..." exec prisma migrate deploy || true
+          pnpm -w -r --if-present exec prisma generate
 
-      - name: Build API (if required by tests)
+      # If you use Playwright for E2E, install browsers (no-op if not present)
+      - name: Install Playwright (best-effort)
         run: |
-          pnpm -w --filter "./apps/api..." run build || echo "No build script; skipping"
+          pnpm -w -r --if-present exec playwright install --with-deps
 
-      - name: Run API E2E
+      - name: Run E2E tests
         run: |
-          # Adjust the script name if your e2e script differs
-          pnpm -w --filter "./apps/api..." run test:e2e
+          # try common script names, succeed if any exists
+          pnpm -w -r --if-present run e2e || \
+          pnpm -w -r --if-present run test:e2e

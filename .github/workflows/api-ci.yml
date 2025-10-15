@@ -1,66 +1,53 @@
+# .github/workflows/api-ci.yml
 name: API CI
 
 on:
-  push:
-    branches: [ feat/e2e-cross-scope ]
   pull_request:
-    branches: [ feat/e2e-cross-scope ]
-
-permissions:
-  contents: read
+    branches: ["**"]
+  push:
+    branches: ["**"]
 
 jobs:
   build:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
-
-    env:
-      NODE_ENV: test
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      # Install pnpm first so setup-node can safely use cache: pnpm
+      - name: Setup pnpm (reads version from package.json > packageManager)
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'pnpm'            # pairs with pnpm-lock.yaml detection
+          cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            **/pnpm-lock.yaml
 
-      # IMPORTANT: DON'T pass a 'version' here.
-      # pnpm/action-setup@v4 will read the version from package.json -> "packageManager"
-      - name: Setup pnpm (read version from packageManager)
-        uses: pnpm/action-setup@v4
-        with:
-          run_install: false
-          standalone: false
-
-      - name: Show tool versions
+      - name: Verify tooling
         run: |
           node -v
-          pnpm --version
-          pnpm config get store-dir || true
+          pnpm -v
 
-      # Optional: explicit cache of pnpm store (keeps CI fast even if setup-node cache misses)
-      - name: Resolve pnpm store path
-        id: pnpm-store
-        run: echo "STORE_PATH=$(pnpm store path)" >> "$GITHUB_OUTPUT"
-
-      - name: Cache pnpm store
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.pnpm-store.outputs.STORE_PATH }}
-          key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: pnpm-store-${{ runner.os }}-
-
-      - name: Install deps (frozen lockfile)
+      - name: Install deps
         run: pnpm install --frozen-lockfile
 
-      # If your API lives elsewhere, adjust the filter path below.
-      - name: Build API
+      # Generate Prisma clients if present (no-op if not)
+      - name: Prisma generate (best-effort)
         run: |
-          pnpm -w --filter "./apps/api..." run build || echo "No build script; skipping"
+          pnpm -w -r --if-present exec prisma generate
 
-      - name: Run unit tests
-        run: |
-          pnpm -w --filter "./apps/api..." run test || echo "No unit tests; skipping"
+      - name: Build (all workspaces, best-effort)
+        run: pnpm -w -r --if-present run build
+
+      - name: Test (all workspaces, best-effort)
+        env:
+          NODE_ENV: test
+        run: pnpm -w -r --if-present run test -- --ci
