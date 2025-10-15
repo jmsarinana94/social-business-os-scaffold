@@ -16,8 +16,11 @@ jobs:
     permissions:
       contents: read
     env:
+      CI: "true"
+      HUSKY: "0"
       NODE_ENV: test
-      E2E_AUTO_CREATE_ORG: true
+      E2E_AUTO_CREATE_ORG: "true"
+      DATABASE_URL: "file:./prisma/dev.db"
 
     steps:
       - name: Checkout
@@ -26,7 +29,6 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 9
           run_install: false
 
       - name: Setup Node
@@ -35,11 +37,19 @@ jobs:
           node-version: 20
           cache: pnpm
 
+      - name: Print versions
+        run: |
+          node -v
+          pnpm -v
+
       - name: Install deps (workspace)
         run: pnpm -w install --frozen-lockfile
+
+      - name: Prisma generate (api)
+        run: pnpm -F @repo/api prisma generate
 
       - name: Build API
         run: pnpm -F @repo/api build
 
-      - name: Run E2E tests
+      - name: Run E2E
         run: pnpm -F @repo/api test:e2e
