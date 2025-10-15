@@ -9,6 +9,10 @@ on:
       - "pnpm-workspace.yaml"
       - "package.json"
 
+concurrency:
+  group: api-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   e2e:
     name: e2e
@@ -21,18 +25,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node 20 + pnpm
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "pnpm"
-      - run: corepack enable
-      - run: pnpm -v
 
       - name: Install deps
         run: pnpm install --frozen-lockfile
 
-      # If your repo needs prisma generate during CI, uncomment:
+      # If your app needs generated Prisma client to compile, uncomment:
       # - name: Prisma generate
       #   run: pnpm -F @repo/api prisma generate
 

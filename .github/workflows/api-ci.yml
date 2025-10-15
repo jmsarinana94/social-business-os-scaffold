@@ -9,6 +9,10 @@ on:
       - "pnpm-workspace.yaml"
       - "package.json"
 
+concurrency:
+  group: api-ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     name: build
@@ -18,13 +22,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node 20 + pnpm
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          # Use the version declared in packageManager, or set an explicit version like "9"
+          run_install: false
+
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "pnpm"
-      - run: corepack enable
-      - run: pnpm -v
 
       - name: Install deps
         run: pnpm install --frozen-lockfile
