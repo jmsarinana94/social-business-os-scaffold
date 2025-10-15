@@ -6,32 +6,28 @@ on:
       - "apps/api/**"
       - ".github/workflows/api-ci.yml"
       - "pnpm-lock.yaml"
-      - ".nvmrc"
-  push:
-    branches: [ main ]
-    paths:
-      - "apps/api/**"
-      - ".github/workflows/api-ci.yml"
-      - "pnpm-lock.yaml"
-      - ".nvmrc"
+      - "pnpm-workspace.yaml"
+      - "package.json"
 
 jobs:
   build:
     name: build
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/api
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node 20 + pnpm
+        uses: actions/setup-node@v4
         with:
-          node-version-file: '.nvmrc'
-          cache: 'pnpm'
-
+          node-version: "20"
+          cache: "pnpm"
       - run: corepack enable
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm -v
 
-      # type-check & compile
-      - run: pnpm -F @repo/api build
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Build API
+        run: pnpm -F @repo/api build

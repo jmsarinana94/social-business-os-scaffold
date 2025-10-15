@@ -6,27 +6,35 @@ on:
       - "apps/api/**"
       - ".github/workflows/api-e2e.yml"
       - "pnpm-lock.yaml"
-      - ".nvmrc"
+      - "pnpm-workspace.yaml"
+      - "package.json"
 
 jobs:
   e2e:
     name: e2e
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/api
+    env:
+      NODE_ENV: test
+      E2E_AUTO_CREATE_ORG: "true"
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node 20 + pnpm
+        uses: actions/setup-node@v4
         with:
-          node-version-file: '.nvmrc'
-          cache: 'pnpm'
-
+          node-version: "20"
+          cache: "pnpm"
       - run: corepack enable
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm -v
 
-      # Your e2e already succeeds locally with sqlite & E2E_AUTO_CREATE_ORG
-      - run: pnpm -F @repo/api test:e2e
-        env:
-          E2E_AUTO_CREATE_ORG: "true"
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+
+      # If your repo needs prisma generate during CI, uncomment:
+      # - name: Prisma generate
+      #   run: pnpm -F @repo/api prisma generate
+
+      - name: Run E2E
+        run: pnpm -F @repo/api test:e2e -- --runInBand
