@@ -2,50 +2,69 @@ name: API E2E Tests
 
 on:
   push:
-    branches:
-      - main
-      - chore/prisma-local-works
-    tags:
-      - 'v*'
+    branches: [ main, feat/** ]
   pull_request:
-    branches:
-      - main
-  workflow_dispatch:
+    branches: [ main, feat/** ]
+
+permissions:
+  contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: api-e2e-${{ github.ref }}
   cancel-in-progress: true
+
+env:
+  NODE_ENV: test
+  # E2E uses SQLite in-repo; create this file before generate
+  DATABASE_URL: file:./apps/api/prisma/dev.db
+  E2E_AUTO_CREATE_ORG: "true"
 
 jobs:
   e2e:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/api
-    steps:
-      - name: 🛠️ Checkout repo
-        uses: actions/checkout@v4
+    runs-on: ubuntu-24.04
 
-      - name: 🧩 Setup Node.js
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup pnpm (reads version from package.json > packageManager)
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'pnpm'
+          cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            **/pnpm-lock.yaml
 
-      - name: 📦 Install dependencies
+      - name: Verify tooling
         run: |
-          corepack enable
-          pnpm install --frozen-lockfile
+          node -v
+          pnpm -v
 
-      - name: 🔨 Build API
-        run: pnpm build
+      - name: Install deps
+        env:
+          PRISMA_GENERATE_SKIP_POSTINSTALL: "true"
+          HUSKY: "0"
+        run: pnpm install --frozen-lockfile
 
-      - name: 🧪 Run Jest E2E tests
-        run: pnpm test:e2e
+      - name: Prepare sqlite file
+        run: |
+          mkdir -p apps/api/prisma
+          : > apps/api/prisma/dev.db
 
-      - name: 🧾 Upload test results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: e2e-results
-          path: apps/api/test-results/
+      - name: Prisma generate (api)
+        run: pnpm -w --filter @repo/api exec -- prisma generate
+
+      # If your e2e creates schema via migrations instead, add:
+      # - name: Prisma migrate (dev)
+      #   run: pnpm -w --filter @repo/api exec -- prisma migrate deploy
+
+      - name: Run E2E tests
+        run: pnpm -w --filter @repo/api run test:e2e
