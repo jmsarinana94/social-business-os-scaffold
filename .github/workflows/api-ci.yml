@@ -4,35 +4,28 @@ on:
   pull_request:
     paths:
       - "apps/api/**"
-      - ".github/workflows/api-ci.yml"
       - "pnpm-lock.yaml"
-      - "pnpm-workspace.yaml"
-      - "package.json"
-
-concurrency:
-  group: api-ci-${{ github.ref }}
-  cancel-in-progress: true
+      - ".github/workflows/api-ci.yml"
 
 jobs:
   build:
-    name: build
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "pnpm"
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          # Use the version declared in packageManager, or set an explicit version like "9"
+          version: 9
           run_install: false
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "pnpm"
 
       - name: Install deps
         run: pnpm install --frozen-lockfile
