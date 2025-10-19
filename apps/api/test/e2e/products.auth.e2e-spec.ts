@@ -1,51 +1,94 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+// apps/api/test/e2e/products.auth.e2e-spec.ts
+import { AppModule } from '@/app.module';
+import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
-import { AppModule } from '../../src/app.module';
-import { PrismaExceptionFilter } from '../../src/common/filters/prisma-exception.filter';
-import { DecimalToNumberInterceptor } from '../../src/common/interceptors/decimal-to-number.interceptor';
+
+const ORG = process.env.E2E_ORG_SLUG || 'demo-9bsfct';
+const baseHeaders = { 'X-Org': ORG, 'Content-Type': 'application/json' };
 
 describe('Products Auth (e2e)', () => {
   let app: INestApplication;
   let token: string;
-  const ORG = process.env.ORG || 'demo';
-  const email = process.env.API_EMAIL || 'tester@example.com';
-  const password = process.env.API_PASS || 'secret123';
-  const headers = { 'x-org': ORG };
+
+  const email = `auth-e2e-${Date.now()}@example.com`;
+  const password = 'password123';
 
   beforeAll(async () => {
-    const mod = await Test.createTestingModule({ imports: [AppModule] }).compile();
-    app = mod.createNestApplication();
+    const moduleRef = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
 
-    app.useGlobalPipes(new ValidationPipe({
-      whitelist: true, forbidNonWhitelisted: true, transform: true,
-      transformOptions: { enableImplicitConversion: true },
-    }));
-    app.useGlobalInterceptors(new DecimalToNumberInterceptor());
-    app.useGlobalFilters(new PrismaExceptionFilter());
+    app = moduleRef.createNestApplication();
     await app.init();
 
-    await request(app.getHttpServer()).post('/auth/signup').send({ email, password, org: ORG });
-    const login = await request(app.getHttpServer()).post('/auth/login').send({ email, password }).expect(200);
+    // ensure account exists
+    await request(app.getHttpServer())
+      .post('/auth/signup')
+      .set(baseHeaders)
+      .send({ email, password, org: ORG });
+
+    // login to get JWT
+    const login = await request(app.getHttpServer())
+      .post('/auth/login')
+      .set(baseHeaders)
+      .send({ email, password })
+      .expect(200);
+
     token = login.body?.access_token || login.body?.token;
+    if (!token) throw new Error('No JWT returned from /auth/login');
   });
 
-  afterAll(async () => { await app.close(); });
+  afterAll(async () => {
+    await app.close();
+  });
 
   it('signup/login then CRUD with Bearer token', async () => {
-    const sku = `SKU-AUTH-${Date.now()}`;
-
-    const created = await request(app.getHttpServer())
+    // CREATE
+    const create = await request(app.getHttpServer())
       .post('/products')
-      .set({ ...headers, Authorization: `Bearer ${token}` })
-      .send({ title: 'Thing', type: 'PHYSICAL', status: 'ACTIVE', price: 9.99, sku })
+      .set({ ...baseHeaders, Authorization: `Bearer ${token}` })
+      .send({
+        title: 'Auth Product v1',
+        sku: `AUTH-${Date.now()}`,
+        price: 49.99,
+        inventoryQty: 5,
+        type: 'PHYSICAL',
+        status: 'ACTIVE',
+      })
       .expect(201);
 
-    const id = created.body.id;
+    const created = create.body;
+    expect(created?.id).toBeDefined();
 
+    // GET
+    const got = await request(app.getHttpServer())
+      .get(`/products/${created.id}`)
+      .set({ ...baseHeaders, Authorization: `Bearer ${token}` })
+      .expect(200);
+
+    expect(got.body?.id).toBe(created.id);
+
+    // UPDATE — use PUT (your API exposes PUT; PATCH would 404)
     await request(app.getHttpServer())
-      .delete(`/products/${id}`)
-      .set({ ...headers, Authorization: `Bearer ${token}` })
+      .put(`/products/${created.id}`)
+      .set({ ...baseHeaders, Authorization: `Bearer ${token}` })
+      .send({ title: 'Auth Product v2' })
+      .expect(200);
+
+    // INVENTORY — POST /products/:id/inventory { delta }
+    const inv = await request(app.getHttpServer())
+      .post(`/products/${created.id}/inventory`)
+      .set({ ...baseHeaders, Authorization: `Bearer ${token}` })
+      .send({ delta: 7 })
+      .expect(200);
+
+    expect(inv.body?.inventoryQty).toBeDefined();
+
+    // DELETE
+    await request(app.getHttpServer())
+      .delete(`/products/${created.id}`)
+      .set({ ...baseHeaders, Authorization: `Bearer ${token}` })
       .expect(200);
   });
 });

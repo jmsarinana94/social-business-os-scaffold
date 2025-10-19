@@ -1,6 +1,6 @@
 {
   "name": "@repo/api",
-  "version": "0.3.0",
+  "version": "0.1.0",
   "private": true,
   "type": "commonjs",
   "main": "dist/src/main.js",
@@ -8,21 +8,21 @@
     "start": "node dist/src/main.js",
     "start:dev": "nest start --watch",
     "build": "nest build",
-    "dev": "bash ./scripts/dev.sh",
-
     "test": "jest --config jest.config.ts",
     "test:e2e": "jest --config jest.config.ts --selectProjects=e2e --runInBand",
+    "test:e2e:spec": "jest --config jest.config.ts --selectProjects=e2e --runInBand",
+    "test:e2e:name": "jest --config jest.config.ts --selectProjects=e2e --runInBand",
+    "test:e2e:cov": "jest --config jest.config.ts --selectProjects=e2e --runInBand --coverage",
+    "db:push": "prisma db push",
+    "db:seed": "ts-node prisma/seed.ts",
+    "db:setup": "pnpm exec prisma generate && pnpm exec prisma db push && pnpm exec ts-node prisma/seed.ts",
     "test:e2e:products": "jest --config jest.config.ts --selectProjects=e2e --runInBand -- test/e2e/products.validation.e2e-spec.ts",
     "inv:test": "bash ./scripts/inventory-test.sh",
-
     "prisma:generate": "prisma generate --schema=prisma/schema.prisma",
     "prisma:migrate:dev": "prisma migrate dev --schema=prisma/schema.prisma",
     "prisma:reset": "bash ./scripts/prisma-reset.sh",
     "seed:demo": "bash ./scripts/prisma-seed-demo.sh",
-
-    "smoke": "./scripts/smoke.sh",
-    "swagger:open": "echo 'Swagger UI available at http://localhost:3000/docs'",
-    "prisma:gen": "prisma generate --schema=prisma/schema.prisma"
+    "dev": "bash ./scripts/dev.sh"
   },
   "dependencies": {
     "@nestjs/common": "10.4.20",
@@ -33,16 +33,13 @@
     "@nestjs/passport": "10.0.3",
     "@nestjs/platform-express": "10.4.20",
     "@nestjs/swagger": "^11.2.0",
-    "@nestjs/throttler": "^6.4.0",
     "@prisma/client": "^6.17.1",
     "bcrypt": "^6.0.0",
-    "bcryptjs": "^3.0.2",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
     "cookie-parser": "^1.4.7",
     "express-rate-limit": "^7.5.1",
     "ioredis": "^5.4.1",
-    "jsonwebtoken": "^9.0.2",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "reflect-metadata": "^0.2.2",
@@ -53,12 +50,12 @@
   "devDependencies": {
     "@nestjs/cli": "^10.4.5",
     "@nestjs/schematics": "^10.2.3",
-    "@nestjs/testing": "^11.1.6",
+    "@nestjs/testing": "^10.4.20",
     "@types/bcrypt": "5.0.2",
-    "@types/bcryptjs": "^3.0.0",
     "@types/cookie-parser": "^1.4.9",
     "@types/express": "^4.17.21",
-    "@types/jest": "^29.5.12",
+    "@types/express-rate-limit": "^6.0.2",
+    "@types/jest": "^29.5.14",
     "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^20.11.30",
     "@types/passport-jwt": "^3.0.13",
@@ -67,7 +64,7 @@
     "prettier": "^3.6.2",
     "prisma": "6.17.1",
     "supertest": "^7.1.4",
-    "ts-jest": "^29.2.5",
+    "ts-jest": "^29.4.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.2"
   }

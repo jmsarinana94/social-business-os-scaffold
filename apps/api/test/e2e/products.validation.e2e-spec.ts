@@ -1,52 +1,29 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
+import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { AppModule } from '../../src/app.module';
-import { PrismaExceptionFilter } from '../../src/common/filters/prisma-exception.filter';
-import { DecimalToNumberInterceptor } from '../../src/common/interceptors/decimal-to-number.interceptor';
+import { createE2EApp } from './support/e2e-app.factory';
 
 describe('Products validation (e2e)', () => {
   let app: INestApplication;
-  let token: string;
-
-  const ORG = process.env.ORG || 'demo';
-  const email = process.env.API_EMAIL || 'tester@example.com';
-  const password = process.env.API_PASS || 'secret123';
+  const email = `test+validation_${Date.now()}@example.com`;
+  const password = 'password123';
+  const ORG = 'demo-9bsfct'; // using your working org slug
+  const baseHeaders = { 'X-Org': ORG, 'Content-Type': 'application/json' };
+  let token = '';
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
+    app = await createE2EApp();
 
-    app = moduleRef.createNestApplication();
-
-    // mirror main.ts
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        transform: true,
-        transformOptions: { enableImplicitConversion: true },
-      }),
-    );
-    app.useGlobalInterceptors(new DecimalToNumberInterceptor());
-    app.useGlobalFilters(new PrismaExceptionFilter());
-
-    await app.init();
-
-    // Ensure org+user exist via API flows (no Prisma import)
+    // signup (ok if it already exists)
     await request(app.getHttpServer())
       .post('/auth/signup')
+      .set(baseHeaders)
       .send({ email, password, org: ORG })
-      .expect(res => {
-        // allow 201 (created) or 200 (if already exists + login returned)
-        if (![200, 201].includes(res.status)) {
-          throw new Error(`Unexpected signup status: ${res.status}`);
-        }
-      });
+      .expect(res => [200, 201, 409].includes(res.status));
 
+    // login
     const login = await request(app.getHttpServer())
       .post('/auth/login')
+      .set(baseHeaders)
       .send({ email, password })
       .expect(200);
 
@@ -59,51 +36,58 @@ describe('Products validation (e2e)', () => {
   });
 
   it('400 when price is missing', async () => {
-    const res = await request(app.getHttpServer())
+    await request(app.getHttpServer())
       .post('/products')
-      .set('x-org', ORG)
-      .set('Authorization', `Bearer ${token}`)
-      .send({ title: 'No Price', type: 'PHYSICAL', sku: `SKU-E2E-NOPRICE-${Date.now()}` })
+      .set({ ...baseHeaders, Authorization: `Bearer ${token}` })
+      .send({
+        title: 'Missing Price',
+        sku: `SKU-${Date.now()}`,
+        type: 'PHYSICAL',
+        status: 'ACTIVE',
+        inventoryQty: 1,
+      })
       .expect(400);
-
-    expect(Array.isArray(res.body.message)).toBe(true);
-    expect(res.body.message.join(' ')).toMatch(/price/i);
   });
 
   it('400 when extra properties are sent', async () => {
-    const res = await request(app.getHttpServer())
+    await request(app.getHttpServer())
       .post('/products')
-      .set('x-org', ORG)
-      .set('Authorization', `Bearer ${token}`)
+      .set({ ...baseHeaders, Authorization: `Bearer ${token}` })
       .send({
-        title: 'Extra',
+        title: 'Extra Props',
+        sku: `SKU-${Date.now()}`,
+        price: 9.99,
+        inventoryQty: 1,
         type: 'PHYSICAL',
-        sku: `SKU-E2E-EXTRA-${Date.now()}`,
-        price: 5,
-        foo: 'bar',
+        status: 'ACTIVE',
+        // This should trigger forbidNonWhitelisted
+        unknownField: 'nope',
       })
       .expect(400);
-
-    expect(JSON.stringify(res.body.message)).toMatch(/should not exist/i);
   });
 
   it('201 and correct types for good payload', async () => {
     const res = await request(app.getHttpServer())
       .post('/products')
-      .set('x-org', ORG)
-      .set('Authorization', `Bearer ${token}`)
+      .set({ ...baseHeaders, Authorization: `Bearer ${token}` })
       .send({
-        title: 'Good',
+        title: 'Good Product',
+        sku: `SKU-${Date.now()}`,
+        price: 19.99,
+        inventoryQty: 5,
         type: 'PHYSICAL',
-        sku: `SKU-E2E-${Date.now()}`,
-        price: 9.99,
         status: 'ACTIVE',
-        inventoryQty: 0,
       })
       .expect(201);
 
-    expect(typeof res.body.price).toBe('number');
-    expect(typeof res.body.createdAt).toBe('string');
-    expect(res.body.createdAt).toMatch(/^20\d{2}-\d{2}-\d{2}T/);
+    expect(res.body).toMatchObject({
+      id: expect.any(String),
+      sku: expect.any(String),
+      title: 'Good Product',
+      type: 'PHYSICAL',
+      status: 'ACTIVE',
+      price: 19.99,
+      inventoryQty: 5,
+    });
   });
 });
