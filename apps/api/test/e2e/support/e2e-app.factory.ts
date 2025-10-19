@@ -1,0 +1,14 @@
+import { AppModule } from '@/app.module'; // uses the alias
+import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
+
+export async function createE2EApp(): Promise<INestApplication> {
+  const moduleRef = await Test.createTestingModule({
+    imports: [AppModule],
+  }).compile();
+
+  const app = moduleRef.createNestApplication();
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
+  await app.init();
+  return app;
+}
