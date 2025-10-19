@@ -1,17 +1,27 @@
-import { Controller, Get, Headers, HttpException, HttpStatus } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, NotFoundException, Post, Req } from '@nestjs/common';
+import { CreateOrgDto } from './dto/create-org.dto';
 import { OrgsService } from './orgs.service';
 
 @Controller('orgs')
 export class OrgsController {
   constructor(private readonly orgs: OrgsService) {}
 
+  @Post()
+  @HttpCode(201)
+  create(@Body() dto: CreateOrgDto) {
+    return this.orgs.create(dto);
+  }
+
   @Get('me')
-  async me(@Headers('x-org') orgId?: string) {
-    if (!orgId) {
-      throw new HttpException('X-Org header is required', HttpStatus.BAD_REQUEST);
-    }
-    const org = await this.orgs.findById(orgId);
-    if (!org) throw new HttpException('Org not found', HttpStatus.NOT_FOUND);
+  async me(@Req() req: any) {
+    const slug =
+      (req?.org?.slug as string | undefined) ||
+      (req?.headers?.['x-org'] as string | undefined);
+
+    if (!slug) throw new NotFoundException('Organization not specified');
+
+    const org = await this.orgs.findBySlug(slug);
+    if (!org) throw new NotFoundException('Organization not found');
     return org;
   }
 }
