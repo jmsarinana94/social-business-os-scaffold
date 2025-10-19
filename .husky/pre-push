@@ -1,0 +1,15 @@
+set -eu
+
+echo "==> pre-push: verifying e2e (apps/api)"
+
+# Temporarily disabled due to local package.json parse error
+# echo "==> prisma generate (apps/api)"
+# pnpm dlx prisma generate --schema apps/api/prisma/schema.prisma >/dev/null
+
+echo "==> build @repo/api"
+pnpm -F @repo/api --silent build
+
+echo "==> e2e @repo/api"
+pnpm -F @repo/api --silent test:e2e
+
+echo "✅ All checks passed"

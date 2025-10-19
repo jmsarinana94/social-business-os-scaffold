@@ -1,0 +1,6 @@
+/* apps/web/styles/globals.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* (optional) your custom resets/tokens here */

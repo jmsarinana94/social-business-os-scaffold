@@ -1,33 +1,51 @@
-import { BadRequestException, CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
-import { PrismaService } from '../infra/prisma/prisma.service';
+import {
+  BadRequestException,
+  CanActivate,
+  ExecutionContext,
+  Injectable,
+} from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
+import { Request } from 'express';
 
 /**
- * Resolves the Organization from the `x-org` header.
- * If not found, it will create it (so tests don't need external seeding).
+ * Reads org slug from:
+ *   1) X-Org header (primary)
+ *   2) body.org (fallback)
+ *
+ * Skips guard entirely for /auth routes to allow signup/login to work
+ * while still letting the controller read org from body.
  */
 @Injectable()
 export class OrgHeaderGuard implements CanActivate {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly reflector: Reflector) {}
 
-  async canActivate(context: ExecutionContext): Promise<boolean> {
-    const req = context.switchToHttp().getRequest();
-    // Supertest/Express gives a plain object for headers, always lowercase keys
-    const orgHeader = (req.headers?.['x-org'] as string | undefined)?.trim();
+  canActivate(context: ExecutionContext): boolean {
+    const req: Request & { orgSlug?: string } = context.switchToHttp().getRequest();
 
-    if (!orgHeader) {
-      throw new BadRequestException('Missing x-org header');
+    const url = req.url || '';
+    // Allow auth routes to pass without enforcing X-Org
+    if (url.startsWith('/auth')) {
+      // If body has org, attach for downstream convenience
+      const bodyOrg =
+        (req.body && (req.body.org || req.body.slug || req.body.organization)) || undefined;
+      if (typeof bodyOrg === 'string' && bodyOrg.trim()) {
+        req.orgSlug = bodyOrg.trim().toLowerCase();
+      }
+      return true;
     }
 
-    // Upsert by slug so first hit creates it, later hits re-use it
-    const org = await this.prisma.organization.upsert({
-      where: { slug: orgHeader },
-      update: {},
-      create: { slug: orgHeader, name: orgHeader },
-      select: { id: true, slug: true, name: true },
-    });
+    const headerOrg = (req.headers['x-org'] as string | undefined)?.trim();
+    const bodyOrg =
+      (req.body && (req.body.org || req.body.slug || req.body.organization)) || undefined;
+    const candidate = headerOrg || (typeof bodyOrg === 'string' ? bodyOrg.trim() : undefined);
 
-    req.orgId = org.id;
-    req.org = org;
+    if (!candidate) {
+      throw new BadRequestException(
+        'Missing organization. Provide header "X-Org: <slug>" or body.org.',
+      );
+    }
+
+    req.orgSlug = candidate.toLowerCase();
     return true;
   }
 }

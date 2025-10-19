@@ -1,17 +1,27 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+
+import { TenantMiddleware } from './common/tenant.middleware';
+
+// Feature modules
 import { AuthModule } from './modules/auth/auth.module';
+import { CategoriesModule } from './modules/categories/categories.module';
 import { HealthModule } from './modules/health/health.module';
+import { OrgsModule } from './modules/orgs/orgs.module';
 import { ProductsModule } from './modules/products/products.module';
-import { PrismaModule } from './shared/prisma/prisma.module';
 
 @Module({
   imports: [
-    PrismaModule,   // global PrismaService provider
-    AuthModule,
-    ProductsModule,
+    ConfigModule.forRoot({ isGlobal: true }),
     HealthModule,
-    // NOTE: If you later re-add your OpenAPI docs module,
-    // import it here once the file exists again.
+    AuthModule,
+    OrgsModule,
+    CategoriesModule,
+    ProductsModule,
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(TenantMiddleware).forRoutes('*');
+  }
+}

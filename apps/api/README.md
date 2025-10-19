@@ -57,3 +57,19 @@ pnpm -C apps/api build && pnpm -C apps/api start
 Use these curl commands to quickly verify inventory behavior without running the full test suite.
 
 ```bash
+
+## Quick start (local)
+
+```bash
+pnpm -C apps/api build && pnpm -C apps/api start
+# API: http://localhost:4000
+# Swagger: http://localhost:4000/docs
+
+### Quick demo
+```bash
+cd apps/api
+cp .envrc.example .envrc   # edit if needed
+direnv allow
+make demo        # happy path
+make heavy       # multiple orders + rollups
+make errors      # guardrails (400s)

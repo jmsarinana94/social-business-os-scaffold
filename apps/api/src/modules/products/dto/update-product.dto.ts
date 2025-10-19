@@ -1,37 +1,38 @@
-import { Type } from 'class-transformer';
 import { IsEnum, IsNumber, IsOptional, IsString, Min } from 'class-validator';
-import { ProductStatus, ProductType } from './create-product.dto';
+import { ProductStatusDto, ProductTypeDto } from './create-product.dto';
 
 export class UpdateProductDto {
-  @IsString()
   @IsOptional()
+  @IsString()
   title?: string;
 
+  @IsOptional()
   @IsString()
-  @IsOptional()
-  sku?: string;
-
-  @IsEnum(ProductType)
-  @IsOptional()
-  type?: ProductType;
-
-  @IsEnum(ProductStatus)
-  @IsOptional()
-  status?: ProductStatus;
+  description?: string | null;
 
   @IsOptional()
-  @Type(() => Number)
   @IsNumber()
   @Min(0)
   price?: number;
 
   @IsOptional()
-  @Type(() => Number)
+  @IsString()
+  sku?: string;
+
+  @IsOptional()
+  @IsEnum(ProductStatusDto)
+  status?: ProductStatusDto;
+
+  @IsOptional()
+  @IsEnum(ProductTypeDto)
+  type?: ProductTypeDto;
+
+  @IsOptional()
+  @IsString()
+  categoryId?: string | null;
+
+  @IsOptional()
   @IsNumber()
   @Min(0)
   inventoryQty?: number;
-
-  @IsString()
-  @IsOptional()
-  description?: string;
 }

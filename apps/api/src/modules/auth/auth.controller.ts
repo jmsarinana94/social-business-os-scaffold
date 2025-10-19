@@ -1,59 +1,36 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
-  Headers,
   HttpCode,
-  HttpStatus,
   Post,
+  Req,
   UseGuards,
 } from '@nestjs/common';
-import { AuthService } from './auth.service';
-import { CurrentUser } from './current-user.decorator';
-import { JwtAuthGuard } from './jwt.guard';
-
-type SignupDto = { email: string; password: string };
-type LoginDto = { email: string; password: string };
+import { AuthGuard } from '@nestjs/passport';
+import { AuthService, LoginDto } from './auth.service';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
-  @Post('signup')
-  async signup(
-    @Headers('x-org') org: string | undefined,
-    @Body() dto: SignupDto,
-  ) {
-    const token = await this.auth.signup({
-      org: org || 'demo',
-      email: dto.email,
-      password: dto.password,
-    });
-    return { access_token: token };
-  }
-
   @Post('login')
-  @HttpCode(HttpStatus.OK)
-  async login(
-    @Headers('x-org') org: string | undefined,
-    @Body() dto: LoginDto,
-  ) {
-    const token = await this.auth.login({
-      org: org || 'demo',
-      email: dto.email,
-      password: dto.password,
-    });
+  @HttpCode(200)
+  async login(@Body() body: LoginDto) {
+    const { email, password } = body ?? {};
+    if (!email || !password) {
+      throw new BadRequestException('email and password are required');
+    }
+    const token = await this.auth.issueToken({ email });
     return { access_token: token };
   }
 
   @Get('me')
-  @UseGuards(JwtAuthGuard)
-  async me(
-    @Headers('x-org') org: string | undefined,
-    @CurrentUser('sub') userId: string | undefined,
-    @CurrentUser('email') emailFromJwt: string | undefined,
-  ) {
-    const orgSlug = org || 'demo';
-    return this.auth.me({ org: orgSlug, userId, email: emailFromJwt });
+  @UseGuards(AuthGuard('jwt'))
+  async me(@Req() req: any) {
+    // req.user is populated by JwtStrategy.validate
+    const user = req.user ?? {};
+    return { id: user.sub ?? user.id ?? 'me', email: user.email ?? null };
   }
 }

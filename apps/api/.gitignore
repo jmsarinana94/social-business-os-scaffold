@@ -2,3 +2,7 @@
 # Ignore Next.js build output
 web/.next/
 
+
+# local prisma db
+prisma/dev.db
+

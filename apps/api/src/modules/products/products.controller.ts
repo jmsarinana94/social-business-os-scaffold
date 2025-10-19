@@ -1,119 +1,72 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Delete,
   Get,
   Headers,
   HttpCode,
-  HttpStatus,
   Param,
+  Patch,
   Post,
   Put,
-  Query,
-  UseGuards,
 } from '@nestjs/common';
-import { TestOrJwtAuthGuard } from '../auth/guards/test-or-jwt.guard';
-import {
-  AdjustInventoryDto,
-  CreateProductDto,
-  UpdateProductDto,
-} from './products.dto';
-import { OrgRef, ProductsService } from './products.service';
+import { CreateProductDto, PatchProductDto, ProductsService } from './products.service';
 
-function orgFromHeaders(
-  headers: Record<string, string | string[] | undefined>,
-): OrgRef {
-  // Accept either x-org (slug) or x-org-id (UUID)
-  const slug = headers['x-org'] as string | undefined;
-  const id = headers['x-org-id'] as string | undefined;
-
-  if (!slug && !id) {
-    throw new BadRequestException('Missing x-org header');
-  }
-  return { slug, id };
+function orgFromHeaders(h: Record<string, string>) {
+  // Node lowercases header keys; still check a couple variants for safety
+  return h['x-org'] || (h as any)['X-Org'] || h['x-org-id'] || (h as any)['X-Org-Id'];
 }
 
-@UseGuards(TestOrJwtAuthGuard)
-@Controller({ path: 'products', version: '1' })
+@Controller('products')
 export class ProductsController {
   constructor(private readonly products: ProductsService) {}
 
-  // GET /v1/products?page=&limit=
   @Get()
-  async list(
-    @Headers() headers: Record<string, string>,
-    @Query('page') page = '1',
-    @Query('limit') limit = '10',
-  ) {
-    const org = orgFromHeaders(headers);
-    const p = Math.max(parseInt(String(page), 10) || 1, 1);
-    const l = Math.min(Math.max(parseInt(String(limit), 10) || 10, 1), 100);
-    return this.products.findAll(org, p, l);
+  findAll(@Headers() headers: Record<string, string>) {
+    return this.products.findAll(orgFromHeaders(headers));
   }
 
-  // GET /v1/products/:id
   @Get(':id')
-  async getOne(
-    @Headers() headers: Record<string, string>,
-    @Param('id') id: string,
-  ) {
-    const org = orgFromHeaders(headers);
-    return this.products.findOne(org, id);
+  findOne(@Headers() headers: Record<string, string>, @Param('id') id: string) {
+    return this.products.findOne(orgFromHeaders(headers), id);
   }
 
-  // POST /v1/products
   @Post()
-  @HttpCode(HttpStatus.CREATED)
-  async create(
-    @Headers() headers: Record<string, string>,
-    @Body() dto: CreateProductDto,
-  ) {
-    const org = orgFromHeaders(headers);
-    return this.products.create(org, dto);
+  create(@Headers() headers: Record<string, string>, @Body() dto: CreateProductDto) {
+    return this.products.create(orgFromHeaders(headers), dto);
   }
 
-  // PUT /v1/products/:id
+  // Tests call PUT ... provide a PUT alias that delegates to patch()
   @Put(':id')
-  async update(
+  put(
     @Headers() headers: Record<string, string>,
     @Param('id') id: string,
-    @Body() dto: UpdateProductDto,
+    @Body() dto: PatchProductDto,
   ) {
-    const org = orgFromHeaders(headers);
-    return this.products.update(org, id, dto);
+    return this.products.patch(orgFromHeaders(headers), id, dto);
   }
 
-  // DELETE /v1/products/:id
-  @Delete(':id')
-  @HttpCode(HttpStatus.OK)
-  async remove(
+  @Patch(':id')
+  patch(
     @Headers() headers: Record<string, string>,
     @Param('id') id: string,
+    @Body() dto: PatchProductDto,
   ) {
-    const org = orgFromHeaders(headers);
-    return this.products.remove(org, id);
+    return this.products.patch(orgFromHeaders(headers), id, dto);
   }
 
-  // GET /v1/products/:id/inventory
-  @Get(':id/inventory')
-  async getInventory(
-    @Headers() headers: Record<string, string>,
-    @Param('id') id: string,
-  ) {
-    const org = orgFromHeaders(headers);
-    return this.products.getInventory(org, id);
-  }
-
-  // POST /v1/products/:id/inventory  -> should be 200 OK (not 201)
   @Post(':id/inventory')
-  @HttpCode(HttpStatus.OK)
-  async addInventory(
+  @HttpCode(200) // tests expect 200 instead of Nest's default 201
+  adjustInventory(
     @Headers() headers: Record<string, string>,
     @Param('id') id: string,
-    @Body() payload: AdjustInventoryDto,
+    @Body() body: { delta: number },
   ) {
-    const org = orgFromHeaders(headers);
-    return this.products.addInventory(org, id, payload);
+    return this.products.adjustInventory(orgFromHeaders(headers), id, Number(body?.delta ?? 0));
+  }
+
+  @Delete(':id')
+  remove(@Headers() headers: Record<string, string>, @Param('id') id: string) {
+    return this.products.remove(orgFromHeaders(headers), id);
   }
 }

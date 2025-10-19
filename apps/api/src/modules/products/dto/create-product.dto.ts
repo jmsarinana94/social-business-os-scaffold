@@ -1,56 +1,45 @@
-import { Type } from 'class-transformer';
-import {
-  IsDefined,
-  IsEnum,
-  IsNotEmpty,
-  IsNumber,
-  IsOptional,
-  IsString,
-  Min,
-} from 'class-validator';
+import { IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 
-export enum ProductType {
+export enum ProductTypeDto {
   PHYSICAL = 'PHYSICAL',
   DIGITAL = 'DIGITAL',
 }
 
-export enum ProductStatus {
+export enum ProductStatusDto {
   ACTIVE = 'ACTIVE',
   INACTIVE = 'INACTIVE',
 }
 
 export class CreateProductDto {
-  @IsDefined()
   @IsString()
   @IsNotEmpty()
   title!: string;
 
-  @IsDefined()
-  @IsString()
-  @IsNotEmpty()
-  sku!: string;
-
-  @IsDefined()
-  @IsEnum(ProductType)
-  type!: ProductType;
-
-  @IsEnum(ProductStatus)
   @IsOptional()
-  status: ProductStatus = ProductStatus.ACTIVE;
+  @IsString()
+  description?: string | null;
 
-  @IsDefined()
-  @Type(() => Number)
   @IsNumber()
   @Min(0)
   price!: number;
 
+  @IsString()
+  @IsNotEmpty()
+  sku!: string;
+
+  @IsEnum(ProductStatusDto)
   @IsOptional()
-  @Type(() => Number)
+  status?: ProductStatusDto;
+
+  @IsEnum(ProductTypeDto)
+  type!: ProductTypeDto;
+
+  @IsOptional()
+  @IsString()
+  categoryId?: string;
+
+  @IsOptional()
   @IsNumber()
   @Min(0)
   inventoryQty?: number;
-
-  @IsString()
-  @IsOptional()
-  description?: string;
 }

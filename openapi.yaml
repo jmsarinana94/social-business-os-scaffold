@@ -1,304 +1,142 @@
 openapi: 3.0.3
 info:
-  title: Social Business OS – API
-  version: "0.2.0"
-  description: >
-    Multi-tenant API (NestJS + Prisma). Auth via JWT. Send `x-org` header
-    for tenant scoping. Prices are numbers; dates are ISO-8601 strings.
+  title: Social Business OS API
+  version: 1.0.0
 servers:
-  - url: http://localhost:4000
-    description: Local
-
-tags:
-  - name: Auth
-  - name: Products
-  - name: Health
-
-security:
-  - bearerAuth: []
-
+  - url: http://localhost:4010/v1
 paths:
-  /health:
-    get:
-      tags: [Health]
-      summary: Liveness check
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/HealthResponse"
-
-  /auth/signup:
-    post:
-      tags: [Auth]
-      summary: Sign up (optionally create/join org)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: false
-              properties:
-                email: { type: string, format: email }
-                password: { type: string, minLength: 6 }
-                org: { type: string, description: "Org slug to join/create" }
-              required: [email, password]
-      responses:
-        "201":
-          description: Created
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AuthToken"
-
   /auth/login:
     post:
-      tags: [Auth]
-      summary: Login
+      summary: Login and get token
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              additionalProperties: false
+              required: [email, password]
               properties:
                 email: { type: string, format: email }
-                password: { type: string, minLength: 6 }
-              required: [email, password]
+                password: { type: string }
       responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AuthToken"
-        "401":
-          description: Invalid credentials
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/ErrorResponse" }
-
-  /auth/me:
-    get:
-      tags: [Auth]
-      summary: Current user
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
+        '200':
           description: OK
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  id: { type: string }
-                  email: { type: string, format: email }
-        "401":
-          description: Unauthorized
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/ErrorResponse" }
-
+                  token: { type: string }
   /products:
     get:
-      tags: [Products]
       summary: List products
       parameters:
-        - $ref: "#/components/parameters/XOrg"
         - in: query
-          name: page
-          schema: { type: integer, minimum: 1, default: 1 }
-        - in: query
-          name: limit
-          schema: { type: integer, minimum: 1, maximum: 100, default: 10 }
+          name: sku
+          schema: { type: string }
       responses:
-        "200":
+        '200':
           description: OK
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  data:
-                    type: array
-                    items: { $ref: "#/components/schemas/Product" }
-                  meta:
-                    $ref: "#/components/schemas/PaginationMeta"
+                type: array
+                items:
+                  $ref: '#/components/schemas/Product'
     post:
-      tags: [Products]
-      summary: Create product
-      security:
-        - bearerAuth: []
+      summary: Upsert product (org-scoped)
       parameters:
-        - $ref: "#/components/parameters/XOrg"
+        - in: header
+          required: true
+          name: x-org-id
+          schema: { type: string }
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/CreateProductDto" }
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ProductWrite'
       responses:
-        "201":
-          description: Created
+        '200':
+          description: OK
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/Product" }
-        "400":
-          description: Validation error
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/ValidationErrorResponse" }
-        "409":
-          description: Duplicate SKU within org
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/ErrorResponse" }
-
+              schema:
+                $ref: '#/components/schemas/Product'
   /products/{id}:
     get:
-      tags: [Products]
       summary: Get product by id
       parameters:
-        - $ref: "#/components/parameters/XOrg"
-        - $ref: "#/components/parameters/Id"
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+        - in: header
+          name: x-org-id
+          required: true
+          schema: { type: string }
       responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/Product" }
-        "404":
-          description: Not found
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/ErrorResponse" }
-    put:
-      tags: [Products]
-      summary: Update product (replace/partial)
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: "#/components/parameters/XOrg"
-        - $ref: "#/components/parameters/Id"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/UpdateProductDto" }
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/Product" }
-        "400":
-          description: Validation error
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/ValidationErrorResponse" }
-        "404":
-          description: Not found
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/ErrorResponse" }
-    delete:
-      tags: [Products]
-      summary: Delete product
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: "#/components/parameters/XOrg"
-        - $ref: "#/components/parameters/Id"
-      responses:
-        "204":
-          description: No Content
-        "404":
-          description: Not found
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/ErrorResponse" }
-
-  /products/{id}/inventory:
-    get:
-      tags: [Products]
-      summary: Get inventory for product (convenience)
-      parameters:
-        - $ref: "#/components/parameters/XOrg"
-        - $ref: "#/components/parameters/Id"
-      responses:
-        "200":
+        '200':
           description: OK
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  inventoryQty: { type: integer }
-    post:
-      tags: [Products]
-      summary: Adjust inventory by delta
-      description: >
-        Positive increments inventory, negative decrements. Will **400**
-        if result would go below zero. Returns the updated product.
-      security:
-        - bearerAuth: []
+                $ref: '#/components/schemas/Product'
+  /orders:
+    get:
+      summary: List orders (most recent first)
       parameters:
-        - $ref: "#/components/parameters/XOrg"
-        - $ref: "#/components/parameters/Id"
+        - in: header
+          name: x-org-id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Order' }
+    post:
+      summary: Create order
+      parameters:
+        - in: header
+          name: x-org-id
+          required: true
+          schema: { type: string }
+        - in: header
+          name: Idempotency-Key
+          required: false
+          schema: { type: string }
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/AdjustInventoryDto" }
+            schema:
+              type: object
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    required: [productId, qty, unitPrice]
+                    properties:
+                      productId: { type: string }
+                      qty: { type: integer, minimum: 1 }
+                      unitPrice: { type: string, pattern: '^[0-9]+(\.[0-9]{2})$' }
       responses:
-        "200":
-          description: OK (updated product)
+        '200':
+          description: OK
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/Product" }
-        "400":
-          description: Bad Request (e.g., below zero)
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/ErrorResponse" }
-        "404":
-          description: Not found
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              schema: { $ref: '#/components/schemas/Order' }
 
 components:
-  parameters:
-    XOrg:
-      in: header
-      name: x-org
-      required: true
-      schema: { type: string }
-      description: Organization slug/header for tenancy
-    Id:
-      in: path
-      name: id
-      required: true
-      schema: { type: string }
-
   schemas:
-    HealthResponse:
-      type: object
-      properties:
-        ok: { type: boolean }
-        service: { type: string }
-        time: { type: string, format: date-time }
-
-    AuthToken:
-      type: object
-      properties:
-        access_token: { type: string }
-      required: [access_token]
-
     Product:
       type: object
       properties:
@@ -306,97 +144,37 @@ components:
         orgId: { type: string }
         sku: { type: string }
         title: { type: string }
-        description: { type: string, nullable: true }
-        type:
-          type: string
-          enum: [PHYSICAL, DIGITAL]
-        status:
-          type: string
-          enum: [ACTIVE, INACTIVE]
+        type: { type: string, enum: [PHYSICAL, DIGITAL] }
+        status: { type: string, enum: [ACTIVE, INACTIVE] }
         price: { type: number }
         inventoryQty: { type: integer }
-        lastPurchasedAt: { type: string, format: date-time, nullable: true }
+        lastPurchasedAt: { type: string, format: date-time }
+    ProductWrite:
+      type: object
+      required: [sku, title, type, status, price, inventoryQty]
+      properties:
+        sku: { type: string }
+        title: { type: string }
+        type: { type: string, enum: [PHYSICAL, DIGITAL] }
+        status: { type: string, enum: [ACTIVE, INACTIVE] }
+        price: { type: number }
+        inventoryQty: { type: integer, minimum: 0 }
+    OrderItem:
+      type: object
+      properties:
+        id: { type: string }
+        orderId: { type: string }
+        productId: { type: string }
+        qty: { type: integer }
+        unitPrice: { type: string }
+    Order:
+      type: object
+      properties:
+        id: { type: string }
+        orgId: { type: string }
+        totalQty: { type: integer }
+        totalPrice: { type: string }
         createdAt: { type: string, format: date-time }
-        updatedAt: { type: string, format: date-time }
-      required:
-        [id, orgId, sku, title, type, status, price, inventoryQty, createdAt, updatedAt]
-
-    CreateProductDto:
-      type: object
-      additionalProperties: false
-      properties:
-        sku: { type: string }
-        title: { type: string }
-        description: { type: string, nullable: true }
-        type:
-          type: string
-          enum: [PHYSICAL, DIGITAL]
-        status:
-          type: string
-          enum: [ACTIVE, INACTIVE]
-        price:
-          type: number
-          minimum: 0
-        inventoryQty:
-          type: integer
-          minimum: 0
-          default: 0
-      required: [sku, title, type, status, price]
-
-    UpdateProductDto:
-      type: object
-      additionalProperties: false
-      properties:
-        sku: { type: string }
-        title: { type: string }
-        description: { type: string, nullable: true }
-        type:
-          type: string
-          enum: [PHYSICAL, DIGITAL]
-        status:
-          type: string
-          enum: [ACTIVE, INACTIVE]
-        price:
-          type: number
-          minimum: 0
-        inventoryQty:
-          type: integer
-          minimum: 0
-
-    AdjustInventoryDto:
-      type: object
-      additionalProperties: false
-      properties:
-        delta:
-          type: integer
-          description: Positive or negative change
-      required: [delta]
-
-    PaginationMeta:
-      type: object
-      properties:
-        page: { type: integer }
-        limit: { type: integer }
-        total: { type: integer }
-        pages: { type: integer }
-
-    ErrorResponse:
-      type: object
-      properties:
-        statusCode: { type: integer }
-        message: { type: string }
-
-    ValidationErrorResponse:
-      type: object
-      properties:
-        statusCode: { type: integer, example: 400 }
-        error: { type: string, example: "Bad Request" }
-        message:
+        items:
           type: array
-          items: { type: string }
-
-  securitySchemes:
-    bearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
+          items: { $ref: '#/components/schemas/OrderItem' }
