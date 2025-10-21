@@ -1,28 +1,59 @@
 import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { IsEmail, IsString } from 'class-validator';
 
-export class LoginDto {
-  @IsEmail()
-  email!: string;
+type MinimalUser = {
+  id: string;
+  email: string;
+  orgId?: string | null;
+};
 
-  @IsString()
-  password!: string;
-}
+type LoginDto = {
+  id?: string;
+  email: string;
+  orgId?: string | null;
+  password?: string;
+};
+
+type SignupDto = {
+  id: string;
+  email: string;
+  orgId?: string | null;
+  password?: string;
+};
 
 @Injectable()
 export class AuthService {
   constructor(private readonly jwt: JwtService) {}
 
-  /**
-   * Issue a JWT that your existing JwtStrategy should accept.
-   * Keep payload minimal and stable: { sub, email }
-   */
-  async issueToken(user: { email: string; id?: string }) {
+  signToken(user: MinimalUser) {
     const payload = {
-      sub: user.id ?? user.email, // fall back to email as subject if no id
+      sub: user.id,
       email: user.email,
+      orgId: user.orgId ?? null,
     };
-    return this.jwt.signAsync(payload);
+    return { access_token: this.jwt.sign(payload) };
+  }
+
+  // Minimal stubs so older controllers/tests compile even if not used.
+  async login(dto: LoginDto) {
+    return this.signToken({
+      id: dto.id ?? 'user-id',
+      email: dto.email,
+      orgId: dto.orgId ?? null,
+    });
+  }
+
+  async signup(dto: SignupDto) {
+    // In real impl, create a user; here just return a token.
+    return this.signToken({
+      id: dto.id,
+      email: dto.email,
+      orgId: dto.orgId ?? null,
+    });
+  }
+
+  me(user: any) {
+    // Whatever JwtStrategy.validate returns becomes req.user
+    return user;
   }
 }

@@ -2,19 +2,29 @@ import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 
+export interface JwtPayload {
+  sub: string;       // user id
+  email: string;
+  orgId?: string | null;
+  iat?: number;
+  exp?: number;
+}
+
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor() {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-      ignoreExpiration: true, // tests don't rely on exp; make this frictionless
-      secretOrKey: process.env.JWT_SECRET || 'dev-secret',
+      ignoreExpiration: false,
+      secretOrKey: process.env.JWT_SECRET || 'dev_jwt_secret',
     });
   }
 
-  async validate(payload: any) {
-    // Whatever you return here becomes req.user
-    // Keep keys { sub, email } to match AuthController.me
-    return { sub: payload.sub, email: payload.email };
+  async validate(payload: JwtPayload) {
+    return {
+      userId: payload.sub,
+      email: payload.email,
+      orgId: payload.orgId ?? null,
+    };
   }
 }

@@ -1,45 +1,42 @@
-import { IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { IsEnum, IsInt, IsNumber, IsOptional, IsPositive, IsString, MaxLength, Min } from 'class-validator';
 
-export enum ProductTypeDto {
+export enum ProductType {
   PHYSICAL = 'PHYSICAL',
   DIGITAL = 'DIGITAL',
 }
 
-export enum ProductStatusDto {
+export enum ProductStatus {
   ACTIVE = 'ACTIVE',
   INACTIVE = 'INACTIVE',
 }
 
 export class CreateProductDto {
   @IsString()
-  @IsNotEmpty()
-  title!: string;
-
-  @IsOptional()
-  @IsString()
-  description?: string | null;
-
-  @IsNumber()
-  @Min(0)
-  price!: number;
-
-  @IsString()
-  @IsNotEmpty()
+  @MaxLength(128)
   sku!: string;
 
-  @IsEnum(ProductStatusDto)
-  @IsOptional()
-  status?: ProductStatusDto;
+  @IsString()
+  @MaxLength(256)
+  title!: string;
 
-  @IsEnum(ProductTypeDto)
-  type!: ProductTypeDto;
+  @IsEnum(ProductType)
+  type!: ProductType;
+
+  @IsEnum(ProductStatus)
+  status!: ProductStatus;
+
+  // Tests expect number, not string
+  @IsNumber()
+  @IsPositive()
+  price!: number;
 
   @IsOptional()
   @IsString()
-  categoryId?: string;
+  @MaxLength(1024)
+  description?: string | null;
 
   @IsOptional()
-  @IsNumber()
+  @IsInt()
   @Min(0)
-  inventoryQty?: number;
+  inventoryQty?: number; // optional on create; default 0 if omitted
 }
