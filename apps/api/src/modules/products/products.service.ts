@@ -4,114 +4,166 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, Product } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
+import { PrismaService } from '../../prisma/prisma.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 
-type OrgFromHeaders = { slug: string };
+type ProductWithPrismaDecimal = {
+  id: string;
+  createdAt: Date;
+  updatedAt: Date;
+  organizationId: string;
+  categoryId: string | null;
+  title: string;
+  sku: string;
+  description: string | null;
+  type: string;
+  status: string;
+  price: Prisma.Decimal | number | string;
+  inventoryQty: number;
+  lastPurchasedAt: Date | null;
+};
+
+function toPlainProduct(p: ProductWithPrismaDecimal) {
+  const price =
+    typeof p.price === 'object' && p.price && 'toNumber' in p.price
+      ? (p.price as Prisma.Decimal).toNumber()
+      : Number(p.price);
+  return { ...p, price };
+}
 
 @Injectable()
 export class ProductsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(org: OrgFromHeaders, dto: CreateProductDto): Promise<Product & { price?: number }> {
-    // Enforce unique SKU per org (if sku is present in your schema/DTO)
-    if ((dto as any).sku) {
+  async findAll(orgSlug: string) {
+    const org = await this.prisma.organization.findUnique({ where: { slug: orgSlug } });
+    if (!org) throw new NotFoundException('Organization not found');
+
+    const items = await this.prisma.product.findMany({
+      where: { organizationId: org.id },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return items.map(toPlainProduct);
+  }
+
+  async findOne(orgSlug: string, id: string) {
+    const org = await this.prisma.organization.findUnique({ where: { slug: orgSlug } });
+    if (!org) throw new NotFoundException('Organization not found');
+
+    const item = await this.prisma.product.findFirst({
+      where: { id, organizationId: org.id },
+    });
+    if (!item) throw new NotFoundException('Product not found');
+
+    return toPlainProduct(item);
+  }
+
+  async create(orgSlug: string, dto: CreateProductDto) {
+    const org = await this.prisma.organization.findUnique({ where: { slug: orgSlug } });
+    if (!org) throw new NotFoundException('Organization not found');
+
+    if (!dto?.sku) throw new BadRequestException('sku is required');
+
+    const dup = await this.prisma.product.findFirst({
+      where: { organizationId: org.id, sku: dto.sku },
+      select: { id: true },
+    });
+    if (dup) throw new ConflictException('SKU already exists in this org');
+
+    // Use relation connects for BOTH org and category to stay on the "checked" input
+    const created = await this.prisma.product.create({
+      data: {
+        organization: { connect: { id: org.id } }, // ← relation connect (no organizationId scalar)
+        title: dto.title,
+        sku: dto.sku,
+        description: dto.description ?? null,
+        type: dto.type as any,
+        status: dto.status as any,
+        price: dto.price as any,
+        inventoryQty: dto.inventoryQty ?? 0,
+        ...((dto as any).categoryId
+          ? { category: { connect: { id: (dto as any).categoryId } } }
+          : {}),
+      },
+    });
+
+    return toPlainProduct(created as unknown as ProductWithPrismaDecimal);
+  }
+
+  async update(orgSlug: string, id: string, dto: UpdateProductDto) {
+    const org = await this.prisma.organization.findUnique({ where: { slug: orgSlug } });
+    if (!org) throw new NotFoundException('Organization not found');
+
+    const existing = await this.prisma.product.findFirst({
+      where: { id, organizationId: org.id },
+      select: { id: true, sku: true },
+    });
+    if (!existing) throw new NotFoundException('Product not found');
+
+    if (dto.sku && dto.sku !== existing.sku) {
       const dup = await this.prisma.product.findFirst({
-        where: {
-          sku: (dto as any).sku,
-          organization: { slug: org.slug },
-        } as Prisma.ProductWhereInput,
+        where: { organizationId: org.id, sku: dto.sku },
         select: { id: true },
       });
       if (dup) throw new ConflictException('SKU already exists in this org');
     }
 
-    const created = await this.prisma.product.create({
+    const updated = await this.prisma.product.update({
+      where: { id },
       data: {
-        ...(dto as any),
-        organization: { connect: { slug: org.slug } },
-      } as any,
+        ...(dto.title !== undefined ? { title: dto.title } : {}),
+        ...(dto.sku !== undefined ? { sku: dto.sku } : {}),
+        ...(dto.description !== undefined ? { description: dto.description } : {}),
+        ...(dto.type !== undefined ? { type: dto.type as any } : {}),
+        ...(dto.status !== undefined ? { status: dto.status as any } : {}),
+        ...(dto.price !== undefined ? { price: dto.price as any } : {}),
+        ...(dto.inventoryQty !== undefined ? { inventoryQty: dto.inventoryQty } : {}),
+        ...((dto as any).categoryId !== undefined
+          ? (dto as any).categoryId
+            ? { category: { connect: { id: (dto as any).categoryId } } }
+            : { category: { disconnect: true } }
+          : {}),
+      },
     });
 
-    // Some Prisma Decimal fields (e.g., price) serialize as strings.
-    // Tests expect price to be a number (e.g., 19.99), so coerce here.
-    const coerced: any = { ...created };
-    if ((created as any).price !== undefined) {
-      const n = Number((created as any).price);
-      coerced.price = Number.isNaN(n) ? undefined : n;
-    }
-    return coerced;
+    return toPlainProduct(updated as unknown as ProductWithPrismaDecimal);
   }
 
-  findAll(org: OrgFromHeaders): Promise<Product[]> {
-    return this.prisma.product.findMany({
-      where: { organization: { slug: org.slug } },
-      orderBy: { createdAt: 'desc' },
-    });
-  }
+  async adjustInventory(orgSlug: string, id: string, delta: number) {
+    const org = await this.prisma.organization.findUnique({ where: { slug: orgSlug } });
+    if (!org) throw new NotFoundException('Organization not found');
 
-  async findOne(org: OrgFromHeaders, id: string): Promise<Product> {
     const product = await this.prisma.product.findFirst({
-      where: { id, organization: { slug: org.slug } },
-    });
-    if (!product) throw new NotFoundException('Product not found');
-    return product;
-  }
-
-  async patch(org: OrgFromHeaders, id: string, dto: UpdateProductDto): Promise<Product> {
-    return this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      const existing = await tx.product.findFirst({
-        where: { id, organization: { slug: org.slug } },
-      });
-      if (!existing) throw new NotFoundException('Product not found');
-
-      const nextSku = (dto as any).sku;
-      if (nextSku && nextSku !== (existing as any).sku) {
-        const dup = await tx.product.findFirst({
-          where: {
-            sku: nextSku,
-            organization: { slug: org.slug },
-          } as Prisma.ProductWhereInput,
-          select: { id: true },
-        });
-        if (dup) throw new ConflictException('SKU already exists in this org');
-      }
-
-      return tx.product.update({
-        where: { id },
-        data: { ...(dto as any) },
-      });
-    });
-  }
-
-  async remove(org: OrgFromHeaders, id: string): Promise<void> {
-    const deleted = await this.prisma.product.deleteMany({
-      where: { id, organization: { slug: org.slug } },
-    });
-    if (deleted.count === 0) throw new NotFoundException('Product not found');
-  }
-
-  /**
-   * Minimal contract per tests:
-   * - Positive delta OK
-   * - Negative delta => 400
-   * (Wire real math once you share the actual inventory column name.)
-   */
-  async adjustInventory(org: OrgFromHeaders, id: string, delta: number): Promise<Product> {
-    const product = await this.prisma.product.findFirst({
-      where: { id, organization: { slug: org.slug } },
+      where: { id, organizationId: org.id },
+      select: { id: true, inventoryQty: true },
     });
     if (!product) throw new NotFoundException('Product not found');
 
-    if (typeof delta !== 'number' || Number.isNaN(delta)) {
-      throw new BadRequestException('Invalid delta');
-    }
-    if (delta < 0) {
-      throw new BadRequestException('Insufficient inventory');
-    }
+    const nextQty = product.inventoryQty + delta;
+    if (nextQty < 0) throw new BadRequestException('Inventory cannot go below zero');
 
-    return product;
+    const updated = await this.prisma.product.update({
+      where: { id },
+      data: { inventoryQty: nextQty },
+    });
+
+    return toPlainProduct(updated as unknown as ProductWithPrismaDecimal);
+  }
+
+  async remove(orgSlug: string, id: string) {
+    const org = await this.prisma.organization.findUnique({ where: { slug: orgSlug } });
+    if (!org) throw new NotFoundException('Organization not found');
+
+    const existing = await this.prisma.product.findFirst({
+      where: { id, organizationId: org.id },
+      select: { id: true },
+    });
+    if (!existing) throw new NotFoundException('Product not found');
+
+    const deleted = await this.prisma.product.delete({ where: { id } });
+    return toPlainProduct(deleted as unknown as ProductWithPrismaDecimal);
   }
 }

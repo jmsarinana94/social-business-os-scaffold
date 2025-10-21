@@ -1,11 +1,14 @@
+// apps/api/src/modules/products/dto/update-product.dto.ts
 import { PartialType } from '@nestjs/mapped-types';
-import { IsInt, IsOptional, Min } from 'class-validator';
+import { IsOptional, IsString } from 'class-validator';
 import { CreateProductDto } from './create-product.dto';
 
+/**
+ * Make all CreateProduct fields optional, and ensure categoryId stays optional.
+ * (PartialType already makes it optional, the explicit redeclare is just for clarity.)
+ */
 export class UpdateProductDto extends PartialType(CreateProductDto) {
-  // add missing optional inventory for partial updates
   @IsOptional()
-  @IsInt()
-  @Min(0)
-  inventoryQty?: number;
+  @IsString()
+  categoryId?: string;
 }

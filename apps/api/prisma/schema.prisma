@@ -22,6 +22,13 @@ enum ProductStatus {
   INACTIVE
 }
 
+enum SubscriptionPlan {
+  FREE
+  STARTER
+  GROWTH
+  ENTERPRISE
+}
+
 //
 // Models
 //
@@ -39,16 +46,23 @@ model User {
 }
 
 model Organization {
-  id        String      @id @default(cuid())
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  id                   String            @id @default(cuid())
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
 
-  slug      String      @unique
-  name      String
+  slug                 String            @unique
+  name                 String
 
-  members   OrgMember[]
-  products  Product[]
-  categories Category[]
+  // Billing (optional; safe defaults)
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  subscriptionPlan     SubscriptionPlan  @default(FREE)
+  subscriptionStatus   String?
+  subscriptionRenewsAt DateTime?
+
+  members              OrgMember[]
+  products             Product[]
+  categories           Category[]
 
   @@map("Org")
 }

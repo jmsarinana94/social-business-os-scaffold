@@ -1,23 +1,20 @@
-import { IsEnum, IsInt, IsNumber, IsOptional, IsPositive, IsString, MaxLength, Min } from 'class-validator';
-
-export enum ProductType {
-  PHYSICAL = 'PHYSICAL',
-  DIGITAL = 'DIGITAL',
-}
-
-export enum ProductStatus {
-  ACTIVE = 'ACTIVE',
-  INACTIVE = 'INACTIVE',
-}
+// apps/api/src/modules/products/dto/create-product.dto.ts
+import { ProductStatus, ProductType } from '@prisma/client';
+import { Type } from 'class-transformer';
+import { IsEnum, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 
 export class CreateProductDto {
   @IsString()
-  @MaxLength(128)
-  sku!: string;
+  @IsNotEmpty()
+  title!: string;
 
   @IsString()
-  @MaxLength(256)
-  title!: string;
+  @IsNotEmpty()
+  sku!: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
 
   @IsEnum(ProductType)
   type!: ProductType;
@@ -25,18 +22,19 @@ export class CreateProductDto {
   @IsEnum(ProductStatus)
   status!: ProductStatus;
 
-  // Tests expect number, not string
-  @IsNumber()
-  @IsPositive()
+  // Prisma uses Decimal, DTO accepts number
+  @Type(() => Number)
+  @IsNumber({ allowNaN: false, allowInfinity: false }, { message: 'price must be a number' })
   price!: number;
 
+  // Optional relation to Category within the same org
   @IsOptional()
   @IsString()
-  @MaxLength(1024)
-  description?: string | null;
+  categoryId?: string;
 
   @IsOptional()
+  @Type(() => Number)
   @IsInt()
   @Min(0)
-  inventoryQty?: number; // optional on create; default 0 if omitted
+  inventoryQty?: number;
 }
