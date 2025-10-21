@@ -1,3 +1,5 @@
+// apps/api/src/modules/products/products.controller.ts
+
 import {
   BadRequestException,
   Body,
@@ -11,89 +13,80 @@ import {
   Post,
   Put,
 } from '@nestjs/common';
-import { CreateProductDto, UpdateProductDto } from './dto';
+import { orgFromHeaders } from '../../shared/org-from-headers';
+import { CreateProductDto } from './dto/create-product.dto';
+import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductsService } from './products.service';
-
-function orgFromHeaders(headers: Record<string, string | string[] | undefined>) {
-  const slug = (headers['x-org'] as string) || (headers['X-Org'] as unknown as string);
-  if (!slug) throw new BadRequestException('Missing X-Org header');
-  return { slug };
-}
 
 @Controller('products')
 export class ProductsController {
   constructor(private readonly products: ProductsService) {}
 
+  // GET /products
   @Get()
-  list(@Headers() headers: Record<string, string>) {
+  async findAll(@Headers() headers: Record<string, string>) {
     return this.products.findAll(orgFromHeaders(headers));
   }
 
+  // GET /products/:id
   @Get(':id')
-  get(@Headers() headers: Record<string, string>, @Param('id') id: string) {
+  async findOne(
+    @Headers() headers: Record<string, string>,
+    @Param('id') id: string,
+  ) {
     return this.products.findOne(orgFromHeaders(headers), id);
   }
 
+  // POST /products
   @Post()
-  create(
+  async create(
     @Headers() headers: Record<string, string>,
     @Body() dto: CreateProductDto,
   ) {
     return this.products.create(orgFromHeaders(headers), dto);
   }
 
-  // Tests use PATCH for partial update
-  @Patch(':id')
-  patch(
-    @Headers() headers: Record<string, string>,
-    @Param('id') id: string,
-    @Body() dto: UpdateProductDto,
-  ) {
-    return this.products.patch(orgFromHeaders(headers), id, dto);
-  }
-
-  // Be extra compatible: allow PUT too (some suites use it occasionally)
+  // PUT /products/:id  (e2e uses PUT with partial payloads; treat as partial update)
   @Put(':id')
-  put(
+  async update(
     @Headers() headers: Record<string, string>,
     @Param('id') id: string,
     @Body() dto: UpdateProductDto,
   ) {
-    return this.products.patch(orgFromHeaders(headers), id, dto);
+    return this.products.update(orgFromHeaders(headers), id, dto);
   }
 
-  // Inventory adjustment: tests hit POST and expect 200
+  // PATCH /products/:id  (alias to the same partial update logic)
+  @Patch(':id')
+  async patch(
+    @Headers() headers: Record<string, string>,
+    @Param('id') id: string,
+    @Body() dto: UpdateProductDto,
+  ) {
+    return this.products.update(orgFromHeaders(headers), id, dto);
+  }
+
+  // POST /products/:id/inventory  — e2e expects 200 OK (not 201)
   @Post(':id/inventory')
   @HttpCode(200)
-  adjustInventoryPost(
+  async adjustInventory(
     @Headers() headers: Record<string, string>,
     @Param('id') id: string,
-    @Body() body: { delta: number },
+    @Body() body: { delta?: number },
   ) {
-    return this.products.adjustInventory(
-      orgFromHeaders(headers),
-      id,
-      Number(body?.delta ?? 0),
-    );
+    const delta = Number(body?.delta ?? 0);
+    if (!Number.isFinite(delta)) {
+      throw new BadRequestException('delta must be a number');
+    }
+    return this.products.adjustInventory(orgFromHeaders(headers), id, delta);
   }
 
-  // Keep PATCH alias as well (harmless and future-proof)
-  @Patch(':id/inventory')
-  @HttpCode(200)
-  adjustInventoryPatch(
-    @Headers() headers: Record<string, string>,
-    @Param('id') id: string,
-    @Body() body: { delta: number },
-  ) {
-    return this.products.adjustInventory(
-      orgFromHeaders(headers),
-      id,
-      Number(body?.delta ?? 0),
-    );
-  }
-
+  // DELETE /products/:id
   @Delete(':id')
-  remove(@Headers() headers: Record<string, string>, @Param('id') id: string) {
+  async remove(
+    @Headers() headers: Record<string, string>,
+    @Param('id') id: string,
+  ) {
     return this.products.remove(orgFromHeaders(headers), id);
   }
 }
