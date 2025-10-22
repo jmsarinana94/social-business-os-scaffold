@@ -1,16 +1,14 @@
-// test/e2e/support/e2e-app.factory.ts
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { AppModule } from '../../../src/app.module';
 
 export async function createE2EApp(): Promise<INestApplication> {
-  const mod = await Test.createTestingModule({
+  const moduleRef = await Test.createTestingModule({
     imports: [AppModule],
   }).compile();
 
-  const app = mod.createNestApplication();
+  const app = moduleRef.createNestApplication();
 
-  // IMPORTANT: same pipes/settings as other passing suites
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -19,9 +17,7 @@ export async function createE2EApp(): Promise<INestApplication> {
     }),
   );
 
-  // DO NOT set a global prefix here (keep it consistent with passing suites)
-  // DO NOT enable versioning here unless all suites do
-
+  // Critical: no global prefix/versioning here.
   await app.init();
   return app;
 }

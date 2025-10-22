@@ -1,0 +1,114 @@
+diff --git a/apps/api/src/modules/orgs/orgs.controller.ts b/apps/api/src/modules/orgs/orgs.controller.ts
+index 0000000..1111111 100644
+--- a/apps/api/src/modules/orgs/orgs.controller.ts
++++ b/apps/api/src/modules/orgs/orgs.controller.ts
+@@ -1,10 +1,26 @@
+ import { Body, Controller, Get, Headers, Param, Post } from '@nestjs/common';
+ import { OrgsService } from './orgs.service';
+ 
+ @Controller('orgs')
+ export class OrgsController {
+   constructor(private readonly orgs: OrgsService) {}
+
+   @Post()
+   async create(@Body() body: any) {
+     const { slug, name } = body || {};
+     return this.orgs.create(slug, name);
+   }
+
++  // ✅ Fix: put 'me' route before ':slug' to avoid /orgs/me being caught by :slug
++  @Get('me')
++  async me(@Headers() headers: Record<string, any>) {
++    const slug = (headers['x-org'] || headers['x-org-slug']) as string;
++    return this.orgs.get(slug);
++  }
++
+   @Get(':slug')
+   async get(@Param('slug') slug: string) {
+     return this.orgs.get(slug);
+   }
+ }
+diff --git a/apps/api/src/modules/products/products.controller.ts b/apps/api/src/modules/products/products.controller.ts
+index 0000000..2222222 100644
+--- a/apps/api/src/modules/products/products.controller.ts
++++ b/apps/api/src/modules/products/products.controller.ts
+@@ -1,20 +1,77 @@
+ import {
+   Body,
+   Controller,
+   Delete,
+   Get,
+   Headers,
+   HttpCode,
+   Param,
+   Post,
+   Put,
+   UseGuards,
+ } from '@nestjs/common';
+ import { ProductsService } from './products.service';
+ import { CreateProductDto } from './dto/create-product.dto';
+ import { UpdateProductDto } from './dto/update-product.dto';
+ import { InventoryDeltaDto } from './dto/inventory.dto';
+ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+ import { OrgGuard } from '../orgs/org.guard';
+
+-@Controller('products')
+-@UseGuards(OrgGuard, JwtAuthGuard)
+-export class ProductsController {
+-  constructor(private readonly products: ProductsService) {}
++@Controller('products')
++// ✅ Fix: Only apply OrgGuard globally; JWT only for mutations
++@UseGuards(OrgGuard)
++export class ProductsController {
++  constructor(private readonly products: ProductsService) {}
++
++  private orgIdFromHeaders(headers: Record<string, string | string[] | undefined>) {
++    const slug = (headers['x-org'] || headers['x-org-slug']) as string;
++    return 'org_' + Buffer.from(slug).toString('hex').slice(0, 8);
++  }
++
++  // --- PUBLIC (no JWT) ---
++  @Get()
++  async findAll(@Headers() headers: any) {
++    const orgId = this.orgIdFromHeaders(headers);
++    return this.products.findAll(orgId);
++  }
++
++  @Get(':id')
++  async findOne(@Headers() headers: any, @Param('id') id: string) {
++    const orgId = this.orgIdFromHeaders(headers);
++    return this.products.findOne(orgId, id);
++  }
++
++  // --- PROTECTED (JWT required) ---
++  @Post()
++  @UseGuards(JwtAuthGuard)
++  async create(@Headers() headers: any, @Body() dto: CreateProductDto) {
++    const orgId = this.orgIdFromHeaders(headers);
++    return this.products.create(orgId, dto); // 201
++  }
++
++  @Put(':id')
++  @UseGuards(JwtAuthGuard)
++  async update(@Headers() headers: any, @Param('id') id: string, @Body() dto: UpdateProductDto) {
++    const orgId = this.orgIdFromHeaders(headers);
++    return this.products.update(orgId, id, dto); // 200
++  }
++
++  @Delete(':id')
++  @UseGuards(JwtAuthGuard)
++  @HttpCode(200) // ✅ tests expect 200 on delete
++  async remove(@Headers() headers: any, @Param('id') id: string) {
++    const orgId = this.orgIdFromHeaders(headers);
++    await this.products.remove(orgId, id);
++    return { ok: true };
++  }
++
++  @Post(':id/inventory')
++  @UseGuards(JwtAuthGuard)
++  @HttpCode(200)
++  async adjustInventory(@Headers() headers: any, @Param('id') id: string, @Body() dto: InventoryDeltaDto) {
++    const orgId = this.orgIdFromHeaders(headers);
++    return this.products.adjustInventory(orgId, id, dto.delta);
++  }
+ }

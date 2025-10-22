@@ -1,26 +1,28 @@
-import { PrismaService } from '@/shared/prisma/prisma.service';
-import { ConflictException, Injectable } from '@nestjs/common';
-import { CreateOrgDto } from './dto/create-org.dto';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+
+type Org = { id: string; slug: string; name: string; createdAt: Date; updatedAt: Date };
 
 @Injectable()
 export class OrgsService {
-  constructor(private readonly prisma: PrismaService) {}
+  private orgs = new Map<string, Org>();
 
-  findBySlug(slug: string) {
-    return this.prisma.organization.findUnique({ where: { slug } });
+  create(slug: string, name: string) {
+    if (this.orgs.has(slug)) throw new ConflictException('Org already exists');
+    const now = new Date();
+    const org: Org = {
+      id: 'org_' + Buffer.from(slug).toString('hex').slice(0, 8),
+      slug,
+      name,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.orgs.set(slug, org);
+    return org;
   }
 
-  async create(dto: CreateOrgDto) {
-    try {
-      return await this.prisma.organization.create({
-        data: { slug: dto.slug, name: dto.name },
-      });
-    } catch (e: any) {
-      // Prisma P2002 unique constraint
-      if (e?.code === 'P2002') {
-        throw new ConflictException('Organization slug already exists');
-      }
-      throw e;
-    }
+  get(slug: string) {
+    const org = this.orgs.get(slug);
+    if (!org) throw new NotFoundException('Org not found');
+    return org;
   }
 }

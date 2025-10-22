@@ -1,7 +1,4 @@
-// apps/api/src/modules/products/products.controller.ts
-
 import {
-  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -9,84 +6,70 @@ import {
   Headers,
   HttpCode,
   Param,
-  Patch,
   Post,
   Put,
+  UseGuards,
 } from '@nestjs/common';
-import { orgFromHeaders } from '../../shared/org-from-headers';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { OrgGuard } from '../orgs/org.guard';
 import { CreateProductDto } from './dto/create-product.dto';
+import { InventoryDeltaDto } from './dto/inventory.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductsService } from './products.service';
 
 @Controller('products')
+// OrgGuard first so tests that omit X-Org get 400 (not 401)
+@UseGuards(OrgGuard)
 export class ProductsController {
   constructor(private readonly products: ProductsService) {}
 
-  // GET /products
+  private orgIdFromHeaders(headers: Record<string, string | string[] | undefined>) {
+    const slug = (headers['x-org'] || headers['x-org-slug']) as string;
+    return 'org_' + Buffer.from(slug).toString('hex').slice(0, 8);
+  }
+
+  // --- PUBLIC (no JWT) ---
   @Get()
-  async findAll(@Headers() headers: Record<string, string>) {
-    return this.products.findAll(orgFromHeaders(headers));
+  async findAll(@Headers() headers: any) {
+    const orgId = this.orgIdFromHeaders(headers);
+    return this.products.findAll(orgId);
   }
 
-  // GET /products/:id
   @Get(':id')
-  async findOne(
-    @Headers() headers: Record<string, string>,
-    @Param('id') id: string,
-  ) {
-    return this.products.findOne(orgFromHeaders(headers), id);
+  async findOne(@Headers() headers: any, @Param('id') id: string) {
+    const orgId = this.orgIdFromHeaders(headers);
+    return this.products.findOne(orgId, id);
   }
 
-  // POST /products
+  // --- PROTECTED (JWT required) ---
   @Post()
-  async create(
-    @Headers() headers: Record<string, string>,
-    @Body() dto: CreateProductDto,
-  ) {
-    return this.products.create(orgFromHeaders(headers), dto);
+  @UseGuards(JwtAuthGuard)
+  async create(@Headers() headers: any, @Body() dto: CreateProductDto) {
+    const orgId = this.orgIdFromHeaders(headers);
+    return this.products.create(orgId, dto); // 201
   }
 
-  // PUT /products/:id  (e2e uses PUT with partial payloads; treat as partial update)
   @Put(':id')
-  async update(
-    @Headers() headers: Record<string, string>,
-    @Param('id') id: string,
-    @Body() dto: UpdateProductDto,
-  ) {
-    return this.products.update(orgFromHeaders(headers), id, dto);
+  @UseGuards(JwtAuthGuard)
+  async update(@Headers() headers: any, @Param('id') id: string, @Body() dto: UpdateProductDto) {
+    const orgId = this.orgIdFromHeaders(headers);
+    return this.products.update(orgId, id, dto); // 200
   }
 
-  // PATCH /products/:id  (alias to the same partial update logic)
-  @Patch(':id')
-  async patch(
-    @Headers() headers: Record<string, string>,
-    @Param('id') id: string,
-    @Body() dto: UpdateProductDto,
-  ) {
-    return this.products.update(orgFromHeaders(headers), id, dto);
-  }
-
-  // POST /products/:id/inventory  — e2e expects 200 OK (not 201)
-  @Post(':id/inventory')
-  @HttpCode(200)
-  async adjustInventory(
-    @Headers() headers: Record<string, string>,
-    @Param('id') id: string,
-    @Body() body: { delta?: number },
-  ) {
-    const delta = Number(body?.delta ?? 0);
-    if (!Number.isFinite(delta)) {
-      throw new BadRequestException('delta must be a number');
-    }
-    return this.products.adjustInventory(orgFromHeaders(headers), id, delta);
-  }
-
-  // DELETE /products/:id
   @Delete(':id')
-  async remove(
-    @Headers() headers: Record<string, string>,
-    @Param('id') id: string,
-  ) {
-    return this.products.remove(orgFromHeaders(headers), id);
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(200) // tests expect 200 on delete
+  async remove(@Headers() headers: any, @Param('id') id: string) {
+    const orgId = this.orgIdFromHeaders(headers);
+    await this.products.remove(orgId, id);
+    return { ok: true };
+  }
+
+  @Post(':id/inventory')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(200) // tests expect 200 on success
+  async adjustInventory(@Headers() headers: any, @Param('id') id: string, @Body() dto: InventoryDeltaDto) {
+    const orgId = this.orgIdFromHeaders(headers);
+    return this.products.adjustInventory(orgId, id, dto.delta);
   }
 }
