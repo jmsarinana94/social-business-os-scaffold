@@ -1,10 +1,23 @@
-name: CI
+name: API CI
+
 on:
-  push: { branches: [ main ] }
-  pull_request: { branches: [ main ] }
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
   api:
+    name: Build, DB push, and e2e
     runs-on: ubuntu-latest
+
     services:
       postgres:
         image: postgres:16-alpine
@@ -12,24 +25,51 @@ jobs:
           POSTGRES_USER: sbo
           POSTGRES_PASSWORD: sbo
           POSTGRES_DB: sbo
-        ports: [ '5432:5432' ]
+        ports: ['5432:5432']
         options: >-
-          --health-cmd="pg_isready -U sbo" --health-interval=10s --health-timeout=5s --health-retries=5
+          --health-cmd="pg_isready -U sbo"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      DATABASE_URL: postgresql://sbo:sbo@localhost:5432/sbo
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 20 }
-      - name: Enable Corepack
-        run: corepack enable && corepack prepare pnpm@9.12.2 --activate
-      - name: Install deps
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Enable Corepack (pnpm)
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.12.2 --activate
+
+      - name: Install deps (root workspace)
         run: pnpm install --frozen-lockfile
-      - name: Set DATABASE_URL
-        run: echo "DATABASE_URL=postgresql://sbo:sbo@localhost:5432/sbo" >> $GITHUB_ENV
+
       - name: Generate Prisma Client
         run: pnpm -w -F @repo/api prisma generate
+
       - name: DB Push
         run: pnpm -w -F @repo/api prisma db push
-      - name: Build
+
+      - name: Build API
         run: pnpm -w -F @repo/api build
-      - name: Test e2e
+
+      - name: Run e2e tests
         run: pnpm -w -F @repo/api test:e2e
+
+      # (Optional) Upload Jest results on failure
+      - name: Upload test logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-test-logs
+          path: apps/api/**/jest*.log
+          if-no-files-found: ignore
