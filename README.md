@@ -45,3 +45,20 @@ pnpm -F @repo/api e2e:quick
 cd apps/api
 direnv allow
 # optionally set ORG_ID (or ORG_SLUG) in .envrc and re-allow
+
+## CI & Quality Gates
+
+PRs must pass:
+- `pnpm -F @repo/api build`
+- `pnpm -F @repo/api typecheck`
+- `pnpm -F @repo/api lint`
+- `pnpm -F @repo/api test:e2e`
+
+### Local quick commands
+```bash
+pnpm i
+pnpm -F @repo/api build
+pnpm -F @repo/api test:e2e
+
+![API CI](https://github.com/jmsarinana94/social-business-os-scaffold/actions/workflows/ci.yml/badge.svg)
+![CodeQL](https://github.com/jmsarinana94/social-business-os-scaffold/actions/workflows/codeql.yml/badge.svg)

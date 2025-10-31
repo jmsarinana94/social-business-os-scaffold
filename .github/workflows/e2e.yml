@@ -1,7 +1,7 @@
 name: e2e
 on:
   push:
-    branches: [ main, master ]
+    branches: [main, master]
   pull_request:
 
 jobs:
@@ -12,7 +12,7 @@ jobs:
       postgres:
         image: postgres:16
         ports:
-          - "5432:5432"
+          - '5432:5432'
         env:
           POSTGRES_DB: sbo
           POSTGRES_USER: sbo

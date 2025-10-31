@@ -2,15 +2,15 @@ version: 2
 updates:
   # JS/TS workspace (pnpm is supported under the npm ecosystem)
   - package-ecosystem: npm
-    directory: "/"
+    directory: '/'
     schedule:
       interval: weekly
       day: monday
-      time: "07:00"
+      time: '07:00'
       timezone: UTC
     open-pull-requests-limit: 10
     versioning-strategy: increase-if-necessary
-    labels: ["dependencies"]
+    labels: ['dependencies']
     groups:
       dev-deps:
         applies-to: version-updates
@@ -21,10 +21,10 @@ updates:
 
   # Keep GitHub Actions up to date (runner images, actions, etc.)
   - package-ecosystem: github-actions
-    directory: "/"
+    directory: '/'
     schedule:
       interval: weekly
       day: monday
-      time: "07:15"
+      time: '07:15'
       timezone: UTC
-    labels: ["dependencies", "github-actions"]
+    labels: ['dependencies', 'github-actions']

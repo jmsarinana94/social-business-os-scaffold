@@ -33,7 +33,7 @@ components:
       properties:
         email: { type: string, format: email, example: tester@example.com }
         password: { type: string, example: password123 }
-        name: { type: string, example: "Demo User" }
+        name: { type: string, example: 'Demo User' }
     AuthLoginRequest:
       type: object
       required: [email, password]
@@ -44,7 +44,7 @@ components:
       type: object
       required: [access_token]
       properties:
-        access_token: { type: string, description: "JWT Bearer token" }
+        access_token: { type: string, description: 'JWT Bearer token' }
 
     Product:
       type: object
@@ -60,8 +60,8 @@ components:
         status:
           type: string
           enum: [ACTIVE, INACTIVE]
-        price: { type: string, example: "12.34" }
-        description: { type: [string, "null"] }
+        price: { type: string, example: '12.34' }
+        description: { type: [string, 'null'] }
         inventoryQty: { type: integer, example: 25 }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
@@ -72,19 +72,19 @@ components:
       properties:
         sku: { type: string, example: DUP-001 }
         title: { type: string, example: Widget }
-        type: { $ref: "#/components/schemas/Product/properties/type" }
-        status: { $ref: "#/components/schemas/Product/properties/status" }
-        price: { type: string, example: "1.00" }
-        description: { type: [string, "null"] }
+        type: { $ref: '#/components/schemas/Product/properties/type' }
+        status: { $ref: '#/components/schemas/Product/properties/status' }
+        price: { type: string, example: '1.00' }
+        description: { type: [string, 'null'] }
     ProductUpdateRequest:
       type: object
       properties:
         sku: { type: string }
         title: { type: string }
-        type: { $ref: "#/components/schemas/Product/properties/type" }
-        status: { $ref: "#/components/schemas/Product/properties/status" }
+        type: { $ref: '#/components/schemas/Product/properties/type' }
+        status: { $ref: '#/components/schemas/Product/properties/status' }
         price: { type: string }
-        description: { type: [string, "null"] }
+        description: { type: [string, 'null'] }
 
     PaginatedProducts:
       type: object
@@ -92,7 +92,7 @@ components:
       properties:
         data:
           type: array
-          items: { $ref: "#/components/schemas/Product" }
+          items: { $ref: '#/components/schemas/Product' }
         meta:
           type: object
           required: [page, limit, total, pages]
@@ -132,15 +132,15 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/AuthSignupRequest" }
+            schema: { $ref: '#/components/schemas/AuthSignupRequest' }
       responses:
-        "201":
+        '201':
           description: User created
-        "409":
+        '409':
           description: Email already exists
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
 
   /auth/login:
     post:
@@ -150,18 +150,18 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/AuthLoginRequest" }
+            schema: { $ref: '#/components/schemas/AuthLoginRequest' }
       responses:
-        "200":
+        '200':
           description: Logged in
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/AuthLoginResponse" }
-        "401":
+              schema: { $ref: '#/components/schemas/AuthLoginResponse' }
+        '401':
           description: Invalid credentials
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
 
   /products:
     get:
@@ -179,23 +179,23 @@ paths:
           name: limit
           schema: { type: integer, minimum: 1, maximum: 100, default: 10 }
       security:
-        - bearerAuth: [ ]
+        - bearerAuth: []
       responses:
-        "200":
+        '200':
           description: OK
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/PaginatedProducts" }
-        "400":
+              schema: { $ref: '#/components/schemas/PaginatedProducts' }
+        '400':
           description: Missing x-org
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/ErrorResponse" }
-        "401":
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '401':
           description: Unauthorized
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
 
     post:
       tags: [Products]
@@ -206,23 +206,23 @@ paths:
           required: true
           schema: { type: string, example: demo }
       security:
-        - bearerAuth: [ ]
+        - bearerAuth: []
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/ProductCreateRequest" }
+            schema: { $ref: '#/components/schemas/ProductCreateRequest' }
       responses:
-        "201":
+        '201':
           description: Created
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/Product" }
-        "409":
+              schema: { $ref: '#/components/schemas/Product' }
+        '409':
           description: Duplicate SKU (same org)
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
 
   /products/{id}:
     get:
@@ -238,18 +238,18 @@ paths:
           required: true
           schema: { type: string }
       security:
-        - bearerAuth: [ ]
+        - bearerAuth: []
       responses:
-        "200":
+        '200':
           description: OK
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/Product" }
-        "404":
+              schema: { $ref: '#/components/schemas/Product' }
+        '404':
           description: Product not found
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
 
     patch:
       tags: [Products]
@@ -264,23 +264,23 @@ paths:
           required: true
           schema: { type: string }
       security:
-        - bearerAuth: [ ]
+        - bearerAuth: []
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/ProductUpdateRequest" }
+            schema: { $ref: '#/components/schemas/ProductUpdateRequest' }
       responses:
-        "200":
+        '200':
           description: Updated
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/Product" }
-        "404":
+              schema: { $ref: '#/components/schemas/Product' }
+        '404':
           description: Not found
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
 
     delete:
       tags: [Products]
@@ -295,15 +295,15 @@ paths:
           required: true
           schema: { type: string }
       security:
-        - bearerAuth: [ ]
+        - bearerAuth: []
       responses:
-        "204":
+        '204':
           description: Deleted
-        "404":
+        '404':
           description: Not found
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
 
   /products/{id}/inventory:
     post:
@@ -322,30 +322,30 @@ paths:
           required: true
           schema: { type: string }
       security:
-        - bearerAuth: [ ]
+        - bearerAuth: []
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/InventoryAdjustRequest" }
+            schema: { $ref: '#/components/schemas/InventoryAdjustRequest' }
       responses:
-        "201":
+        '201':
           description: Inventory updated (created adjustment)
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/Product" }
-        "400":
+              schema: { $ref: '#/components/schemas/Product' }
+        '400':
           description: Invalid delta (e.g., negative overshoot)
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/ErrorResponse" }
-        "401":
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '401':
           description: Unauthorized
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/ErrorResponse" }
-        "404":
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '404':
           description: Product not found
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              schema: { $ref: '#/components/schemas/ErrorResponse' }

@@ -1,4 +1,4 @@
-name: API CI
+name: CI
 
 on:
   push:
@@ -6,17 +6,15 @@ on:
   pull_request:
     branches: [main]
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
-permissions:
-  contents: read
-
 jobs:
   api:
-    name: Build, DB push, and e2e
+    name: API – Test & Build Matrix
     runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [18, 20, 22]
 
     services:
       postgres:
@@ -32,26 +30,22 @@ jobs:
           --health-timeout=5s
           --health-retries=5
 
-    env:
-      DATABASE_URL: postgresql://sbo:sbo@localhost:5432/sbo
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: pnpm
+          node-version: ${{ matrix.node }}
+          cache: 'pnpm'
 
-      - name: Enable Corepack (pnpm)
-        run: |
-          corepack enable
-          corepack prepare pnpm@9.12.2 --activate
+      - name: Enable Corepack
+        run: corepack enable && corepack prepare pnpm@9.12.2 --activate
 
-      - name: Install deps (root workspace)
+      - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Set DATABASE_URL
+        run: echo "DATABASE_URL=postgresql://sbo:sbo@localhost:5432/sbo" >> $GITHUB_ENV
 
       - name: Generate Prisma Client
         run: pnpm -w -F @repo/api prisma generate
@@ -62,14 +56,29 @@ jobs:
       - name: Build API
         run: pnpm -w -F @repo/api build
 
-      - name: Run e2e tests
-        run: pnpm -w -F @repo/api test:e2e
+      - name: Run e2e tests with coverage
+        run: pnpm -w -F @repo/api test:e2e -- --coverage
 
-      # (Optional) Upload Jest results on failure
-      - name: Upload test logs
-        if: failure()
+      - name: Upload coverage report
         uses: actions/upload-artifact@v4
         with:
-          name: api-test-logs
-          path: apps/api/**/jest*.log
-          if-no-files-found: ignore
+          name: api-coverage-${{ matrix.node }}
+          path: apps/api/coverage
+
+  lint:
+    name: Lint & Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+      - name: Enable Corepack
+        run: corepack enable && corepack prepare pnpm@9.12.2 --activate
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Lint
+        run: pnpm lint
+      - name: Check formatting
+        run: pnpm format --check

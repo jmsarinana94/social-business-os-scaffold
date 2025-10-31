@@ -4,7 +4,6 @@
   "private": true,
   "type": "commonjs",
   "main": "dist/src/main.js",
-
   "scripts": {
     "//": "───────────────────────────────",
     "//": "🚀 Core Commands",
@@ -12,7 +11,6 @@
     "start:dev": "nest start --watch",
     "build": "nest build",
     "dev": "bash ./scripts/dev.sh",
-
     "//": "───────────────────────────────",
     "//": "🧪 Testing",
     "test": "jest --config jest.config.ts",
@@ -21,7 +19,6 @@
     "test:e2e:fresh": "pnpm db:reset && pnpm build && pnpm test:e2e",
     "test:e2e:products": "jest --config jest.config.ts --selectProjects=e2e --runInBand -- test/e2e/products.validation.e2e-spec.ts",
     "inv:test": "bash ./scripts/inventory-test.sh",
-
     "//": "───────────────────────────────",
     "//": "🗄️ Database & Prisma",
     "prisma:generate": "prisma generate --schema=prisma/schema.prisma",
@@ -33,11 +30,9 @@
     "prisma:reset": "bash ./scripts/prisma-reset.sh",
     "seed:demo": "bash ./scripts/prisma-seed-demo.sh"
   },
-
   "prisma": {
     "seed": "node prisma/seed.cjs"
   },
-
   "dependencies": {
     "@nestjs/common": "10.4.20",
     "@nestjs/config": "^3.3.0",
@@ -63,7 +58,6 @@
     "swagger-ui-express": "^5.0.1",
     "zod": "^3.23.8"
   },
-
   "devDependencies": {
     "@nestjs/cli": "^10.4.5",
     "@nestjs/schematics": "^10.2.3",
@@ -84,5 +78,19 @@
     "ts-jest": "^29.4.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.2"
+  },
+  "jest": {
+    "coverageReporters": [
+      "text",
+      "lcov"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "branches": 70,
+        "functions": 75,
+        "lines": 80,
+        "statements": 80
+      }
+    }
   }
 }

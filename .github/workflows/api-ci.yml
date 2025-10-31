@@ -2,9 +2,9 @@ name: API CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   api:
@@ -14,7 +14,7 @@ jobs:
     env:
       # keep these aligned with your local .env or CI secrets
       NODE_ENV: test
-      E2E_AUTO_CREATE_ORG: "true"
+      E2E_AUTO_CREATE_ORG: 'true'
 
     steps:
       - name: Checkout

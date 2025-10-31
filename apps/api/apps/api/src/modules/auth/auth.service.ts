@@ -9,7 +9,7 @@ import { SignupDto } from './dto/signup.dto';
 export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly jwt: JwtService,
+    private readonly jwt: JwtService
   ) {}
 
   async signup(dto: SignupDto) {

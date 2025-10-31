@@ -2,12 +2,14 @@
   "name": "social-business-os-scaffold-v0.2",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@9.12.2",
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev --parallel",
     "lint": "turbo run lint",
     "test": "turbo run test",
     "format": "prettier --write .",
+    "prepare": "husky",
     "api:dev": "pnpm -C apps/api start",
     "api:build": "pnpm -C apps/api build",
     "api:smoke": "./apps/api/scripts/smoke.sh",
@@ -18,9 +20,12 @@
     "prisma:migrate": "pnpm -C apps/api prisma migrate dev"
   },
   "devDependencies": {
+    "husky": "9.1.7",
     "prettier": "^3.3.3",
+    "prettier-plugin-prisma": "5.0.0",
+    "prettier-plugin-tailwindcss": "0.7.1",
     "prisma": "6.14.0",
-    "turbo": "^2.1.1"
+    "turbo": "^2.5.8"
   },
   "workspaces": [
     "apps/*",

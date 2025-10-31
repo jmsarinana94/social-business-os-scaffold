@@ -1,11 +1,32 @@
 {
-  "printWidth": 100,
-  "tabWidth": 2,
-  "useTabs": false,
+  "$schema": "https://json.schemastore.org/prettierrc",
   "semi": true,
   "singleQuote": true,
-  "trailingComma": "all",
+  "trailingComma": "es5",
+  "tabWidth": 2,
+  "printWidth": 100,
   "bracketSpacing": true,
   "arrowParens": "always",
-  "plugins": ["prettier-plugin-prisma", "prettier-plugin-tailwindcss"]
+  "endOfLine": "lf",
+  "plugins": ["prettier-plugin-prisma", "prettier-plugin-tailwindcss"],
+  "overrides": [
+    {
+      "files": "*.prisma",
+      "options": {
+        "parser": "prisma"
+      }
+    },
+    {
+      "files": "*.yml",
+      "options": {
+        "tabWidth": 2
+      }
+    },
+    {
+      "files": "*.md",
+      "options": {
+        "proseWrap": "always"
+      }
+    }
+  ]
 }
