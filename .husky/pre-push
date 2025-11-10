@@ -1,15 +1,10 @@
 #!/usr/bin/env sh
-# ----------------------------------------
-# Husky pre-push hook
-# Runs API tests before pushing
-# ----------------------------------------
-
-# Exit on first error
-set -e
+. "$(dirname -- "$0")/_/husky.sh"
+set -euo pipefail
 
 echo "🚀 Running pre-push checks..."
 
-# Run API tests (allows empty test suites)
-pnpm -C apps/api test -- --passWithNoTests
+# Run API tests but don't fail if a package currently has zero tests
+pnpm -C apps/api exec jest --config jest.config.cjs --passWithNoTests
 
-echo "✅ All pre-push checks passed!"
+echo "✅ Pre-push checks passed!"
