@@ -8,7 +8,6 @@ jobs:
     runs-on: ubuntu-latest
 
     services:
-      # Spin up Postgres that matches the masked DATABASE_URL in logs.
       postgres:
         image: postgres:16
         ports:
@@ -25,7 +24,7 @@ jobs:
 
     env:
       NODE_ENV: test
-      # Matches the pattern seen in your run logs: ***localhost:5432/sbo?schema=public
+      # Matches the masked pattern seen in logs
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/sbo?schema=public
       ORG: demo
       API_EMAIL: tester@example.com
@@ -35,11 +34,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Let the action read package.json -> "packageManager": "pnpm@10.20.0"
       - name: Setup PNPM
         uses: pnpm/action-setup@v4
         with:
-          # Align with package.json -> "packageManager": "pnpm@10.20.0"
-          version: 10.20.0
           run_install: false
 
       - name: Setup Node
@@ -63,12 +61,11 @@ jobs:
           mkdir -p ../../.tmp/jest-cache
           TMPDIR="$(pwd)/../../.tmp" pnpm test:e2e:cov
 
-      # Collect and upload coverage no matter what
+      # Always collect and upload coverage
       - name: Collect coverage artifacts
         if: always()
         run: |
           mkdir -p _artifacts
-          # Jest default output dir is apps/api/coverage; copy to a flat artifact folder
           cp -r apps/api/coverage/* _artifacts/ || true
 
       - name: Upload coverage artifact
