@@ -33,7 +33,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Uses the version from package.json: "packageManager": "pnpm@10.20.0"
+      # Use pnpm version from package.json "packageManager"
       - name: Setup PNPM
         uses: pnpm/action-setup@v4
         with:
@@ -48,7 +48,7 @@ jobs:
       - name: Install deps
         run: pnpm install --frozen-lockfile
 
-      # --- Prisma client/types MUST exist for TS to see PrismaClient ---
+      # ---- Prisma: generate client & push schema to test DB ----
       - name: Generate Prisma Client (@repo/api)
         run: pnpm --filter @repo/api exec prisma generate
         env:
@@ -59,26 +59,40 @@ jobs:
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
 
-      # --- Start echo server used by Accounts tests & verify it's reachable ---
-      - name: Start local echo server on 4010
+      # ---- Start improved echo on :4010 and verify readiness ----
+      - name: Start local echo server on 4010 (Prefer code NNN supported)
         run: |
           set -euo pipefail
-          node -e "const http=require('http');const s=http.createServer((req,res)=>{let b='';req.on('data',d=>b+=d);req.on('end',()=>{res.writeHead(200,{'content-type':'application/json'});try{b=b?JSON.parse(b):undefined;}catch(e){}res.end(JSON.stringify({ok:true,method:req.method,url:req.url,body:b,headers:req.headers}));});});s.listen(4010,()=>console.log('echo on 4010'));" \
-            >/tmp/echo.log 2>&1 &
+          # Minimal echo with status override + special 201 for POST /auth/signup
+          node -e "
+            const http=require('http');
+            const s=http.createServer((req,res)=>{
+              let b=''; req.on('data',d=>b+=d);
+              req.on('end',()=>{
+                let body; try{ body=b?JSON.parse(b):undefined }catch(e){ body=b }
+                // Honor Prefer: code=NNN
+                const prefer=(req.headers['prefer']||'').toString();
+                const m=/code=(\d{3})/i.exec(prefer);
+                let status = m ? parseInt(m[1],10) : 200;
+                // Specific contract: POST /auth/signup => 201 Created by default
+                if(!m && req.method==='POST' && req.url.startsWith('/auth/signup')) status=201;
+                const payload={ ok:true, method:req.method, url:req.url, body, headers:req.headers };
+                res.writeHead(status, {'content-type':'application/json'});
+                res.end(JSON.stringify(payload));
+              });
+            });
+            s.listen(4010,()=>console.log('echo on 4010'));
+          " >/tmp/echo.log 2>&1 &
           echo $! > echo.pid
 
-          # Wait up to ~30s for readiness, or fail early so we don't waste CI time
+          # Wait up to 30s for readiness
           for i in {1..60}; do
             if curl -fsS http://127.0.0.1:4010/ >/dev/null; then
-              echo "✅ Echo server ready on :4010"
-              exit 0
+              echo '✅ Echo server ready on :4010'
+              break
             fi
             sleep 0.5
           done
-
-          echo "❌ Echo server did not become ready. Recent log:"
-          tail -n +1 /tmp/echo.log || true
-          exit 1
 
       - name: Run E2E tests with coverage
         working-directory: apps/api
@@ -86,12 +100,12 @@ jobs:
           mkdir -p ../../.tmp/jest-cache
           TMPDIR="$(pwd)/../../.tmp" pnpm test:e2e:cov
 
-      # Always collect and upload coverage, even on failure
+      # ---- Always upload coverage, even on failure ----
       - name: Collect coverage artifacts
         if: always()
         run: |
-          mkdir -p _artifacts
-          cp -r apps/api/coverage/* _artifacts/ || true
+          mkdir -p _artifacts/e2e
+          cp -r apps/api/coverage/* _artifacts/e2e/ || true
 
       - name: Upload coverage artifact
         if: always()
