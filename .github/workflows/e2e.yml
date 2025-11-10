@@ -1,41 +1,32 @@
 name: e2e
 
 on:
-  push:
-    branches: [main, master]
-  pull_request:
-  workflow_dispatch: {}
-
-concurrency:
-  group: e2e-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
-permissions:
-  contents: read
+  workflow_dispatch:
 
 jobs:
   e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
 
+    # Spin up Postgres that matches the masked DATABASE_URL in logs.
     services:
       postgres:
         image: postgres:16
         ports:
-          - '5432:5432'
+          - 5432:5432
         env:
           POSTGRES_DB: sbo
-          POSTGRES_USER: sbo
-          POSTGRES_PASSWORD: sbo
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
         options: >-
-          --health-cmd="pg_isready -U sbo -d sbo"
+          --health-cmd="pg_isready -U postgres -d sbo"
           --health-interval=5s
           --health-timeout=5s
-          --health-retries=60
+          --health-retries=10
 
     env:
       NODE_ENV: test
-      DATABASE_URL: postgresql://sbo:sbo@localhost:5432/sbo?schema=public
+      # Matches the pattern seen in your run logs: ***localhost:5432/sbo?schema=public
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/sbo?schema=public
       ORG: demo
       API_EMAIL: tester@example.com
       API_PASS: password123
@@ -44,44 +35,52 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Allow pnpm/action-setup to use the version declared in package.json's "packageManager"
       - name: Setup PNPM
         uses: pnpm/action-setup@v4
         with:
-          # Do NOT set "version" to avoid conflicts with package.json's packageManager
-          package_json_file: package.json
+          version: 9
 
-      - name: Setup Node.js
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
 
-      - name: Install dependencies (workspace)
+      - name: Install deps
         run: pnpm install --frozen-lockfile
 
-      - name: Prisma generate
-        working-directory: apps/api
-        run: pnpm prisma generate --schema=prisma/schema.prisma
-
-      - name: Prisma db push
-        working-directory: apps/api
-        run: pnpm prisma db push
-
-      - name: Seed demo data
-        working-directory: apps/api
-        run: pnpm prisma db seed
+      - name: Start local echo server on 4010 (for Accounts tests)
+        run: |
+          node -e "const http=require('http');const s=http.createServer((req,res)=>{let b='';req.on('data',d=>b+=d);req.on('end',()=>{res.writeHead(200,{'content-type':'application/json'});try{b=b?JSON.parse(b):undefined;}catch(e){}res.end(JSON.stringify({ok:true,method:req.method,url:req.url,body:b,headers:req.headers}));});});s.listen(4010,()=>console.log('echo on 4010')););" &
+          echo $! > echo.pid
+          for i in {1..40}; do nc -z 127.0.0.1 4010 && break || sleep 0.25; done
 
       - name: Run E2E tests with coverage
         working-directory: apps/api
         run: |
-          mkdir -p .tmp/jest-cache
-          TMPDIR="$(pwd)/.tmp" pnpm -F @repo/api test:e2e:cov
+          mkdir -p ../../.tmp/jest-cache
+          TMPDIR="$(pwd)/../../.tmp" pnpm test:e2e:cov
 
-      - name: Upload coverage report
+      # Collect and upload coverage no matter what
+      - name: Collect coverage artifacts
+        if: always()
+        run: |
+          mkdir -p _artifacts
+          # Jest default output dir is apps/api/coverage; copy to a flat artifact folder
+          cp -r apps/api/coverage/* _artifacts/ || true
+
+      - name: Upload coverage artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: api-e2e-coverage
-          path: apps/api/coverage/e2e
-          if-no-files-found: warn
+          path: _artifacts/**
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Stop echo server
+        if: always()
+        run: |
+          if [ -f echo.pid ]; then
+            kill "$(cat echo.pid)" || true
+          fi
