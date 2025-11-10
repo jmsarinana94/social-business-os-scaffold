@@ -45,7 +45,7 @@
     "test": "jest --config jest.config.cjs",
     "test:unit": "jest --config jest.config.cjs --selectProjects=unit",
     "test:e2e": "dotenv -e .env.test -- jest --config ./jest-e2e.config.cjs --runInBand",
-    "test:e2e:cov": "dotenv -e .env.test -- jest --config jest.config.cjs --selectProjects=e2e --runInBand --coverage",
+    "test:e2e:cov": "dotenv -e .env.test -- jest --config ./jest-e2e.config.cjs --runInBand --coverage",
     "test:e2e:fresh": "dotenv -e .env.test -- pnpm run db:setup:test && pnpm run build && pnpm run test:e2e",
     "test:e2e:products": "dotenv -e .env.test -- jest --config jest.config.cjs --selectProjects=e2e --runInBand -- test/e2e/products.validation.e2e-spec.ts",
     "test:one": "dotenv -e .env.test -- jest --config ./jest-e2e.config.cjs --runInBand --testPathPattern",
