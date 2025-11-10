@@ -33,7 +33,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Reads packageManager from package.json (pnpm@10.20.0 in your repo)
+      # Uses the version from package.json: "packageManager": "pnpm@10.20.0"
       - name: Setup PNPM
         uses: pnpm/action-setup@v4
         with:
@@ -48,28 +48,37 @@ jobs:
       - name: Install deps
         run: pnpm install --frozen-lockfile
 
-      # ---- Prisma: make sure types & client exist BEFORE compiling/tests ----
-      - name: Generate Prisma Client
-        working-directory: apps/api
-        run: pnpm prisma generate
-
-      # Push schema to the test database (no migrations required for CI)
-      - name: Prisma DB Push (test DB)
-        working-directory: apps/api
+      # --- Prisma client/types MUST exist for TS to see PrismaClient ---
+      - name: Generate Prisma Client (@repo/api)
+        run: pnpm --filter @repo/api exec prisma generate
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
-        run: pnpm prisma db push --accept-data-loss
 
-      # ---- Start echo server used by accounts tests & wait for it to be ready ----
+      - name: Prisma DB Push (test DB)
+        run: pnpm --filter @repo/api exec prisma db push --accept-data-loss
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+
+      # --- Start echo server used by Accounts tests & verify it's reachable ---
       - name: Start local echo server on 4010
         run: |
-          node -e "const http=require('http');const s=http.createServer((req,res)=>{let b='';req.on('data',d=>b+=d);req.on('end',()=>{res.writeHead(200,{'content-type':'application/json'});try{b=b?JSON.parse(b):undefined;}catch(e){}res.end(JSON.stringify({ok:true,method:req.method,url:req.url,body:b,headers:req.headers}));});});s.listen(4010,()=>console.log('echo on 4010'));" &
+          set -euo pipefail
+          node -e "const http=require('http');const s=http.createServer((req,res)=>{let b='';req.on('data',d=>b+=d);req.on('end',()=>{res.writeHead(200,{'content-type':'application/json'});try{b=b?JSON.parse(b):undefined;}catch(e){}res.end(JSON.stringify({ok:true,method:req.method,url:req.url,body:b,headers:req.headers}));});});s.listen(4010,()=>console.log('echo on 4010'));" \
+            >/tmp/echo.log 2>&1 &
           echo $! > echo.pid
-          # Wait for port to respond using curl (no nc dependency)
+
+          # Wait up to ~30s for readiness, or fail early so we don't waste CI time
           for i in {1..60}; do
-            curl -sS http://127.0.0.1:4010/ >/dev/null && echo "4010 ready" && break
+            if curl -fsS http://127.0.0.1:4010/ >/dev/null; then
+              echo "✅ Echo server ready on :4010"
+              exit 0
+            fi
             sleep 0.5
           done
+
+          echo "❌ Echo server did not become ready. Recent log:"
+          tail -n +1 /tmp/echo.log || true
+          exit 1
 
       - name: Run E2E tests with coverage
         working-directory: apps/api
@@ -77,7 +86,7 @@ jobs:
           mkdir -p ../../.tmp/jest-cache
           TMPDIR="$(pwd)/../../.tmp" pnpm test:e2e:cov
 
-      # ---- Always collect and upload coverage, even on failure ----
+      # Always collect and upload coverage, even on failure
       - name: Collect coverage artifacts
         if: always()
         run: |
