@@ -7,8 +7,8 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
 
-    # Spin up Postgres that matches the masked DATABASE_URL in logs.
     services:
+      # Spin up Postgres that matches the masked DATABASE_URL in logs.
       postgres:
         image: postgres:16
         ports:
@@ -38,7 +38,9 @@ jobs:
       - name: Setup PNPM
         uses: pnpm/action-setup@v4
         with:
-          version: 9
+          # Align with package.json -> "packageManager": "pnpm@10.20.0"
+          version: 10.20.0
+          run_install: false
 
       - name: Setup Node
         uses: actions/setup-node@v4
