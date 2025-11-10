@@ -1,12 +1,13 @@
-import { IsString, Matches, MaxLength } from 'class-validator';
+import { IsNotEmpty, IsString, Matches } from 'class-validator';
 
 export class CreateOrgDto {
   @IsString()
-  @Matches(/^[a-z0-9-]+$/, { message: 'slug must be lowercase letters, numbers, or dashes' })
-  @MaxLength(50)
+  @IsNotEmpty()
+  // simple, lowercase/number/dash slugs
+  @Matches(/^[a-z0-9-]{3,}$/)
   slug!: string;
 
   @IsString()
-  @MaxLength(100)
+  @IsNotEmpty()
   name!: string;
 }

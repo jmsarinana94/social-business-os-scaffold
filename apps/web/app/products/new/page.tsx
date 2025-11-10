@@ -1,8 +1,9 @@
 'use client';
 
-import { createProduct, type Product } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+
+import { createProduct, Product } from '@/lib/api';
 
 export default function NewProductPage() {
   const router = useRouter();

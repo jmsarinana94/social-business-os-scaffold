@@ -1,27 +1,28 @@
-import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 
-import { TenantMiddleware } from './common/tenant.middleware';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
 
-// Feature modules
 import { AuthModule } from './modules/auth/auth.module';
-import { CategoriesModule } from './modules/categories/categories.module';
-import { HealthModule } from './modules/health/health.module';
 import { OrgsModule } from './modules/orgs/orgs.module';
+import { PrismaModule } from './modules/prisma/prisma.module';
 import { ProductsModule } from './modules/products/products.module';
+// import { AccountsModule } from './modules/accounts/accounts.module'; // <-- hold off for now
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
-    HealthModule,
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: ['.env', 'prisma/.env'],
+    }),
+    PrismaModule,
     AuthModule,
     OrgsModule,
-    CategoriesModule,
     ProductsModule,
+    // AccountsModule, // <-- comment out until Prisma model matches service
   ],
+  controllers: [AppController],
+  providers: [AppService],
 })
-export class AppModule implements NestModule {
-  configure(consumer: MiddlewareConsumer) {
-    consumer.apply(TenantMiddleware).forRoutes('*');
-  }
-}
+export class AppModule {}

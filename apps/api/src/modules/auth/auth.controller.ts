@@ -1,36 +1,60 @@
+// apps/api/src/modules/auth/auth.controller.ts
+
 import {
-  BadRequestException,
   Body,
   Controller,
   Get,
   HttpCode,
+  HttpStatus,
   Post,
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
-import { AuthService, LoginDto } from './auth.service';
+import { AuthService } from './auth.service';
+import { JwtAuthGuard } from './jwt-auth.guard';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
-  @Post('login')
-  @HttpCode(200)
-  async login(@Body() body: LoginDto) {
-    const { email, password } = body ?? {};
-    if (!email || !password) {
-      throw new BadRequestException('email and password are required');
-    }
-    const token = await this.auth.issueToken({ email });
-    return { access_token: token };
+  /**
+   * POST /auth/signup
+   * Keep default 201 Created (tests expect 201)
+   */
+  @Post('signup')
+  async signup(@Body() body: any) {
+    const { email, password, org } = body ?? {};
+    return this.auth.signup(email, password, org || 'default-org');
   }
 
-  @Get('me')
-  @UseGuards(AuthGuard('jwt'))
-  async me(@Req() req: any) {
-    // req.user is populated by JwtStrategy.validate
-    const user = req.user ?? {};
-    return { id: user.sub ?? user.id ?? 'me', email: user.email ?? null };
+  /**
+   * POST /auth/login
+   * Tests expect 200 OK for login
+   */
+  @Post('login')
+  @HttpCode(HttpStatus.OK)
+  async login(@Body() body: any) {
+    const { email, password, org } = body ?? {};
+    const { token } = await this.auth.login(
+      email,
+      password,
+      org || 'default-org',
+    );
+    // Return both keys for compatibility with different tests/clients
+    return { access_token: token, token };
   }
+
+  /**
+   * GET /auth/me
+   * Must return root-level fields (id, email, org)
+   */
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  async me(@Req() req: any) {
+    return {
+      id: req.user?.sub,
+      email: req.user?.email,
+      org: req.user?.org,
+    };
+    }
 }

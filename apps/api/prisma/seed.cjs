@@ -1,60 +1,125 @@
- 
-const { PrismaClient } = require('@prisma/client');
-const bcrypt = require('bcryptjs');
+/* ---------------------------------------
+ * apps/api/prisma/seed.cjs
+ * ---------------------------------------
+ * Runs as Prisma's official seed entrypoint.
+ * Compatible with "type": "module" projects.
+ *
+ * Usage:
+ *   pnpm -C apps/api run db:seed
+ *   or
+ *   pnpm -C apps/api run db:reset:seed:local
+ * --------------------------------------*/
+
+const { PrismaClient, Prisma } = require("@prisma/client");
+const bcrypt = require("bcrypt");
 
 const prisma = new PrismaClient();
 
 async function main() {
-  const orgSlug = process.env.ORG || 'demo';
-  const email = process.env.API_EMAIL || 'tester@example.com';
-  const password = process.env.API_PASS || 'password123';
+  console.log("🌱 Starting seed...");
 
-  // Upsert org
-  const org = await prisma.organization.upsert({
-    where: { slug: orgSlug },
-    update: {},
-    create: { slug: orgSlug, name: 'Demo Org' },
-  });
+  // -----------------------------
+  // Defaults (from .env or fallback)
+  // -----------------------------
+  const EMAIL = process.env.SEED_EMAIL || "tester@example.com";
+  const PASS = process.env.SEED_PASSWORD || "password123";
+  const ORG_SLUG = process.env.SEED_ORG_SLUG || "demo-9bsfct";
+  const ORG_NAME = process.env.SEED_ORG_NAME || "Demo Org";
 
-  // Upsert user (hashed password)
-  const hash = await bcrypt.hash(password, 10);
+  // -----------------------------
+  // 1) Seed default orgs for E2E
+  // -----------------------------
+  const orgSlugs = ["demo", "test-org", "acme", ORG_SLUG];
+  const orgs = [];
+
+  for (const slug of orgSlugs) {
+    const org = await prisma.organization.upsert({
+      where: { slug },
+      update: { name: slug === "demo" ? "Demo Org" : slug.replace(/-/g, " ") },
+      create: {
+        slug,
+        name: slug === "demo" ? "Demo Org" : slug.replace(/-/g, " "),
+      },
+    });
+    orgs.push(org);
+  }
+
+  // -----------------------------
+  // 2) Ensure demo user
+  // -----------------------------
+  const passwordHash = await bcrypt.hash(PASS, 10);
   const user = await prisma.user.upsert({
-    where: { email },
-    // 👉 if the user exists, force-update the password to what we set
-    update: { password: hash },
-    create: { email, password: hash },
+    where: { email: EMAIL },
+    update: { passwordHash },
+    create: { email: EMAIL, passwordHash },
+    select: { id: true, email: true },
   });
 
-  // Ensure membership (OWNER)
-  await prisma.orgMember.upsert({
-    where: { orgId_userId: { orgId: org.id, userId: user.id } },
-    update: { role: 'OWNER' },
-    create: { orgId: org.id, userId: user.id, role: 'OWNER' },
+  // -----------------------------
+  // 3) Ensure membership
+  // -----------------------------
+  const demoOrg =
+    orgs.find((o) => o.slug === ORG_SLUG) ||
+    orgs.find((o) => o.slug === "demo");
+
+  if (demoOrg) {
+    const member = await prisma.orgMember.findFirst({
+      where: { userId: user.id, organizationId: demoOrg.id },
+    });
+    if (!member) {
+      await prisma.orgMember.create({
+        data: { userId: user.id, organizationId: demoOrg.id, role: "ADMIN" },
+      });
+    }
+  }
+
+  // -----------------------------
+  // 4) Ensure demo product
+  // -----------------------------
+  const SEED_SKU = "SEED-SKU-001";
+  const existing = await prisma.product.findFirst({
+    where: { sku: SEED_SKU, organizationId: demoOrg.id },
   });
 
-  // Seed a few products (idempotent on org+sku)
-  const products = [
-    { title: 'Widget',          sku: 'WID-001',   type: 'PHYSICAL', status: 'ACTIVE', price: 12.34,  inventoryQty: 25 },
-    { title: 'Pro Subscription',sku: 'SUB-PRO',   type: 'DIGITAL',  status: 'ACTIVE', price: 29.0,   inventoryQty: 0  },
-    { title: 'Consulting',      sku: 'CONS-001',  type: 'SERVICE',  status: 'ACTIVE', price: 150.0,  inventoryQty: 0  },
-  ];
-
-  for (const p of products) {
-    await prisma.product.upsert({
-      // IMPORTANT: input is orgId_sku, not sku_orgId
-      where: { orgId_sku: { orgId: org.id, sku: p.sku } },
-      update: {},
-      create: { orgId: org.id, ...p },
+  if (existing) {
+    await prisma.product.update({
+      where: { id: existing.id },
+      data: {
+        title: "Seed Hoodie",
+        price: new Prisma.Decimal(59.99),
+        status: "ACTIVE",
+        inventoryQty: 10,
+        type: "PHYSICAL",
+      },
+    });
+  } else {
+    await prisma.product.create({
+      data: {
+        sku: SEED_SKU,
+        title: "Seed Hoodie",
+        description: "A sample seeded product",
+        type: "PHYSICAL",
+        status: "ACTIVE",
+        price: new Prisma.Decimal(59.99),
+        inventoryQty: 10,
+        organizationId: demoOrg.id,
+      },
     });
   }
 
-
-  console.log('Seeded:', { org: org.slug, email });
+  console.log("✅ Seed complete:");
+  console.table({
+    user: user.email,
+    orgs: orgs.map((o) => o.slug).join(", "),
+    product: SEED_SKU,
+  });
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-}).finally(async () => {
-  await prisma.$disconnect();
-});
+main()
+  .catch((e) => {
+    console.error("❌ Seed failed:", e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

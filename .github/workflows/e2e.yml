@@ -1,18 +1,28 @@
 name: e2e
+
 on:
   push:
-    branches: [ main, master ]
+    branches: [main, master]
   pull_request:
+  workflow_dispatch: {}
+
+concurrency:
+  group: e2e-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   e2e:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     services:
       postgres:
         image: postgres:16
         ports:
-          - "5432:5432"
+          - '5432:5432'
         env:
           POSTGRES_DB: sbo
           POSTGRES_USER: sbo
@@ -21,23 +31,34 @@ jobs:
           --health-cmd="pg_isready -U sbo -d sbo"
           --health-interval=5s
           --health-timeout=5s
-          --health-retries=20
+          --health-retries=60
 
     env:
+      NODE_ENV: test
       DATABASE_URL: postgresql://sbo:sbo@localhost:5432/sbo?schema=public
       ORG: demo
       API_EMAIL: tester@example.com
       API_PASS: password123
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with: { version: 9 }
-      - uses: actions/setup-node@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Allow pnpm/action-setup to use the version declared in package.json's "packageManager"
+      - name: Setup PNPM
+        uses: pnpm/action-setup@v4
+        with:
+          # Do NOT set "version" to avoid conflicts with package.json's packageManager
+          package_json_file: package.json
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+
+      - name: Install dependencies (workspace)
+        run: pnpm install --frozen-lockfile
 
       - name: Prisma generate
         working-directory: apps/api
@@ -51,8 +72,16 @@ jobs:
         working-directory: apps/api
         run: pnpm prisma db seed
 
-      - name: Run e2e tests
+      - name: Run E2E tests with coverage
         working-directory: apps/api
         run: |
           mkdir -p .tmp/jest-cache
-          TMPDIR="$(pwd)/.tmp" pnpm -F @repo/api test:e2e -- --runInBand --cacheDirectory "$(pwd)/.tmp/jest-cache"
+          TMPDIR="$(pwd)/.tmp" pnpm -F @repo/api test:e2e:cov
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-e2e-coverage
+          path: apps/api/coverage/e2e
+          if-no-files-found: warn
