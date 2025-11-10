@@ -1,3 +1,15 @@
 #!/usr/bin/env sh
-. "$(dirname -- "$0")/_/husky.sh"
+# ----------------------------------------
+# Husky pre-push hook
+# Runs API tests before pushing
+# ----------------------------------------
+
+# Exit on first error
+set -e
+
+echo "🚀 Running pre-push checks..."
+
+# Run API tests (allows empty test suites)
 pnpm -C apps/api test -- --passWithNoTests
+
+echo "✅ All pre-push checks passed!"

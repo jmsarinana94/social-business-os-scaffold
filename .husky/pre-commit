@@ -1,2 +1,15 @@
 #!/usr/bin/env sh
-pnpm -w run fmt:check
+# ----------------------------------------
+# Husky pre-commit hook
+# Lints and formats staged files before committing
+# ----------------------------------------
+
+# Exit on first error
+set -e
+
+echo "🔍 Running pre-commit checks..."
+
+# Run lint-staged (handles eslint + prettier on staged files)
+pnpm exec lint-staged
+
+echo "✅ Pre-commit checks passed!"

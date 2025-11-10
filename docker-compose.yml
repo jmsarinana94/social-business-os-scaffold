@@ -1,39 +1,97 @@
-# docker-compose.yml
+version: '3.9'
+
 services:
   db:
     image: postgres:16-alpine
+    container_name: sbo-db
+    restart: unless-stopped
     environment:
       POSTGRES_DB: sbo
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
-      - "5432:5432"
+      - '5432:5432'
     volumes:
       - sbo_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d sbo"]
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d sbo']
       interval: 5s
       timeout: 3s
       retries: 20
 
+  redis:
+    image: redis:7-alpine
+    container_name: sbo-redis
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    ports:
+      - '6379:6379'
+    volumes:
+      - sbo_redisdata:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # Optional UI to inspect Redis keys locally
+  # redis-commander:
+  #   image: rediscommander/redis-commander:latest
+  #   container_name: sbo-redis-commander
+  #   restart: unless-stopped
+  #   environment:
+  #     - REDIS_HOSTS=local:redis:6379
+  #   depends_on:
+  #     redis:
+  #       condition: service_healthy
+  #   ports:
+  #     - "8081:8081"
+
   api:
-    image: sbo-api:0.2.3       # the image you’ve built with your NestJS app
+    # Option A: use a prebuilt image
+    image: sbo-api:0.2.3
+    # Option B: build from your Dockerfile (uncomment and remove 'image:' above)
+    # build:
+    #   context: .
+    #   dockerfile: apps/api/Dockerfile
+    container_name: sbo-api
+    restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
-      # JWT / App
+      # App
+      NODE_ENV: development
+      PORT: '4000'
       JWT_SECRET: dev-super-secret
       JWT_EXPIRES_IN: 1d
-      NODE_ENV: development
-      PORT: "4000"
-      # DB (use service name "db" as host)
+
+      # DB (service name 'db' as host)
       DATABASE_URL: postgresql://postgres:postgres@db:5432/sbo?schema=public
+
+      # Redis (service name 'redis' as host)
+      REDIS_URL: redis://redis:6379/0
+
+      # E2E/dev helpers (optional)
+      API_EMAIL: tester@example.com
+      API_PASS: secret123
+      ORG: demo
+
+    # Expose API on host 4001 -> container 4000
     ports:
-      - "4001:4000"            # host:container
-    command: ["node", "/app/dist/src/main.js"]
-    # If you prefer to pass a .env file from apps/api, uncomment:
-    # env_file: apps/api/.env
+      - '4001:4000'
+
+    # If your image expects to start the compiled Nest app like this:
+    command: ['node', '/app/dist/main.js']
+    # If your build outputs to /app/dist/src/main.js, use that instead:
+    # command: ["node", "/app/dist/src/main.js"]
+
+    # If you'd rather load envs from apps/api/.env, uncomment:
+    # env_file:
+    #   - apps/api/.env
 
 volumes:
   sbo_pgdata:
+  sbo_redisdata:

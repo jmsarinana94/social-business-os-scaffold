@@ -1,5 +1,6 @@
 import { Injectable, NestMiddleware } from '@nestjs/common';
 import { Request, Response } from 'express';
+
 import { RequestContextService } from './request-context.service';
 
 function readOrgSlug(req: Request): string | null {

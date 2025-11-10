@@ -13,7 +13,7 @@ export class AppLogger {
 
   info(message: any, meta?: Record<string, any>) {
      
-    console.log(this.fmt('info', message, meta));
+    console.info(this.fmt('info', message, meta));
   }
   warn(message: any, meta?: Record<string, any>) {
      
@@ -25,7 +25,7 @@ export class AppLogger {
   }
   debug(message: any, meta?: Record<string, any>) {
      
-    console.debug(this.fmt('debug', message, meta));
+    console.info(this.fmt('debug', message, meta));
   }
   verbose(message: any, meta?: Record<string, any>) {
      

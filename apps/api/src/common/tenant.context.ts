@@ -1,11 +1,12 @@
 // apps/api/src/common/tenant.context.ts
+
 import {
-    BadRequestException,
-    ExecutionContext,
-    Inject,
-    Injectable,
-    Scope,
-    createParamDecorator,
+  BadRequestException,
+  createParamDecorator,
+  ExecutionContext,
+  Inject,
+  Injectable,
+  Scope,
 } from '@nestjs/common';
 import { REQUEST } from '@nestjs/core';
 import type { Request } from 'express';
@@ -19,17 +20,6 @@ export interface TenantInfo {
 }
 
 //
-// Global augmentation for Express.Request
-//
-declare global {
-  namespace Express {
-    interface Request {
-      tenant?: TenantInfo;
-    }
-  }
-}
-
-//
 // Request-scoped accessor used across services
 //
 @Injectable({ scope: Scope.REQUEST })
@@ -38,7 +28,12 @@ export class TenantContext {
 
   /** Returns orgId if present, otherwise undefined */
   getOrgId(): string | undefined {
-    return this.req.tenant?.orgId ?? undefined;
+    return this.req.tenant?.orgId ?? this.req.orgId ?? undefined;
+  }
+
+  /** Returns orgSlug if present, otherwise undefined */
+  getOrgSlug(): string | undefined {
+    return this.req.tenant?.orgSlug ?? this.req.orgSlug ?? undefined;
   }
 
   /** Returns orgId or throws 400 if missing (used by services) */
@@ -51,18 +46,33 @@ export class TenantContext {
   }
 
   /** Helper for middleware to set tenant info */
-  setOrg(id: string, slug?: string | null) {
-    this.req.tenant = { orgId: id, orgSlug: slug ?? null };
+  setTenant(orgId: string, orgSlug?: string | null): void {
+    const normalizedSlug = orgSlug ?? undefined;
+    this.req.tenant = { orgId, orgSlug: orgSlug ?? null };
+    this.req.orgId = orgId;
+    this.req.orgSlug = normalizedSlug;
+  }
+
+  /** Returns the entire tenant info object */
+  getTenant(): TenantInfo | null {
+    return (
+      this.req.tenant ?? {
+        orgId: this.req.orgId,
+        orgSlug: this.req.orgSlug ?? null,
+      }
+    );
   }
 }
 
 //
-// Controller helper: inject the current orgId directly
+// Controller helpers: param decorators for easy injection
 //
+
+/** Enforces that a valid orgId is present */
 export const TenantOrgId = createParamDecorator(
   (_data: unknown, ctx: ExecutionContext): string => {
     const req = ctx.switchToHttp().getRequest<Request>();
-    const orgId = req.tenant?.orgId ?? undefined;
+    const orgId = req.tenant?.orgId ?? req.orgId;
     if (!orgId) {
       throw new BadRequestException('X-Org header required for this endpoint');
     }
@@ -70,13 +80,10 @@ export const TenantOrgId = createParamDecorator(
   },
 );
 
-/** Optional variant: returns orgId or null (never throws) */
+/** Optional variant that safely returns orgId or null */
 export const OptionalTenantOrgId = createParamDecorator(
   (_data: unknown, ctx: ExecutionContext): string | null => {
     const req = ctx.switchToHttp().getRequest<Request>();
-    return req.tenant?.orgId ?? null;
+    return req.tenant?.orgId ?? req.orgId ?? null;
   },
 );
-
-// ensure this file is treated as a module even with global augmentation
-export { };

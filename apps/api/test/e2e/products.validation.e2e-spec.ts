@@ -1,5 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
+
 import { createE2EApp } from './support/e2e-app.factory';
 
 describe('Products validation (e2e)', () => {

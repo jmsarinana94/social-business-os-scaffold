@@ -2,13 +2,20 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
   pull_request:
-    branches: [main]
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   api:
-    name: API – Test & Build Matrix
+    name: 🧩 API – Test & Build Matrix
     runs-on: ubuntu-latest
 
     strategy:
@@ -31,15 +38,17 @@ jobs:
           --health-retries=5
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node.js ${{ matrix.node }}
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
           cache: 'pnpm'
 
-      - name: Enable Corepack
-        run: corepack enable && corepack prepare pnpm@9.12.2 --activate
+      - name: Enable Corepack (pnpm)
+        run: corepack enable && corepack prepare pnpm@10.20.0 --activate
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -50,7 +59,7 @@ jobs:
       - name: Generate Prisma Client
         run: pnpm -w -F @repo/api prisma generate
 
-      - name: DB Push
+      - name: Push DB Schema
         run: pnpm -w -F @repo/api prisma db push
 
       - name: Build API
@@ -65,9 +74,59 @@ jobs:
           name: api-coverage-${{ matrix.node }}
           path: apps/api/coverage
 
-  lint:
-    name: Lint & Format Check
+  web:
+    name: 🌐 Web – Build & Typecheck
     runs-on: ubuntu-latest
+    needs: [api]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Enable Corepack
+        run: corepack enable && corepack prepare pnpm@10.20.0 --activate
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck Web
+        run: pnpm -F @repo/web run typecheck || pnpm -w exec tsc -p apps/web/tsconfig.json --noEmit
+
+      - name: Build Web
+        run: pnpm -F @repo/web run build
+
+  lint:
+    name: 🧹 Lint & Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Enable Corepack
+        run: corepack enable && corepack prepare pnpm@10.20.0 --activate
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint (no warnings)
+        run: pnpm -w exec eslint . --ext .ts,.tsx --max-warnings 0
+
+      - name: Check formatting
+        run: pnpm format --check
+
+  typecheck:
+    name: 🔍 Global Typecheck
+    runs-on: ubuntu-latest
+    needs: [lint]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -75,10 +134,19 @@ jobs:
           node-version: 20
           cache: 'pnpm'
       - name: Enable Corepack
-        run: corepack enable && corepack prepare pnpm@9.12.2 --activate
+        run: corepack enable && corepack prepare pnpm@10.20.0 --activate
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Lint
-        run: pnpm lint
-      - name: Check formatting
-        run: pnpm format --check
+      - name: Run TypeScript typecheck
+        run: pnpm -w exec tsc --noEmit --pretty false
+
+  summary:
+    name: ✅ CI Summary
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck, api, web]
+    steps:
+      - name: CI Completed
+        run: echo "✅ All checks passed successfully!"
+
+  env:
+  NEXT_PUBLIC_ORG_ID: ${{ secrets.NEXT_PUBLIC_ORG_ID }}

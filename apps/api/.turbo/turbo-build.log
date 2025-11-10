@@ -3,15 +3,3 @@
 > @repo/api@0.1.0 build /Users/mannysarinana/Downloads/social-business-os-scaffold-v0.2/apps/api
 > nest build
 
-[96msrc/modules/products/products.controller.ts[0m:[93m3[0m:[93m72[0m - [91merror[0m[90m TS2307: [0mCannot find module './dto/products.dto' or its corresponding type declarations.
-
-[7m3[0m import { AdjustInventoryDto, CreateProductDto, UpdateProductDto } from './dto/products.dto';
-[7m [0m [91m                                                                       ~~~~~~~~~~~~~~~~~~~~[0m
-[96msrc/modules/products/products.service.ts[0m:[93m4[0m:[93m72[0m - [91merror[0m[90m TS2307: [0mCannot find module './dto/products.dto' or its corresponding type declarations.
-
-[7m4[0m import { AdjustInventoryDto, CreateProductDto, UpdateProductDto } from './dto/products.dto';
-[7m [0m [91m                                                                       ~~~~~~~~~~~~~~~~~~~~[0m
-
-Found 2 error(s).
-
-[41m[30m ELIFECYCLE [39m[49m [31mCommand failed with exit code 1.[39m

@@ -1,5 +1,6 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+
 import { AppModule } from '../../src/app.module';
 
 export async function bootstrapE2E(): Promise<INestApplication> {

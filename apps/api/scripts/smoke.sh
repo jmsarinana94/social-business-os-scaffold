@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# apps/api/scripts/smoke.sh
 # Smoke/seed script for local API (multi-tenant compatible)
 # Works on macOS/BSD & Linux.
 set -euo pipefail
@@ -25,12 +26,14 @@ Usage:
 
 Flags:
   --json        Output machine-friendly JSON summary.
-  --ci          CI-friendly (no prompts).
+  --ci          CI-friendly (waits for /health; no prompts).
   --seed N      Create N demo products after the smoke flow.
 
 Environment:
-  API_BASE      Base URL for API (e.g., http://127.0.0.1:56425)
-  ORG_SLUG      Override tenant slug (otherwise auto-detected or 'demo-org').
+  API_BASE      Base URL for API (e.g., http://127.0.0.1:4010)
+  ORG_SLUG      Tenant slug (default: demo-9bsfct)
+  API_EMAIL     Email for signup/login (default: owner@example.com)
+  API_PASS      Password for signup/login (default: secret123)
 H
       exit 0 ;;
     *) shift ;;
@@ -74,20 +77,42 @@ discover_base() {
     echo "$from_file"
     return 0
   fi
-  # last resort default
-  echo "http://127.0.0.1:3000"
+  # Default to local Nest port; keep path-less base (endpoints are /auth, /health).
+  echo "http://127.0.0.1:4010"
 }
 
 BASE="$(discover_base)"
-PID_HINT="$(pgrep -n node || true)"
+# normalize: strip trailing slash if present
+BASE="${BASE%/}"
 ENV_HINT="${NODE_ENV:-local}"
-info "Using BASE=${BASE} (PID=${PID_HINT:-n/a}) ENV=${ENV_HINT}"
+info "Using BASE=${BASE} ENV=${ENV_HINT}"
+
+# If --ci, wait up to 30s for /health to go green
+if [[ "$FLAG_CI" -eq 1 ]]; then
+  for i in {1..30}; do
+    if curl -sSf -m 2 "${BASE}/health" >/dev/null 2>&1; then
+      ok "Health endpoint reachable"
+      break
+    fi
+    [[ $i -eq 30 ]] && { err "Health check failed after 30s"; exit 1; }
+    sleep 1
+  done
+else
+  # Non-fatal quick check
+  if curl -sSf -m 2 "${BASE}/health" >/dev/null 2>&1; then
+    ok "Health endpoint reachable"
+  else
+    warn "Health check failed or missing; continuing…"
+  fi
+fi
 
 # -----------------------------
 # HTTP helpers
 # -----------------------------
 TOKEN=""
-ORG_SLUG="${ORG_SLUG:-}"   # allow override via env
+ORG_SLUG="${ORG_SLUG:-demo-9bsfct}"  # default seeded tenant slug
+
+have_cmd() { command -v "$1" >/dev/null 2>&1; }
 
 http_post_json() {
   local url="$1"; shift
@@ -117,15 +142,27 @@ http_auth_post_json() {
     -d "$body" "$url"
 }
 
+extract_json_field() {
+  # Usage: extract_json_field '{"a":1,"b":"x"}' 'b'
+  local json="$1" key="$2"
+  if have_cmd jq; then
+    echo "$json" | jq -r --arg k "$key" '.[$k] // empty' 2>/dev/null || true
+  else
+    # lenient fallback for flat keys like "token"
+    echo "$json" | sed -nE "s/.*\"$key\":\"?([^\",}]+).*/\1/p" | head -n1
+  fi
+}
+
 # -----------------------------
 # Auth flow
 # -----------------------------
-USER_EMAIL="tester@example.com"
-USER_PASS="Passw0rd!"
-USER_ORG="default-org"
+USER_EMAIL="${API_EMAIL:-owner@example.com}"
+USER_PASS="${API_PASS:-secret123}"
+USER_ORG="$ORG_SLUG"
 
 signup_and_login() {
   local signup_body login_body res
+
   signup_body="$(cat <<JSON
 {"email":"${USER_EMAIL}","password":"${USER_PASS}","org":"${USER_ORG}"}
 JSON
@@ -134,14 +171,11 @@ JSON
 {"email":"${USER_EMAIL}","password":"${USER_PASS}"}
 JSON
 )"
-  # Best-effort signup; ignore errors if already exists
-  http_post_json "${BASE}/auth/signup" "$signup_body" > /dev/null 2>&1 || true
+  # Send X-Org for multi-tenant routes
+  http_post_json "${BASE}/auth/signup" "$signup_body" -H "X-Org: ${ORG_SLUG}" >/dev/null 2>&1 || true
 
-  res="$(http_post_json "${BASE}/auth/login" "$login_body")"
-  if ! echo "$res" | grep -q '"token"'; then
-    return 1
-  fi
-  TOKEN="$(echo "$res" | sed -nE 's/.*"token":"?([^",}]+).*/\1/p')"
+  res="$(http_post_json "${BASE}/auth/login" "$login_body" -H "X-Org: ${ORG_SLUG}")"
+  TOKEN="$(extract_json_field "$res" "token" || true)"
   [[ -n "$TOKEN" ]]
 }
 
@@ -157,24 +191,9 @@ ME_JSON="$(http_auth_get "${BASE}/auth/me" || true)"
 [[ "$FLAG_JSON" -eq 0 && -n "$ME_JSON" ]] && echo "🙋 ${ME_JSON}"
 
 # -----------------------------
-# Auto-detect org slug
-# -----------------------------
-if [[ -z "${ORG_SLUG}" ]]; then
-  # Try to pull org slug from /auth/me (supporting different shapes)
-  # Accept: {"org":"default-org"} OR {"org":{"slug":"..."}}
-  if echo "$ME_JSON" | grep -q '"org":"[^"]\+"'; then
-    ORG_SLUG="$(echo "$ME_JSON" | sed -nE 's/.*"org":"([^"]+)".*/\1/p')"
-  elif echo "$ME_JSON" | grep -q '"org":{'; then
-    ORG_SLUG="$(echo "$ME_JSON" | sed -nE 's/.*"org":\{[^}]*"slug":"([^"]+)".*/\1/p')"
-  fi
-fi
-ORG_SLUG="${ORG_SLUG:-demo-org}"
-
-# -----------------------------
 # Ensure org exists
 # -----------------------------
 ensure_org() {
-  # create is idempotent (ignore error if exists)
   http_auth_post_json "${BASE}/orgs" "{\"slug\":\"${ORG_SLUG}\",\"name\":\"Demo Org\"}" >/dev/null 2>&1 || true
   http_auth_get "${BASE}/orgs/${ORG_SLUG}"
 }
@@ -185,7 +204,7 @@ if [[ -z "$ORG_JSON" ]]; then
   [[ "$FLAG_JSON" -eq 1 ]] && echo '{"ok":false,"error":"org_failed"}'
   exit 1
 fi
-[[ "$FLAG_JSON" -eq 0 ]] && echo "🔎 ${ORG_JSON}"
+[[ "$FLAG_JSON" -eq 0 ]] && echo "🏢 ${ORG_JSON}"
 
 # -----------------------------
 # Create product
@@ -203,8 +222,8 @@ JSON
 PROD_JSON="$(create_product || true)"
 if [[ -n "$PROD_JSON" && "$FLAG_JSON" -eq 0 ]]; then
   if echo "$PROD_JSON" | grep -q '"id"'; then
-    PROD_ID="$(echo "$PROD_JSON" | sed -nE 's/.*"id":"?([^",}]+).*/\1/p')"
-    ok "Product created: ${PROD_ID}"
+    PROD_ID="$(extract_json_field "$PROD_JSON" "id" || true)"
+    ok "Product created: ${PROD_ID:-unknown}"
   else
     warn "Product creation returned no ID (already seeded or DTO mismatch)"
   fi
@@ -217,11 +236,11 @@ LIST_JSON="$(http_auth_get "${BASE}/products" || true)"
 [[ "$FLAG_JSON" -eq 0 && -n "$LIST_JSON" ]] && echo "📦 ${LIST_JSON}"
 
 # -----------------------------
-# Increment inventory using JSON body
+# Increment inventory
 # -----------------------------
 increment_inventory_if_possible() {
   local last_id
-  # Pick the last created product (simple heuristic)
+  # attempt to grab the last SMOKE product id
   last_id="$(echo "$LIST_JSON" | tr -d '\n' | sed -nE 's/.*\{"id":"([^"]+)","sku":"SMOKE-[^"]+".*/\1/p' | tail -n1)"
   [[ -z "$last_id" ]] && return 0
   local url="${BASE}/products/${last_id}/inventory"
@@ -230,7 +249,10 @@ increment_inventory_if_possible() {
 }
 
 INV_JSON="$(increment_inventory_if_possible || true)"
-[[ "$FLAG_JSON" -eq 0 && -n "$INV_JSON" ]] && echo "📈 Try inventory increment (+5)\n${INV_JSON}"
+if [[ "$FLAG_JSON" -eq 0 && -n "$INV_JSON" ]]; then
+  echo "📈 Inventory +5"
+  echo "$INV_JSON"
+fi
 
 # -----------------------------
 # Optional seeding
@@ -240,7 +262,6 @@ seed_products() {
   [[ "$n" -gt 0 ]] || return 0
   local i
   for ((i=1; i<=n; i++)); do
-    # simple price curve; awk used only for float math
     local price
     price="$(awk "BEGIN {printf \"%.2f\", 9.99 + ($i*2.49)}")"
     http_auth_post_json "${BASE}/products" "$(cat <<JSON
@@ -260,8 +281,8 @@ fi
 # Output
 # -----------------------------
 if [[ "$FLAG_JSON" -eq 1 ]]; then
-  count="$(echo "$LIST_JSON" | grep -o '"title":"[^"]*"' | wc -l | tr -d ' ')"
-  sample="$(echo "$LIST_JSON" | sed -n '1,200p')"
+  count="$(echo "$LIST_JSON" | grep -o '"title":"' | wc -l | tr -d ' ' || true)"
+  sample="$(echo "$LIST_JSON" | sed -n '1,200p' || true)"
   printf '{'
   printf '"ok":true,"base":%q,' "$BASE"
   printf '"org":%q,' "$ORG_SLUG"
@@ -269,5 +290,5 @@ if [[ "$FLAG_JSON" -eq 1 ]]; then
   printf '"sample":%q' "$sample"
   printf '}\n'
 else
-  ok "Smoke test complete."
+  ok "Smoke test complete for org=${ORG_SLUG}"
 fi

@@ -4,13 +4,27 @@ import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
+// -----------------------------
+// Config
+// -----------------------------
 const EMAIL = process.env.SEED_EMAIL ?? 'tester@example.com';
 const PASS = process.env.SEED_PASSWORD ?? 'password123';
+
 const ORG_SLUG = process.env.SEED_ORG_SLUG ?? 'demo-9bsfct';
 const ORG_NAME = process.env.SEED_ORG_NAME ?? 'Demo Org';
 
+const DEFAULT_CATEGORY = process.env.SEED_CATEGORY ?? 'General';
+
+// -----------------------------
+// Helpers
+// -----------------------------
+const dec = (n: number | string) => new Prisma.Decimal(n);
+
+// -----------------------------
+// Main seed
+// -----------------------------
 async function main() {
-  // 1) User with passwordHash
+  // 1) User (hash password on every run to keep it current)
   const passwordHash = await bcrypt.hash(PASS, 10);
   const user = await prisma.user.upsert({
     where: { email: EMAIL },
@@ -19,7 +33,7 @@ async function main() {
     select: { id: true, email: true },
   });
 
-  // 2) Organization (slug + name are required)
+  // 2) Organization
   const org = await prisma.organization.upsert({
     where: { slug: ORG_SLUG },
     update: { name: ORG_NAME },
@@ -27,60 +41,82 @@ async function main() {
     select: { id: true, slug: true, name: true },
   });
 
-  // 3) Membership (use organizationId only)
-  const existingMember = await prisma.orgMember.findFirst({
-    where: { userId: user.id, organizationId: org.id },
+  // 3) Membership (ADMIN)
+  await prisma.orgMember.upsert({
+    where: { organizationId_userId: { organizationId: org.id, userId: user.id } },
+    update: { role: 'ADMIN' },
+    create: { organizationId: org.id, userId: user.id, role: 'ADMIN' },
   });
 
-  if (!existingMember) {
-    await prisma.orgMember.create({
-      data: {
-        userId: user.id,
-        organizationId: org.id,
-        role: 'ADMIN',
-      },
-    });
-  }
-
-  // 4) Seed product for this org (match on organizationId + sku)
-  const SEED_SKU = 'SEED-SKU-001';
-
-  const existingProduct = await prisma.product.findFirst({
-    where: { sku: SEED_SKU, organizationId: org.id },
+  // 4) Default Category
+  const category = await prisma.category.upsert({
+    where: { organizationId_name: { organizationId: org.id, name: DEFAULT_CATEGORY } },
+    update: {},
+    create: {
+      organizationId: org.id,
+      name: DEFAULT_CATEGORY,
+      description: 'Default category',
+    },
+    select: { id: true, name: true },
   });
 
-  if (existingProduct) {
-    await prisma.product.update({
-      where: { id: existingProduct.id },
-      data: {
-        title: 'Seed Hoodie',
-        status: 'ACTIVE',
-        price: new Prisma.Decimal(59.99),
-        inventoryQty: 10,
-        type: 'PHYSICAL',
-      },
-    });
-  } else {
-    await prisma.product.create({
-      data: {
-        sku: SEED_SKU,
-        title: 'Seed Hoodie',
+  // 5) Products (idempotent via composite unique organizationId+sku)
+  const products = [
+    {
+      sku: 'SEED-SKU-001',
+      title: 'Seed Hoodie',
+      price: dec(59.99),
+      inventoryQty: 10,
+      type: 'PHYSICAL' as const,
+      status: 'ACTIVE' as const,
+    },
+    {
+      sku: 'SEED-SKU-002',
+      title: 'Seed Cap',
+      price: dec(24.99),
+      inventoryQty: 30,
+      type: 'PHYSICAL' as const,
+      status: 'ACTIVE' as const,
+    },
+  ];
+
+  for (const p of products) {
+    await prisma.product.upsert({
+      where: { organizationId_sku: { organizationId: org.id, sku: p.sku } },
+      update: {
+        title: p.title,
         description: null,
-        type: 'PHYSICAL',
-        status: 'ACTIVE',
-        price: new Prisma.Decimal(59.99),
-        inventoryQty: 10,
+        price: p.price,
+        status: p.status,
+        type: p.type,
+        inventoryQty: p.inventoryQty,
+        categoryId: category.id,
+      },
+      create: {
         organizationId: org.id,
+        categoryId: category.id,
+        sku: p.sku,
+        title: p.title,
+        description: null,
+        price: p.price,
+        status: p.status,
+        type: p.type,
+        inventoryQty: p.inventoryQty,
       },
     });
   }
 
-  console.log({ ok: true, org, user });
+  console.log('✅ Seed complete:', {
+    org,
+    user,
+    category,
+    products: products.map((p) => p.sku),
+  });
 }
 
 main()
   .catch((e) => {
-    console.error(e);
+    console.error('❌ Seed failed:', e);
     process.exit(1);
   })
   .finally(async () => {
