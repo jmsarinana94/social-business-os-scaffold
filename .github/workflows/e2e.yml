@@ -1,4 +1,5 @@
 name: e2e
+
 on:
   push:
     branches: [main, master]
@@ -24,20 +25,29 @@ jobs:
           --health-retries=20
 
     env:
+      NODE_ENV: test
       DATABASE_URL: postgresql://sbo:sbo@localhost:5432/sbo?schema=public
       ORG: demo
       API_EMAIL: tester@example.com
       API_PASS: password123
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with: { version: 9 }
-      - uses: actions/setup-node@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PNPM
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+
+      - name: Install dependencies (workspace)
+        run: pnpm install --frozen-lockfile
 
       - name: Prisma generate
         working-directory: apps/api
@@ -51,8 +61,12 @@ jobs:
         working-directory: apps/api
         run: pnpm prisma db seed
 
-      - name: Run e2e tests
-        working-directory: apps/api
-        run: |
-          mkdir -p .tmp/jest-cache
-          TMPDIR="$(pwd)/.tmp" pnpm -F @repo/api test:e2e -- --runInBand --cacheDirectory "$(pwd)/.tmp/jest-cache"
+      - name: Run E2E tests with coverage
+        run: pnpm -F @repo/api test:e2e:cov
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-e2e-coverage
+          path: apps/api/coverage/e2e
