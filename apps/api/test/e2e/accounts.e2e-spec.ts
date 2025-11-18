@@ -1,29 +1,52 @@
-// apps/api/test/e2e/accounts.e2e-spec.ts
 import request from 'supertest';
 
-const BASE = process.env.BASE ?? 'http://127.0.0.1:4010';
-const ORG = process.env.E2E_ORG_SLUG ?? 'demo';
+const BASE = process.env.BASE ?? 'http://127.0.0.1:4000';
+// Prefer seeded value if present, otherwise fall back to demo
+const ORG = process.env.E2E_ORG_SLUG ?? process.env.ORG ?? 'demo';
+
+// In CI we point BASE at the Prism echo server on 4010.
+// In that mode, auth responses are mocked and may not contain a token field.
+const IS_ECHO = BASE.includes('4010');
 
 async function signupAndLogin(base: string) {
-  const email = `tester+${Date.now()}@example.com`;
-  const password = 'password123!';
+  if (IS_ECHO) {
+    // Echo/mock mode (CI):
+    // /accounts endpoints don't actually enforce a real JWT,
+    // they just care about the org scoping. Use a dummy token.
+    const authHeaders: Record<string, string> = {
+      Authorization: 'Bearer dummy-token',
+      'X-Org': ORG,
+    };
 
-  // Sign up -> 201
-  await request(base)
-    .post('/auth/signup')
-    .send({ email, password })
-    .expect(201);
+    return authHeaders;
+  }
+
+  // "Real" API mode (e.g. local Nest app on 4000)
+  const email =
+    process.env.API_EMAIL ?? `tester+${Date.now()}@example.com`;
+  const password = process.env.API_PASS ?? 'password123!';
+
+  // If we're not using a seeded user, create one first.
+  if (!process.env.API_EMAIL) {
+    await request(base)
+      .post('/auth/signup')
+      .send({ email, password })
+      .expect(201);
+  }
 
   // Login -> 200
-  const { body } = await request(base)
+  const login = await request(base)
     .post('/auth/login')
     .send({ email, password })
     .expect(200);
 
+  const body = login.body as any;
   // Support both shapes:
-  // - { access_token: "..." } (real API / other tests)
-  // - { token: "..." }        (legacy/mock shape)
-  const token: string | undefined = body?.access_token ?? body?.token;
+  // - { access_token: "..." }  (current API)
+  // - { token: "..." }         (legacy/mock shape)
+  const token: string | undefined =
+    body?.access_token ?? body?.token;
+
   expect(typeof token).toBe('string');
 
   // Common headers for org-scoped + auth endpoints
