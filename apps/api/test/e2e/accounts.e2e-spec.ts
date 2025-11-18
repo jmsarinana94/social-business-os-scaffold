@@ -1,7 +1,8 @@
+// apps/api/test/e2e/accounts.e2e-spec.ts
 import request from 'supertest';
 
 const BASE = process.env.BASE ?? 'http://127.0.0.1:4010';
-const ORG = process.env.E2E_ORG_SLUG ?? 'demo-org';
+const ORG = process.env.E2E_ORG_SLUG ?? 'demo';
 
 async function signupAndLogin(base: string) {
   const email = `tester+${Date.now()}@example.com`;
@@ -19,7 +20,10 @@ async function signupAndLogin(base: string) {
     .send({ email, password })
     .expect(200);
 
-  const token = body?.token;
+  // Support both shapes:
+  // - { access_token: "..." } (real API / other tests)
+  // - { token: "..." }        (legacy/mock shape)
+  const token: string | undefined = body?.access_token ?? body?.token;
   expect(typeof token).toBe('string');
 
   // Common headers for org-scoped + auth endpoints
