@@ -39,6 +39,7 @@
     "db:setup": "pnpm run prisma:generate && pnpm run migrate:deploy && pnpm run db:seed",
     "db:setup:local": "dotenv -e .env -- pnpm run prisma:generate && pnpm run migrate:deploy && pnpm run db:seed",
     "db:setup:test": "dotenv -e .env.test -- pnpm run prisma:generate && pnpm run migrate:deploy",
+    "echo:4010": "node scripts/echo-4010.cjs",
     "prisma:reset": "bash ./scripts/prisma-reset.sh",
     "seed:demo": "bash ./scripts/prisma-seed-demo.sh",
     "// 🔥 Tests & Smoke": "",

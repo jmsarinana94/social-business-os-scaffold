@@ -1,19 +1,22 @@
+// apps/api/src/modules/billing/billing.controller.ts
+
 import {
-    BadRequestException,
-    Body,
-    Controller,
-    HttpCode,
-    Post,
-    Req,
-    Res,
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Post,
+  Req,
+  Res,
 } from '@nestjs/common';
 import {
-    ApiBadRequestResponse,
-    ApiBody,
-    ApiExcludeEndpoint,
-    ApiOkResponse,
-    ApiOperation,
-    ApiTags,
+  ApiBadRequestResponse,
+  ApiBody,
+  ApiExcludeEndpoint,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
 } from '@nestjs/swagger';
 import { Request, Response } from 'express';
 
@@ -24,6 +27,22 @@ import { BillingService } from './billing.service';
 @Controller('billing')
 export class BillingController {
   constructor(private readonly billing: BillingService) {}
+
+  @Get('health')
+  @ApiOperation({ summary: 'Health check for billing module' })
+  @ApiOkResponse({
+    description: 'Billing module is reachable',
+    schema: {
+      type: 'object',
+      properties: {
+        ok: { type: 'boolean', example: true },
+        scope: { type: 'string', example: 'billing' },
+      },
+    },
+  })
+  health() {
+    return { ok: true, scope: 'billing' };
+  }
 
   @Post('customer')
   @HttpCode(200)
@@ -56,7 +75,6 @@ export class BillingController {
       type: 'object',
       properties: {
         id: { type: 'string', example: 'cs_test_123' },
-        // Use nullable instead of array type to satisfy OpenAPI/Swagger typing
         url: { type: 'string', nullable: true, example: 'https://checkout.stripe.com/...' },
       },
     },

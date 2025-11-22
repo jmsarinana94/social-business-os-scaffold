@@ -1,3 +1,5 @@
+// apps/api/src/modules/billing/billing.module.ts
+
 import { Module } from '@nestjs/common';
 
 import { BillingController } from './billing.controller';

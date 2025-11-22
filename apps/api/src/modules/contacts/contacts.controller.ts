@@ -1,67 +1,65 @@
-// apps/api/src/modules/contacts/contacts.controller.ts
-
 import {
-    BadRequestException,
     Body,
     Controller,
     Delete,
     Get,
-    Headers,
     HttpCode,
+    HttpStatus,
     Param,
     Patch,
     Post,
-    UseGuards,
+    Query,
 } from '@nestjs/common';
-import { OrgGuard } from '../orgs/org.guard';
+import { OrgSlug } from '../../shared/decorators/org-slug.decorator';
 import { ContactsService } from './contacts.service';
 import { CreateContactDto } from './dto/create-contact.dto';
 import { UpdateContactDto } from './dto/update-contact.dto';
 
-@UseGuards(OrgGuard)
 @Controller('contacts')
 export class ContactsController {
-  constructor(private readonly contacts: ContactsService) {}
+  constructor(private readonly contactsService: ContactsService) {}
 
-  private assertOrg(org?: string) {
-    if (!org) {
-      throw new BadRequestException('X-Org header required');
-    }
+  @Post()
+  create(
+    @OrgSlug() orgSlug: string,
+    @Body() dto: CreateContactDto,
+  ) {
+    return this.contactsService.create(orgSlug, dto);
   }
 
   @Get()
-  async list(@Headers('x-org') org: string) {
-    this.assertOrg(org);
-    return this.contacts.list(org);
+  findAll(
+    @OrgSlug() orgSlug: string,
+    @Query('search') search?: string,
+  ) {
+    // e2e expects an array response
+    return this.contactsService.findAll(orgSlug, search);
   }
 
-  @Post()
-  @HttpCode(201)
-  async create(
-    @Headers('x-org') org: string,
-    @Body() dto: CreateContactDto,
+  @Get(':id')
+  findOne(
+    @OrgSlug() orgSlug: string,
+    @Param('id') id: string,
   ) {
-    this.assertOrg(org);
-    return this.contacts.create(org, dto);
+    return this.contactsService.findOne(orgSlug, id);
   }
 
   @Patch(':id')
-  async update(
-    @Headers('x-org') org: string,
+  update(
+    @OrgSlug() orgSlug: string,
     @Param('id') id: string,
     @Body() dto: UpdateContactDto,
   ) {
-    this.assertOrg(org);
-    return this.contacts.update(org, id, dto);
+    return this.contactsService.update(orgSlug, id, dto);
   }
 
   @Delete(':id')
-  @HttpCode(204)
+  @HttpCode(HttpStatus.NO_CONTENT)
   async remove(
-    @Headers('x-org') org: string,
+    @OrgSlug() orgSlug: string,
     @Param('id') id: string,
   ): Promise<void> {
-    this.assertOrg(org);
-    await this.contacts.delete(org, id);
+    await this.contactsService.remove(orgSlug, id);
+    // No body -> 204 No Content (matches e2e expectation)
   }
 }

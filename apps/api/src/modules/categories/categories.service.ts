@@ -1,7 +1,8 @@
 // apps/api/src/modules/categories/categories.service.ts
+
 import { Injectable, NotFoundException } from '@nestjs/common';
 
-import { PrismaService } from '../../common/prisma.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { CreateCategoryDto, UpdateCategoryDto } from './dto/category.dto';
 
 @Injectable()
@@ -47,6 +48,7 @@ export class CategoriesService {
 
   async update(orgSlug: string, id: string, dto: UpdateCategoryDto) {
     const orgId = await this.orgIdFromSlug(orgSlug);
+
     // Ensure it belongs to this org
     const exists = await this.prisma.category.findFirst({
       where: { id, organizationId: orgId },
@@ -65,6 +67,7 @@ export class CategoriesService {
 
   async remove(orgSlug: string, id: string) {
     const orgId = await this.orgIdFromSlug(orgSlug);
+
     const exists = await this.prisma.category.findFirst({
       where: { id, organizationId: orgId },
       select: { id: true },

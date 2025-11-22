@@ -1,47 +1,75 @@
+// apps/api/src/modules/accounts/accounts.controller.ts
+
 import {
-    BadRequestException,
-    Body,
-    Controller,
-    Get,
-    Header,
-    HttpCode,
-    Param,
-    Post,
-    Req,
-    UseGuards,
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Headers,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
 } from '@nestjs/common';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { AccountsService, CreateAccountDto } from './accounts.service';
+import { OrgGuard } from '../orgs/org.guard';
+import { AccountsService } from './accounts.service';
+import { CreateAccountDto } from './dto/create-account.dto';
+import { UpdateAccountDto } from './dto/update-account.dto';
 
-function requireOrgHeader(req: any): string {
-  const slug = (req.headers['x-org'] || req.headers['X-Org']) as string | undefined;
-  if (!slug) throw new BadRequestException('Missing X-Org header');
-  return slug;
-}
-
+@UseGuards(OrgGuard)
 @Controller('accounts')
 export class AccountsController {
   constructor(private readonly accounts: AccountsService) {}
 
-  @Get()
-  async list(@Req() req: any) {
-    const org = requireOrgHeader(req);
-    return this.accounts.list(org);
+  private assertOrg(org?: string) {
+    if (!org) {
+      throw new BadRequestException('X-Org header required');
+    }
   }
 
-  @Post()
-  @UseGuards(JwtAuthGuard)
-  @Header('Content-Type', 'application/json')
-  @HttpCode(201)
-  async create(@Req() req: any, @Body() dto: CreateAccountDto) {
-    const org = requireOrgHeader(req);
-    const userId = req.user?.sub ?? null;
-    return this.accounts.create(org, userId, dto);
+  @Get()
+  async list(@Headers('x-org') org?: string) {
+    this.assertOrg(org);
+    return this.accounts.list(org!);
   }
 
   @Get(':id')
-  async get(@Req() req: any, @Param('id') id: string) {
-    const org = requireOrgHeader(req);
-    return this.accounts.get(org, id);
+  async get(@Headers('x-org') org: string | undefined, @Param('id') id: string) {
+    this.assertOrg(org);
+    return this.accounts.get(org!, id);
+  }
+
+  @Post()
+  @HttpCode(HttpStatus.CREATED)
+  async create(
+    @Headers('x-org') org: string | undefined,
+    @Body() dto: CreateAccountDto,
+  ) {
+    this.assertOrg(org);
+    // TODO: wire real userId from auth; null for now.
+    return this.accounts.create(org!, null, dto);
+  }
+
+  @Patch(':id')
+  async update(
+    @Headers('x-org') org: string | undefined,
+    @Param('id') id: string,
+    @Body() dto: UpdateAccountDto,
+  ) {
+    this.assertOrg(org);
+    return this.accounts.update(org!, id, dto);
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async remove(
+    @Headers('x-org') org: string | undefined,
+    @Param('id') id: string,
+  ): Promise<void> {
+    this.assertOrg(org);
+    await this.accounts.remove(org!, id);
   }
 }

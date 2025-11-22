@@ -26,6 +26,12 @@ enum SubscriptionPlan {
   ENTERPRISE
 }
 
+/**
+ * =========================
+ * Core auth / org models
+ * =========================
+ */
+
 model User {
   id           String      @id @default(cuid())
   createdAt    DateTime    @default(now())
@@ -34,7 +40,7 @@ model User {
   passwordHash String      @map("passwordHash")
   lastLoginAt  DateTime?
   memberships  OrgMember[]
-  activities   Activity[] // author of activities (optional usage)
+  activities   Activity[]  // author of activities (optional usage)
   Account      Account[]
   Contact      Contact[]
   AuditLog     AuditLog[]
@@ -56,7 +62,7 @@ model Organization {
   members              OrgMember[]
   products             Product[]
   categories           Category[]
-  // New relations
+  // CRM relations
   accounts             Account[]
   contacts             Contact[]
   pipelines            Pipeline[]
@@ -134,7 +140,10 @@ model Account {
   updatedAt      DateTime     @updatedAt
   organizationId String
   name           String
-  domain         String? // example.com
+  // Full website URL, e.g. "https://example.com"
+  website        String?      @db.VarChar(2048)
+  // Bare domain, e.g. "example.com"
+  domain         String?
   description    String?
   ownerUserId    String?
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
