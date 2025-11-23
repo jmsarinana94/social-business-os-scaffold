@@ -1,66 +1,56 @@
-// apps/api/src/modules/orders/dto/create-order.dto.ts
-
+import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
-  ArrayMinSize,
   IsArray,
   IsInt,
-  IsNotEmpty,
   IsOptional,
   IsPositive,
   IsString,
+  Min,
   ValidateNested,
 } from 'class-validator';
 
-/**
- * Single order line item in the request payload.
- */
-export class OrderItemInputDto {
+export class CreateOrderItemDto {
+  @ApiProperty({
+    example: 'prod_123',
+    description: 'ID of the product being ordered',
+  })
   @IsString()
-  @IsNotEmpty()
   productId!: string;
 
-  // qty required, >= 1
+  @ApiProperty({
+    example: 1,
+    description: 'Quantity of this product',
+  })
   @IsInt()
   @IsPositive()
   quantity!: number;
 
-  /**
-   * NOTE: client may send unitPrice, but the server will ignore it and
-   * always use the product’s current DB price once we wire persistence.
-   * Kept here only for forward-compat.
-   */
-  @IsOptional()
-  unitPrice?: number;
+  @ApiProperty({
+    example: 1999,
+    description: 'Unit price in cents (e.g. 1999 = $19.99)',
+  })
+  @IsInt()
+  @Min(0)
+  unitPriceCents!: number;
 }
 
-/**
- * Payload for creating an order.
- */
 export class CreateOrderDto {
+  @ApiProperty({
+    type: () => [CreateOrderItemDto],
+    description: 'Line items for this order',
+  })
   @IsArray()
-  @ArrayMinSize(1)
   @ValidateNested({ each: true })
-  @Type(() => OrderItemInputDto)
-  items!: OrderItemInputDto[];
+  @Type(() => CreateOrderItemDto)
+  items!: CreateOrderItemDto[];
 
-  // Optional customer email etc. (not persisted in this minimal schema)
+  @ApiProperty({
+    example: 'USD',
+    required: false,
+    description: 'ISO currency code; defaults to USD',
+  })
   @IsOptional()
   @IsString()
-  customerEmail?: string;
-}
-
-/**
- * Pagination for listing orders.
- */
-export class ListOrdersQueryDto {
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  offset?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  limit?: number;
+  currency?: string;
 }
