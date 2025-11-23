@@ -12,6 +12,9 @@ import {
   ValidateNested,
 } from 'class-validator';
 
+/**
+ * Single order line item in the request payload.
+ */
 export class OrderItemInputDto {
   @IsString()
   @IsNotEmpty()
@@ -22,12 +25,18 @@ export class OrderItemInputDto {
   @IsPositive()
   quantity!: number;
 
-  // NOTE: client may send unitPrice, but the server will ignore it and
-  // always use the product’s current DB price. Kept here only for forward-compat.
+  /**
+   * NOTE: client may send unitPrice, but the server will ignore it and
+   * always use the product’s current DB price once we wire persistence.
+   * Kept here only for forward-compat.
+   */
   @IsOptional()
   unitPrice?: number;
 }
 
+/**
+ * Payload for creating an order.
+ */
 export class CreateOrderDto {
   @IsArray()
   @ArrayMinSize(1)
@@ -41,6 +50,9 @@ export class CreateOrderDto {
   customerEmail?: string;
 }
 
+/**
+ * Pagination for listing orders.
+ */
 export class ListOrdersQueryDto {
   @IsOptional()
   @Type(() => Number)
