@@ -26,6 +26,21 @@ enum SubscriptionPlan {
   ENTERPRISE
 }
 
+enum ActivityType {
+  NOTE
+  TASK
+  CALL
+  EMAIL
+  MEETING
+}
+
+enum OrderStatus {
+  DRAFT
+  PENDING
+  PAID
+  CANCELED
+}
+
 /**
  * =========================
  * Core auth / org models
@@ -69,6 +84,8 @@ model Organization {
   deals                Deal[]
   activities           Activity[]
   auditLogs            AuditLog[]
+  // Orders
+  orders               Order[]
 
   @@map("Org")
 }
@@ -121,6 +138,8 @@ model Product {
   price           Decimal       @default(0)
   inventoryQty    Int           @default(0)
   lastPurchasedAt DateTime?
+  // Order items
+  orderItems      OrderItem[]
 
   @@unique([organizationId, sku])
   @@index([organizationId])
@@ -150,6 +169,7 @@ model Account {
   owner          User?        @relation(fields: [ownerUserId], references: [id], onDelete: SetNull)
   contacts       Contact[]
   deals          Deal[]
+  orders         Order[]
 
   @@unique([organizationId, domain])
   @@index([organizationId, name])
@@ -173,6 +193,7 @@ model Contact {
   owner          User?        @relation(fields: [ownerUserId], references: [id], onDelete: SetNull)
   deals          Deal[]
   activities     Activity[]
+  orders         Order[]
 
   @@unique([organizationId, email])
   @@index([organizationId, lastName, firstName])
@@ -242,17 +263,55 @@ model Deal {
 
 /**
  * =========================
- * Activity & Audit
+ * Orders
  * =========================
  */
 
-enum ActivityType {
-  NOTE
-  TASK
-  CALL
-  EMAIL
-  MEETING
+model Order {
+  id             String       @id @default(cuid())
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organizationId String
+  accountId      String?
+  contactId      String?
+  status         OrderStatus  @default(PENDING)
+  currency       String       @default("USD")
+  total          Decimal      @default(0)
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  account        Account?     @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  contact        Contact?     @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  items          OrderItem[]
+
+  @@index([organizationId])
+  @@index([accountId])
+  @@index([contactId])
+  @@map("Order")
 }
+
+model OrderItem {
+  id         String   @id @default(cuid())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  orderId    String
+  productId  String
+  quantity   Int      @default(1)
+  unitPrice  Decimal  @default(0)
+  lineTotal  Decimal  @default(0)
+
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([productId])
+  @@map("OrderItem")
+}
+
+/**
+ * =========================
+ * Activity & Audit
+ * =========================
+ */
 
 model Activity {
   id             String       @id @default(cuid())

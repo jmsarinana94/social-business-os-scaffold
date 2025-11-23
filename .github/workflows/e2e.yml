@@ -2,29 +2,31 @@ name: e2e
 
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - 'apps/api/**'
+      - '.github/workflows/e2e.yml'
+  push:
+    branches:
+      - ci-e2e-fix
+    paths:
+      - 'apps/api/**'
+      - '.github/workflows/e2e.yml'
 
 jobs:
   e2e:
     runs-on: ubuntu-latest
 
-    services:
-      postgres:
-        image: postgres:16
-        ports:
-          - 5432:5432
-        env:
-          POSTGRES_DB: sbo
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-        options: >-
-          --health-cmd="pg_isready -U postgres -d sbo"
-          --health-interval=5s
-          --health-timeout=5s
-          --health-retries=10
+    # Default to running commands in apps/api (matches your logs)
+    defaults:
+      run:
+        shell: bash
+        working-directory: apps/api
 
     env:
       NODE_ENV: test
-      DATABASE_URL: postgres://postgres:postgres@localhost:5432/sbo?schema=public
+      # Adjust if you later switch to a service DB; this mirrors your logs
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sbo?schema=public
       ORG: demo
       API_EMAIL: tester@example.com
       API_PASS: password123
@@ -33,92 +35,104 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Use pnpm version from package.json "packageManager"
-      - name: Setup PNPM
-        uses: pnpm/action-setup@v4
-        with:
-          run_install: false
-
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: pnpm
+          node-version: '20.x'
 
-      - name: Install deps
-        run: pnpm install --frozen-lockfile
+      - name: Enable Corepack
+        run: corepack enable
+        working-directory: .
 
-      # ---- Prisma: generate client & push schema to test DB ----
-      - name: Generate Prisma Client (@repo/api)
-        run: pnpm --filter @repo/api exec prisma generate
-        env:
-          DATABASE_URL: ${{ env.DATABASE_URL }}
-
-      - name: Prisma DB Push (test DB)
-        run: pnpm --filter @repo/api exec prisma db push --accept-data-loss
-        env:
-          DATABASE_URL: ${{ env.DATABASE_URL }}
-
-      # ---- Start improved echo on :4010 and verify readiness ----
-      - name: Start local echo server on 4010 (Prefer code NNN supported)
+      # Read the pnpm version from the repo root package.json's packageManager
+      - name: Read pnpm version from packageManager
+        id: pnpmver
         run: |
           set -euo pipefail
-          # Minimal echo with status override + special 201 for POST /auth/signup
+          v=$(node -p "require('./package.json').packageManager?.split('@')[1] ?? ''")
+          if [[ -z "$v" ]]; then
+            echo "No packageManager field found; defaulting pnpm 9"
+            v="9"
+          fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+        working-directory: .
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: ${{ steps.pnpmver.outputs.version }}
+
+      - name: Install deps (repo root)
+        run: pnpm install --frozen-lockfile
+        working-directory: .
+
+      # --- Optional: cache the PNPM store for faster runs
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ~/.pnpm-store
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            pnpm-store-${{ runner.os }}-
+
+      - name: Configure pnpm store path
+        run: pnpm config set store-dir ~/.pnpm-store
+        working-directory: .
+
+      # ---- Minimal echo server matching your usage on :4010
+      - name: 'Start local echo server on 4010 (supports Prefer: code=NNN)'
+        run: |
+          set -euo pipefail
           node -e "
-            const http=require('http');
-            const s=http.createServer((req,res)=>{
-              let b=''; req.on('data',d=>b+=d);
-              req.on('end',()=>{
-                let body; try{ body=b?JSON.parse(b):undefined }catch(e){ body=b }
-                // Honor Prefer: code=NNN
-                const prefer=(req.headers['prefer']||'').toString();
-                const m=/code=(\d{3})/i.exec(prefer);
-                let status = m ? parseInt(m[1],10) : 200;
-                // Specific contract: POST /auth/signup => 201 Created by default
-                if(!m && req.method==='POST' && req.url.startsWith('/auth/signup')) status=201;
-                const payload={ ok:true, method:req.method, url:req.url, body, headers:req.headers };
-                res.writeHead(status, {'content-type':'application/json'});
-                res.end(JSON.stringify(payload));
+            const http = require('http');
+            const server = http.createServer((req, res) => {
+              const prefer = String(req.headers['prefer'] || '');
+              const m = /code=(\d{3})/i.exec(prefer);
+              let status = m ? parseInt(m[1], 10) : 200;
+
+              // Force 201 for POST /auth/signup unless caller explicitly overrides
+              if (req.method === 'POST' && req.url.startsWith('/auth/signup')) {
+                if (!m || status === 200) status = 201;
+              }
+
+              if (req.url === '/health') {
+                res.writeHead(200, { 'content-type': 'application/json' });
+                return res.end(JSON.stringify({ ok: true }));
+              }
+
+              let body = '';
+              req.on('data', (c) => (body += c));
+              req.on('end', () => {
+                res.writeHead(status, { 'content-type': 'application/json' });
+                res.end(JSON.stringify({
+                  method: req.method,
+                  url: req.url,
+                  status,
+                  headers: req.headers,
+                  body: body ? (() => { try { return JSON.parse(body) } catch { return String(body) } })() : null
+                }));
               });
             });
-            s.listen(4010,()=>console.log('echo on 4010'));
-          " >/tmp/echo.log 2>&1 &
-          echo $! > echo.pid
-
-          # Wait up to 30s for readiness
-          for i in {1..60}; do
-            if curl -fsS http://127.0.0.1:4010/ >/dev/null; then
-              echo '✅ Echo server ready on :4010'
-              break
+            server.listen(4010, '127.0.0.1', () => console.log('READY:4010'));
+          " &
+          for i in {1..50}; do
+            if curl -sSf http://127.0.0.1:4010/health >/dev/null; then
+              echo "echo server ready"; break
             fi
-            sleep 0.5
+            sleep 0.2
           done
 
       - name: Run E2E tests with coverage
-        working-directory: apps/api
         run: |
           mkdir -p ../../.tmp/jest-cache
           TMPDIR="$(pwd)/../../.tmp" pnpm test:e2e:cov
 
-      # ---- Always upload coverage, even on failure ----
-      - name: Collect coverage artifacts
-        if: always()
-        run: |
-          mkdir -p _artifacts/e2e
-          cp -r apps/api/coverage/* _artifacts/e2e/ || true
-
-      - name: Upload coverage artifact
+      - name: Upload E2E coverage artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: api-e2e-coverage
-          path: _artifacts/**
+          path: |
+            apps/api/e2e/**
+            !apps/api/e2e/**/*.map
           if-no-files-found: ignore
-          retention-days: 7
-
-      - name: Stop echo server
-        if: always()
-        run: |
-          if [ -f echo.pid ]; then
-            kill "$(cat echo.pid)" || true
-          fi
