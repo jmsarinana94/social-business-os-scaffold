@@ -60,6 +60,10 @@ jobs:
           cache: pnpm
 
       - name: Install pnpm
+        run: |
+          npm install -g pnpm
+
+      - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
           # use the same major you use locally; 10.x works great too
