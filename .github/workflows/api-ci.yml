@@ -21,26 +21,25 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: sbo_test
+          POSTGRES_DB: sbo
         ports:
           - 5432:5432
         options: >-
-          --health-cmd="pg_isready -U postgres -d sbo_test"
+          --health-cmd="pg_isready -U postgres -d sbo"
           --health-interval=5s
           --health-timeout=5s
           --health-retries=30
 
     env:
-      # --- Postgres for CI ---
+      # --- Postgres + runtime env for tests/smoke ---
       NODE_ENV: test
-      DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/sbo_test?schema=public'
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sbo?schema=public
 
-      # --- API runtime for smoke ---
       PORT: '4010'
       API_BASE: 'http://127.0.0.1:4010'
       JWT_SECRET: 'test_jwt_secret'
 
-      # --- e2e helpers (tests may read these) ---
+      # --- e2e helpers (these mirror what you use locally) ---
       E2E_AUTO_CREATE_ORG: 'true'
       API_EMAIL: 'tester@example.com'
       API_PASS: 'secret123'
@@ -66,20 +65,21 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
-          # use the same major you use locally; 10.x works great too
           version: 9
           run_install: false
 
       - name: Show tool versions
         run: |
-          echo "Node $(node -v)"
-          echo "pnpm $(pnpm -v)"
+          echo "Node: $(node -v)"
+          echo "pnpm: $(pnpm -v)"
 
       - name: Enforce Node engines (18.x or 20.x)
         run: |
-          node -e "const maj=+process.version.slice(1).split('.')[0]; if (maj<18 || maj>=21) { console.error('Unsupported Node major', maj); process.exit(1); }"
+          node -e "const maj = +process.version.slice(1).split('.')[0]; if (maj < 18 || maj >= 21) { console.error('Unsupported Node major', maj); process.exit(1); }"
 
-      # Cache pnpm store + Prisma engines to speed up CI
+      # --------------------------
+      # Cache pnpm + Prisma
+      # --------------------------
       - name: Cache pnpm store & Prisma engines
         uses: actions/cache@v4
         with:
@@ -91,7 +91,7 @@ jobs:
             pnpm-${{ runner.os }}-
 
       # --------------------------
-      # Install & Prisma prep (Postgres + migrations)
+      # Install & Prisma prep
       # --------------------------
       - name: Install workspace dependencies
         run: pnpm install --frozen-lockfile
@@ -129,6 +129,7 @@ jobs:
           node apps/api/dist/main.js > api.log 2>&1 &
           echo $! > api.pid
           echo "Server PID: $(cat api.pid)"
+
           # Wait until health endpoint is ready (45s timeout)
           for i in {1..45}; do
             if curl -fsS "${API_BASE}/health" >/dev/null; then
@@ -138,6 +139,7 @@ jobs:
             echo "Waiting for API... ($i/45)"
             sleep 1
           done
+
           curl -fsS "${API_BASE}/health" || (echo "Health check failed" && exit 1)
 
       - name: Run smoke script
@@ -145,7 +147,7 @@ jobs:
         env:
           API_BASE: ${{ env.API_BASE }}
         run: |
-          bash ./scripts/smoke.sh --json | tee ../smoke-output.json
+          pnpm smoke
           echo "✅ Smoke test executed successfully"
 
       # --------------------------
@@ -169,4 +171,4 @@ jobs:
             api.log
             apps/api/prisma/migrations
             apps/api/dist
-            smoke-output.json
+          if-no-files-found: ignore
