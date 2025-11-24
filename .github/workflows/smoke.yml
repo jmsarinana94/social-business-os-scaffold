@@ -1,0 +1,61 @@
+name: Smoke
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1) Checkout repo
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      # 2) Install Node (reads .nvmrc)
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      # 3) Install pnpm (the missing step causing your failures)
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+          run_install: false
+
+      # 4) Show tool versions (debug helper)
+      - name: Show versions
+        run: |
+          node -v
+          pnpm -v
+
+      # 5) Install workspace dependencies
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # 6) Build API
+      - name: Build API
+        run: pnpm -F @repo/api build
+
+      # 7) Run smoke script
+      - name: Run smoke test
+        working-directory: apps/api
+        env:
+          API_BASE: http://127.0.0.1:4010
+        run: pnpm smoke
+
+      # 8) Upload logs on failure
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-logs
+          path: |
+            apps/api/api.log
+            apps/api/smoke-output.json
