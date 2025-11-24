@@ -1,5 +1,7 @@
+// apps/api/src/modules/orders/orders.service.ts
+
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { OrderStatus, Prisma } from '@prisma/client';
+import { OrderStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 
@@ -7,32 +9,29 @@ import { CreateOrderDto } from './dto/create-order.dto';
 export class OrdersService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async health() {
+  health() {
     return { ok: true, scope: 'orders' };
   }
 
-  /**
-   * Basic list endpoint — currently just filters by organizationId
-   * and returns most recent orders first.
-   */
-  async list(orgId: string, _query?: unknown) {
+  async list(orgId: string) {
     return this.prisma.order.findMany({
       where: { organizationId: orgId },
       orderBy: { createdAt: 'desc' },
       include: {
         items: true,
+        account: true,
+        contact: true,
       },
     });
   }
 
-  /**
-   * Fetch a single order by id scoped to org.
-   */
   async getOne(orgId: string, id: string) {
     const order = await this.prisma.order.findFirst({
       where: { id, organizationId: orgId },
       include: {
         items: true,
+        account: true,
+        contact: true,
       },
     });
 
@@ -43,42 +42,36 @@ export class OrdersService {
     return order;
   }
 
-  /**
-   * Create a simple order with line items.
-   * - Accepts prices in cents in the DTO
-   * - Stores Decimal amounts in the DB
-   */
   async create(orgId: string, dto: CreateOrderDto) {
-    const itemsData =
-      dto.items?.map((item) => {
-        const unitPrice = new Prisma.Decimal(item.unitPriceCents).div(100);
-        const lineTotal = unitPrice.mul(item.quantity);
+    const { accountId, contactId, status, items } = dto;
 
-        return {
-          productId: item.productId,
-          quantity: item.quantity,
-          unitPrice,
-          lineTotal,
-        };
-      }) ?? [];
+    const totalCents = items.reduce((sum, item) => {
+      return sum + item.quantity * item.unitPriceCents;
+    }, 0);
 
-    const total = itemsData.reduce(
-      (acc, item) => acc.add(item.lineTotal),
-      new Prisma.Decimal(0),
-    );
+    const total = totalCents / 100;
 
     return this.prisma.order.create({
       data: {
         organizationId: orgId,
-        currency: dto.currency ?? 'USD',
-        status: OrderStatus.PENDING,
+        accountId: accountId ?? null,
+        contactId: contactId ?? null,
+        status: status ?? OrderStatus.PENDING,
+        currency: 'USD',
         total,
         items: {
-          create: itemsData,
+          create: items.map((item) => ({
+            productId: item.productId,
+            quantity: item.quantity,
+            unitPrice: item.unitPriceCents / 100,
+            lineTotal: (item.quantity * item.unitPriceCents) / 100,
+          })),
         },
       },
       include: {
         items: true,
+        account: true,
+        contact: true,
       },
     });
   }
