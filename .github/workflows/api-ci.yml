@@ -33,18 +33,18 @@ jobs:
     env:
       # --- Postgres for CI ---
       NODE_ENV: test
-      DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/sbo_test?schema=public'
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sbo_test?schema=public
 
       # --- API runtime for smoke ---
       PORT: '4010'
-      API_BASE: 'http://127.0.0.1:4010'
-      JWT_SECRET: 'test_jwt_secret'
+      API_BASE: http://127.0.0.1:4010
+      JWT_SECRET: test_jwt_secret
 
       # --- e2e helpers (tests may read these) ---
       E2E_AUTO_CREATE_ORG: 'true'
-      API_EMAIL: 'tester@example.com'
-      API_PASS: 'secret123'
-      ORG: 'demo'
+      API_EMAIL: tester@example.com
+      API_PASS: secret123
+      ORG: demo
 
     steps:
       # --------------------------
@@ -53,28 +53,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Install pnpm FIRST so it's available for everything else
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
-          run_install: false
-
       - name: Use Node (per .nvmrc)
         uses: actions/setup-node@v4
         with:
           node-version-file: ./.nvmrc
-          # do NOT use "cache: pnpm" here or it will look for pnpm too early
-          cache: 'npm'
+          cache: pnpm
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          # No version here: uses "packageManager": "pnpm@10.x" from package.json
+          run_install: false
 
       - name: Show tool versions
         run: |
-          echo "Node $(node -v)"
-          echo "pnpm $(pnpm -v)"
+          echo "Node: $(node -v)"
+          echo "pnpm: $(pnpm -v)"
 
       - name: Enforce Node engines (18.x or 20.x)
         run: |
-          node -e "const maj=+process.version.slice(1).split('.')[0]; if (maj<18 || maj>=21) { console.error('Unsupported Node major', maj); process.exit(1); }"
+          node -e "const maj = +process.version.slice(1).split('.')[0]; if (maj < 18 || maj >= 21) { console.error('Unsupported Node major', maj); process.exit(1); }"
 
       # Cache pnpm store + Prisma engines to speed up CI
       - name: Cache pnpm store & Prisma engines
