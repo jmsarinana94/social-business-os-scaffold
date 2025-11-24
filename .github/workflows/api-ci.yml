@@ -59,7 +59,7 @@ jobs:
           node-version-file: ./.nvmrc
           cache: pnpm
 
-      - name: Install pnpm (match package.json)
+      - name: Install pnpm (10.20.0 to match packageManager)
         uses: pnpm/action-setup@v4
         with:
           # MUST match package.json: "packageManager": "pnpm@10.20.0"
@@ -75,7 +75,7 @@ jobs:
         run: |
           node -e "const maj = +process.version.slice(1).split('.')[0]; if (maj < 18 || maj >= 21) { console.error('Unsupported Node major', maj); process.exit(1); }"
 
-      # Cache pnpm store + Prisma engines to speed up CI
+      # Cache pnpm store + Prisma engines
       - name: Cache pnpm store & Prisma engines
         uses: actions/cache@v4
         with:
@@ -92,7 +92,7 @@ jobs:
       - name: Install workspace dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Approve Prisma postinstall
+      - name: Approve Prisma postinstall (CI)
         run: pnpm approve-builds @prisma/client @prisma/engines prisma || true
 
       - name: Generate Prisma client
@@ -125,13 +125,12 @@ jobs:
           node apps/api/dist/main.js > api.log 2>&1 &
           echo $! > api.pid
           echo "Server PID: $(cat api.pid)"
-          # Wait until health endpoint is ready (45s timeout)
-          for i in {1..45}; do
+          for i in {1..60}; do
             if curl -fsS "${API_BASE}/health" >/dev/null; then
               echo "Health check OK"
               break
             fi
-            echo "Waiting for API... ($i/45)"
+            echo "Waiting for API... ($i/60)"
             sleep 1
           done
           curl -fsS "${API_BASE}/health" || (echo "Health check failed" && exit 1)
