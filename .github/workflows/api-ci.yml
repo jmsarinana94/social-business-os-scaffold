@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: api-ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   api:
     name: Build + Test + Smoke (apps/api)
@@ -27,32 +31,39 @@ jobs:
           --health-retries=30
 
     env:
+      # --- Postgres for CI ---
       NODE_ENV: test
-      DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/sbo_test?schema=public'
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sbo_test?schema=public
+
+      # --- API runtime for smoke ---
       PORT: '4010'
       API_BASE: 'http://127.0.0.1:4010'
-      JWT_SECRET: 'test_secret'
+      JWT_SECRET: 'test_jwt_secret'
+
+      # --- e2e helpers (tests may read these) ---
       E2E_AUTO_CREATE_ORG: 'true'
       API_EMAIL: 'tester@example.com'
       API_PASS: 'secret123'
       ORG: 'demo'
 
     steps:
-      - name: Checkout repo
+      # --------------------------
+      # Checkout & Tooling
+      # --------------------------
+      - name: Checkout
         uses: actions/checkout@v4
 
-      # --- 1) Install Node ---
-      - name: Setup Node.js (per .nvmrc)
+      # IMPORTANT: do NOT put "cache: pnpm" here – it makes setup-node
+      # try to run pnpm before we've installed it.
+      - name: Setup Node.js from .nvmrc
         uses: actions/setup-node@v4
         with:
-          node-version-file: .nvmrc
-          cache: 'npm'
+          node-version-file: ./.nvmrc
 
-      # --- 2) Install pnpm BEFORE anything else ---
       - name: Install pnpm 10
         uses: pnpm/action-setup@v4
         with:
-          version: 10
+          version: 10.20.0
           run_install: false
 
       - name: Show tool versions
@@ -60,60 +71,92 @@ jobs:
           echo "Node: $(node -v)"
           echo "pnpm: $(pnpm -v)"
 
-      # --- 3) Cache pnpm store ---
-      - name: Cache pnpm store
+      - name: Enforce Node engines (18.x or 20.x)
+        run: |
+          node -e "const maj = +process.version.slice(1).split('.')[0]; if (maj < 18 || maj >= 21) { console.error('Unsupported Node major', maj); process.exit(1); }"
+
+      # Cache pnpm store + Prisma engines to speed up CI
+      - name: Cache pnpm store & Prisma engines
         uses: actions/cache@v4
         with:
-          path: ~/.local/share/pnpm/store
+          path: |
+            ~/.local/share/pnpm/store
+            ~/.cache/prisma
           key: pnpm-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
           restore-keys: |
             pnpm-${{ runner.os }}-
 
-      # --- 4) Install dependencies ---
-      - name: Install dependencies
+      # --------------------------
+      # Install & Prisma prep
+      # --------------------------
+      - name: Install workspace dependencies
         run: pnpm install --frozen-lockfile
 
-      # --- 5) Prisma ---
+      - name: Approve Prisma postinstall
+        run: pnpm approve-builds @prisma/client @prisma/engines prisma || true
+
       - name: Generate Prisma client
         working-directory: apps/api
-        run: pnpm exec prisma generate
+        run: pnpm exec prisma generate --schema=prisma/schema.prisma
 
-      - name: Apply DB migrations
+      - name: Apply DB migrations (deploy)
         working-directory: apps/api
-        run: pnpm exec prisma migrate deploy
+        run: pnpm exec prisma migrate deploy --schema=prisma/schema.prisma
 
-      # --- 6) Build & Tests ---
+      # --------------------------
+      # Build + Tests
+      # --------------------------
       - name: Build API
         run: pnpm -F @repo/api build
 
-      - name: Run tests
+      - name: Run unit/integration tests
         run: pnpm -F @repo/api test
 
-      - name: Run E2E tests
+      - name: Run E2E tests (API)
         run: pnpm -F @repo/api test:e2e
 
-      # --- 7) Start API for smoke test ---
-      - name: Start API (background)
+      # --------------------------
+      # Smoke (real HTTP against compiled server)
+      # --------------------------
+      - name: Start API (background, compiled on 4010)
+        env:
+          PORT: 4010
         run: |
           node apps/api/dist/main.js > api.log 2>&1 &
           echo $! > api.pid
+          echo "Server PID: $(cat api.pid)"
+          # Wait until health endpoint is ready (45s timeout)
           for i in {1..45}; do
-            if curl -fsS $API_BASE/health >/dev/null; then
-              echo "API alive"
+            if curl -fsS "${API_BASE}/health" >/dev/null; then
+              echo "Health check OK"
               break
             fi
+            echo "Waiting for API... ($i/45)"
             sleep 1
           done
+          curl -fsS "${API_BASE}/health" || (echo "Health check failed" && exit 1)
 
-      # --- 8) Smoke Test ---
-      - name: Run smoke test
+      - name: Run smoke script
+        working-directory: apps/api
         env:
           API_BASE: ${{ env.API_BASE }}
-        working-directory: apps/api
-        run: bash ./scripts/smoke.sh --json > smoke-output.json
+        run: |
+          bash ./scripts/smoke.sh --json | tee smoke-output.json
+          echo "✅ Smoke test executed successfully"
 
-      # --- 9) Upload logs on failure ---
-      - name: Upload logs
+      # --------------------------
+      # Teardown + Artifacts
+      # --------------------------
+      - name: Stop API
+        if: always()
+        run: |
+          if [[ -f api.pid ]]; then
+            kill "$(cat api.pid)" || true
+            sleep 2
+            pkill -f "apps/api/dist/main.js" || true
+          fi
+
+      - name: Upload logs (on failure)
         if: failure()
         uses: actions/upload-artifact@v4
         with:
@@ -121,9 +164,3 @@ jobs:
           path: |
             api.log
             apps/api/smoke-output.json
-
-      # --- 10) Cleanup ---
-      - name: Stop API
-        if: always()
-        run: |
-          kill $(cat api.pid) || true
