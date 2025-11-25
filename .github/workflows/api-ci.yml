@@ -33,7 +33,7 @@ jobs:
     env:
       # --- Postgres for CI ---
       NODE_ENV: test
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sbo_test?schema=public
+      DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/sbo_test?schema=public'
 
       # --- API runtime for smoke ---
       PORT: '4010'
@@ -53,16 +53,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # IMPORTANT: do NOT put "cache: pnpm" here – it makes setup-node
-      # try to run pnpm before we've installed it.
-      - name: Setup Node.js from .nvmrc
+      - name: Use Node (per .nvmrc)
         uses: actions/setup-node@v4
         with:
           node-version-file: ./.nvmrc
+          # ❌ IMPORTANT: no "cache: pnpm" here
 
-      - name: Install pnpm 10
+      - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
+          # match package.json: "packageManager": "pnpm@10.20.0"
           version: 10.20.0
           run_install: false
 
@@ -75,7 +75,7 @@ jobs:
         run: |
           node -e "const maj = +process.version.slice(1).split('.')[0]; if (maj < 18 || maj >= 21) { console.error('Unsupported Node major', maj); process.exit(1); }"
 
-      # Cache pnpm store + Prisma engines to speed up CI
+      # Cache pnpm store + Prisma engines
       - name: Cache pnpm store & Prisma engines
         uses: actions/cache@v4
         with:
@@ -163,4 +163,6 @@ jobs:
           name: api-logs
           path: |
             api.log
+            apps/api/prisma/migrations
+            apps/api/dist
             apps/api/smoke-output.json
