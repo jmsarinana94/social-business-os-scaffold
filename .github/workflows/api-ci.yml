@@ -8,8 +8,8 @@ on:
 
 jobs:
   api:
-    runs-on: ubuntu-latest
     name: Build + Test + Smoke (apps/api)
+    runs-on: ubuntu-latest
 
     services:
       postgres:
@@ -31,28 +31,25 @@ jobs:
       DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/sbo_test?schema=public'
       PORT: '4010'
       API_BASE: 'http://127.0.0.1:4010'
-      JWT_SECRET: 'test_jwt_secret'
+      JWT_SECRET: 'test_secret'
       E2E_AUTO_CREATE_ORG: 'true'
       API_EMAIL: 'tester@example.com'
       API_PASS: 'secret123'
+      ORG: 'demo'
 
     steps:
-      - name: Checkout
+      - name: Checkout repo
         uses: actions/checkout@v4
 
-      # -------------------------
-      # 1️⃣ Install Node
-      # -------------------------
-      - name: Use Node (per .nvmrc)
+      # --- 1) Install Node ---
+      - name: Setup Node.js (per .nvmrc)
         uses: actions/setup-node@v4
         with:
-          node-version-file: '.nvmrc'
-          cache: 'pnpm'
+          node-version-file: .nvmrc
+          cache: 'npm'
 
-      # -------------------------
-      # 2️⃣ Install pnpm (must be here)
-      # -------------------------
-      - name: Install pnpm
+      # --- 2) Install pnpm BEFORE anything else ---
+      - name: Install pnpm 10
         uses: pnpm/action-setup@v4
         with:
           version: 10
@@ -60,63 +57,73 @@ jobs:
 
       - name: Show tool versions
         run: |
-          node -v
-          pnpm -v
+          echo "Node: $(node -v)"
+          echo "pnpm: $(pnpm -v)"
 
-      - name: Install workspace dependencies
+      # --- 3) Cache pnpm store ---
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/pnpm/store
+          key: pnpm-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            pnpm-${{ runner.os }}-
+
+      # --- 4) Install dependencies ---
+      - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # -------------------------
-      # Prisma
-      # -------------------------
+      # --- 5) Prisma ---
       - name: Generate Prisma client
         working-directory: apps/api
-        run: pnpm exec prisma generate --schema=prisma/schema.prisma
+        run: pnpm exec prisma generate
 
       - name: Apply DB migrations
         working-directory: apps/api
-        run: pnpm exec prisma migrate deploy --schema=prisma/schema.prisma
+        run: pnpm exec prisma migrate deploy
 
-      # -------------------------
-      # Build + Tests
-      # -------------------------
+      # --- 6) Build & Tests ---
       - name: Build API
         run: pnpm -F @repo/api build
 
-      - name: Run unit tests
+      - name: Run tests
         run: pnpm -F @repo/api test
 
       - name: Run E2E tests
         run: pnpm -F @repo/api test:e2e
 
-      # -------------------------
-      # Smoke
-      # -------------------------
-      - name: Start API
+      # --- 7) Start API for smoke test ---
+      - name: Start API (background)
         run: |
           node apps/api/dist/main.js > api.log 2>&1 &
           echo $! > api.pid
-          sleep 5
+          for i in {1..45}; do
+            if curl -fsS $API_BASE/health >/dev/null; then
+              echo "API alive"
+              break
+            fi
+            sleep 1
+          done
 
-      - name: Run smoke script
+      # --- 8) Smoke Test ---
+      - name: Run smoke test
+        env:
+          API_BASE: ${{ env.API_BASE }}
         working-directory: apps/api
-        run: bash ./scripts/smoke.sh --json | tee smoke-output.json
+        run: bash ./scripts/smoke.sh --json > smoke-output.json
 
-      # -------------------------
-      # Upload logs safely
-      # -------------------------
+      # --- 9) Upload logs on failure ---
       - name: Upload logs
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: api-artifacts
+          name: api-logs
           path: |
             api.log
             apps/api/smoke-output.json
 
+      # --- 10) Cleanup ---
       - name: Stop API
         if: always()
         run: |
-          if [[ -f api.pid ]]; then
-            kill $(cat api.pid) || true
-          fi
+          kill $(cat api.pid) || true
