@@ -4,36 +4,18 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
 
 jobs:
   smoke:
     runs-on: ubuntu-latest
 
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: sbo_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd="pg_isready -U postgres -d sbo_test"
-          --health-interval=5s
-          --health-timeout=5s
-          --health-retries=30
-
     env:
       NODE_ENV: test
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sbo_test?schema=public
       PORT: '4010'
       API_BASE: 'http://127.0.0.1:4010'
       JWT_SECRET: 'test_jwt_secret'
-      E2E_AUTO_CREATE_ORG: 'true'
-      API_EMAIL: 'tester@example.com'
-      API_PASS: 'secret123'
-      ORG: 'demo'
 
     steps:
       - name: Checkout repo
@@ -43,10 +25,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version-file: ./.nvmrc
+          cache: pnpm
 
-      - name: Install pnpm (use version from packageManager)
+      - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
+          # Use pnpm version from packageManager (10.x)
           run_install: false
 
       - name: Show tool versions
@@ -54,15 +38,7 @@ jobs:
           echo "Node: $(node -v)"
           echo "pnpm: $(pnpm -v)"
 
-      - name: Cache pnpm store
-        uses: actions/cache@v4
-        with:
-          path: ~/.local/share/pnpm/store
-          key: pnpm-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            pnpm-${{ runner.os }}-
-
-      - name: Install workspace dependencies
+      - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Build API
@@ -75,6 +51,7 @@ jobs:
           node apps/api/dist/main.js > api.log 2>&1 &
           echo $! > api.pid
           echo "Server PID: $(cat api.pid)"
+
           for i in {1..45}; do
             if curl -fsS "${API_BASE}/health" >/dev/null; then
               echo "Health check OK"
@@ -83,7 +60,8 @@ jobs:
             echo "Waiting for API... ($i/45)"
             sleep 1
           done
-          curl -fsS "${API_BASE}/health" || (echo 'Health check failed' && exit 1)
+
+          curl -fsS "${API_BASE}/health" || (echo "Health check failed" && exit 1)
 
       - name: Run smoke test
         working-directory: apps/api

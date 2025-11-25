@@ -31,17 +31,20 @@ jobs:
           --health-retries=30
 
     env:
+      # --- Postgres for CI ---
       NODE_ENV: test
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sbo_test?schema=public
 
+      # --- API runtime for smoke ---
       PORT: '4010'
-      API_BASE: http://127.0.0.1:4010
-      JWT_SECRET: test_jwt_secret
+      API_BASE: 'http://127.0.0.1:4010'
+      JWT_SECRET: 'test_jwt_secret'
 
+      # --- e2e helpers (tests may read these) ---
       E2E_AUTO_CREATE_ORG: 'true'
-      API_EMAIL: tester@example.com
-      API_PASS: secret123
-      ORG: demo
+      API_EMAIL: 'tester@example.com'
+      API_PASS: 'secret123'
+      ORG: 'demo'
 
     steps:
       # --------------------------
@@ -50,7 +53,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Use Node (from .nvmrc)
+      - name: Use Node (per .nvmrc)
         uses: actions/setup-node@v4
         with:
           node-version-file: ./.nvmrc
@@ -59,18 +62,19 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 10
+          # Let the action read pnpm@10.x from package.json:packageManager
           run_install: false
 
       - name: Show tool versions
         run: |
-          echo "Node $(node -v)"
-          echo "pnpm $(pnpm -v)"
+          echo "Node: $(node -v)"
+          echo "pnpm: $(pnpm -v)"
 
       - name: Enforce Node engines (18.x or 20.x)
         run: |
-          node -e "const maj=+process.version.slice(1).split('.')[0]; if (maj<18 || maj>=21) { console.error('Unsupported Node major', maj); process.exit(1); }"
+          node -e "const maj = +process.version.slice(1).split('.')[0]; if (maj < 18 || maj >= 21) { console.error('Unsupported Node major', maj); process.exit(1); }"
 
+      # Cache pnpm store + Prisma engines to speed up CI
       - name: Cache pnpm store & Prisma engines
         uses: actions/cache@v4
         with:
@@ -113,13 +117,14 @@ jobs:
       # --------------------------
       # Smoke (real HTTP against compiled server)
       # --------------------------
-      - name: Start API (background on :4010)
+      - name: Start API (background on 4010)
         env:
           PORT: 4010
         run: |
           node apps/api/dist/main.js > api.log 2>&1 &
           echo $! > api.pid
           echo "Server PID: $(cat api.pid)"
+
           for i in {1..45}; do
             if curl -fsS "${API_BASE}/health" >/dev/null; then
               echo "Health check OK"
@@ -128,6 +133,7 @@ jobs:
             echo "Waiting for API... ($i/45)"
             sleep 1
           done
+
           curl -fsS "${API_BASE}/health" || (echo "Health check failed" && exit 1)
 
       - name: Run smoke script
@@ -157,6 +163,6 @@ jobs:
           name: api-logs
           path: |
             api.log
+            smoke-output.json
             apps/api/prisma/migrations
             apps/api/dist
-            smoke-output.json
