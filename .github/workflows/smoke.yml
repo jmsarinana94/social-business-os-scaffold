@@ -21,9 +21,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version-file: ./.nvmrc
-          # no cache: pnpm here
+          # no cache here
 
-      - name: Install pnpm (global)
+      - name: Install pnpm (global via npm)
         run: npm install -g pnpm@10.20.0
 
       - name: Show tool versions
