@@ -1,3 +1,4 @@
+# .github/workflows/api-ci.yml
 name: API CI
 
 on:
@@ -11,47 +12,130 @@ jobs:
     name: Build + Test + Smoke (apps/api)
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: sbo_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d sbo_test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+
     env:
-      # keep these aligned with your local .env or CI secrets
       NODE_ENV: test
-      E2E_AUTO_CREATE_ORG: "true"
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sbo_test?schema=public
+
+      PORT: '4010'
+      API_BASE: 'http://127.0.0.1:4010'
+      JWT_SECRET: 'test_jwt_secret'
+
+      E2E_AUTO_CREATE_ORG: 'true'
+      API_EMAIL: 'tester@example.com'
+      API_PASS: 'secret123'
+      ORG: 'demo'
 
     steps:
+      # -------------------------
+      # Checkout & Node (NO pnpm cache here)
+      # -------------------------
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Use Node (pinned to repo policy)
+      - name: Use Node (per .nvmrc)
         uses: actions/setup-node@v4
         with:
           node-version-file: ./.nvmrc
-          cache: 'pnpm'
+          # ⚠️ IMPORTANT: NO "cache" INPUT HERE.
+          # This keeps setup-node from trying to run pnpm internally.
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
-          run_install: false
+      - name: Install pnpm (global via npm)
+        run: npm install -g pnpm@10.20.0
 
-      - name: Show versions
+      - name: Show tool versions
         run: |
           node -v
           pnpm -v
 
-      - name: Enforce engines
+      - name: Enforce Node engines (18.x or 20.x)
         run: |
-          v=$(node -v)
-          echo "Node $v (expect 18/20, <21)"
-          # quick hard stop if someone changes .nvmrc wrong
-          node -e "const [maj]=process.version.match(/^v(\d+)/).slice(1).map(Number); if(maj>=21||maj<18) process.exit(1)"
+          node -e "const maj = +process.version.slice(1).split('.')[0]; if (maj < 18 || maj >= 21) { console.error('Unsupported Node major', maj); process.exit(1); }"
 
-      - name: Install workspace deps
+      # -------------------------
+      # Deps + Prisma
+      # -------------------------
+      - name: Install workspace dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Generate Prisma client
+        working-directory: apps/api
+        run: pnpm exec prisma generate --schema=prisma/schema.prisma
+
+      - name: Apply DB migrations (deploy)
+        working-directory: apps/api
+        run: pnpm exec prisma migrate deploy --schema=prisma/schema.prisma
+
+      # -------------------------
+      # Build + Tests
+      # -------------------------
       - name: Build API
         run: pnpm -F @repo/api build
 
-      - name: E2E tests (API)
+      - name: Run unit/integration tests
+        run: pnpm -F @repo/api test
+
+      - name: Run E2E tests (API)
         run: pnpm -F @repo/api test:e2e
 
-      - name: Smoke script (API)
-        run: pnpm -F @repo/api smoke
+      # -------------------------
+      # Smoke
+      # -------------------------
+      - name: Start API (background, compiled on 4010)
+        env:
+          PORT: 4010
+        run: |
+          node apps/api/dist/main.js > api.log 2>&1 &
+          echo $! > api.pid
+          echo "Server PID: $(cat api.pid)"
+
+          for i in {1..45}; do
+            if curl -fsS "${API_BASE}/health" >/dev/null; then
+              echo "Health check OK"
+              break
+            fi
+            echo "Waiting for API... ($i/45)"
+            sleep 1
+          done
+
+          curl -fsS "${API_BASE}/health"
+
+      - name: Run smoke script
+        working-directory: apps/api
+        env:
+          API_BASE: ${{ env.API_BASE }}
+        run: |
+          bash ./scripts/smoke.sh --json | tee smoke-output.json
+          echo "✅ Smoke test executed successfully"
+
+      - name: Stop API
+        if: always()
+        run: |
+          if [ -f api.pid ]; then
+            kill "$(cat api.pid)" || true
+            sleep 2
+            pkill -f "apps/api/dist/main.js" || true
+          fi
+
+      - name: Upload logs (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-logs
+          path: |
+            api.log
+            apps/api/smoke-output.json
