@@ -31,16 +31,13 @@ jobs:
           --health-retries=30
 
     env:
-      # --- Postgres for CI ---
       NODE_ENV: test
       DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/sbo_test?schema=public'
 
-      # --- API runtime for smoke ---
       PORT: '4010'
       API_BASE: 'http://127.0.0.1:4010'
       JWT_SECRET: 'test_jwt_secret'
 
-      # --- e2e helpers (tests may read these) ---
       E2E_AUTO_CREATE_ORG: 'true'
       API_EMAIL: 'tester@example.com'
       API_PASS: 'secret123'
@@ -48,7 +45,7 @@ jobs:
 
     steps:
       # --------------------------
-      # Checkout & Node / pnpm
+      # Checkout & Tooling
       # --------------------------
       - name: Checkout
         uses: actions/checkout@v4
@@ -57,18 +54,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version-file: ./.nvmrc
-          # ❌ no cache: pnpm here – it tries to run pnpm before it exists
+          # ⚠️ DO NOT add "cache: pnpm" here
 
-      - name: Install pnpm 10.20.0
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10.20.0
-          run_install: false
-
-      - name: Show tool versions
+      - name: Install pnpm globally
         run: |
-          echo "Node:  $(node -v)"
-          echo "pnpm:  $(pnpm -v)"
+          npm install -g pnpm@10.20.0
+          pnpm -v
 
       - name: Enforce Node engines (18.x or 20.x)
         run: |
@@ -115,7 +106,6 @@ jobs:
           echo $! > api.pid
           echo "Server PID: $(cat api.pid)"
 
-          # Wait until health endpoint is ready (45s timeout)
           for i in {1..45}; do
             if curl -fsS "${API_BASE}/health" >/dev/null; then
               echo "Health check OK"

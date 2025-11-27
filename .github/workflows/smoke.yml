@@ -18,6 +18,7 @@ jobs:
       PORT: '4010'
       API_BASE: 'http://127.0.0.1:4010'
       JWT_SECRET: 'test_jwt_secret'
+
       E2E_AUTO_CREATE_ORG: 'true'
       API_EMAIL: 'tester@example.com'
       API_PASS: 'secret123'
@@ -32,16 +33,10 @@ jobs:
         with:
           node-version-file: ./.nvmrc
 
-      - name: Install pnpm 10.20.0
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10.20.0
-          run_install: false
-
-      - name: Show tool versions
+      - name: Install pnpm globally
         run: |
-          echo "Node:  $(node -v)"
-          echo "pnpm:  $(pnpm -v)"
+          npm install -g pnpm@10.20.0
+          pnpm -v
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -54,7 +49,7 @@ jobs:
         env:
           API_BASE: ${{ env.API_BASE }}
         run: |
-          node ../..//apps/api/dist/main.js > api.log 2>&1 &
+          node ../../apps/api/dist/main.js > api.log 2>&1 &
           echo $! > api.pid
 
           for i in {1..45}; do
@@ -74,8 +69,8 @@ jobs:
       - name: Stop API
         if: always()
         run: |
-          if [[ -f apps/api/api.pid ]]; then
-            kill "$(cat apps/api/api.pid)" || true
+          if [[ -f api.pid ]]; then
+            kill "$(cat api.pid)" || true
             sleep 2
             pkill -f "apps/api/dist/main.js" || true
           fi
