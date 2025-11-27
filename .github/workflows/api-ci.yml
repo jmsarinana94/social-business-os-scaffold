@@ -1,4 +1,3 @@
-# .github/workflows/api-ci.yml
 name: API CI
 
 on:
@@ -42,24 +41,35 @@ jobs:
 
     steps:
       # -------------------------
-      # Checkout & Node (NO pnpm cache here)
+      # Checkout
       # -------------------------
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Use Node (per .nvmrc)
+      # -------------------------
+      # Node
+      # -------------------------
+      - name: Use Node (from .nvmrc)
         uses: actions/setup-node@v4
         with:
-          node-version-file: ./.nvmrc
-          # ⚠️ IMPORTANT: NO "cache" INPUT HERE.
-          # This keeps setup-node from trying to run pnpm internally.
+          node-version-file: .nvmrc
+          cache: npm
 
-      - name: Install pnpm (global via npm)
-        run: npm install -g pnpm@10.20.0
-
-      - name: Show tool versions
+      # -------------------------
+      # Install pnpm FIRST (BEFORE ANY pnpm is used)
+      # -------------------------
+      - name: Install pnpm (global)
         run: |
-          node -v
+          npm install -g pnpm@10.20.0
+          echo "PNPM INSTALLED"
+          pnpm -v
+
+      # -------------------------
+      # Ensure pnpm is available
+      # -------------------------
+      - name: Verify pnpm is on PATH
+        run: |
+          which pnpm || (echo "pnpm missing from PATH" && exit 1)
           pnpm -v
 
       - name: Enforce Node engines (18.x or 20.x)
@@ -67,7 +77,7 @@ jobs:
           node -e "const maj = +process.version.slice(1).split('.')[0]; if (maj < 18 || maj >= 21) { console.error('Unsupported Node major', maj); process.exit(1); }"
 
       # -------------------------
-      # Deps + Prisma
+      # Install deps
       # -------------------------
       - name: Install workspace dependencies
         run: pnpm install --frozen-lockfile
@@ -76,7 +86,7 @@ jobs:
         working-directory: apps/api
         run: pnpm exec prisma generate --schema=prisma/schema.prisma
 
-      - name: Apply DB migrations (deploy)
+      - name: Apply DB migrations
         working-directory: apps/api
         run: pnpm exec prisma migrate deploy --schema=prisma/schema.prisma
 
@@ -93,22 +103,22 @@ jobs:
         run: pnpm -F @repo/api test:e2e
 
       # -------------------------
-      # Smoke
+      # Smoke Test
       # -------------------------
-      - name: Start API (background, compiled on 4010)
+      - name: Start API background server
         env:
           PORT: 4010
         run: |
           node apps/api/dist/main.js > api.log 2>&1 &
           echo $! > api.pid
-          echo "Server PID: $(cat api.pid)"
+          echo "PID: $(cat api.pid)"
 
           for i in {1..45}; do
             if curl -fsS "${API_BASE}/health" >/dev/null; then
-              echo "Health check OK"
+              echo "API is healthy"
               break
             fi
-            echo "Waiting for API... ($i/45)"
+            echo "Waiting for API ($i/45)..."
             sleep 1
           done
 
@@ -120,7 +130,7 @@ jobs:
           API_BASE: ${{ env.API_BASE }}
         run: |
           bash ./scripts/smoke.sh --json | tee smoke-output.json
-          echo "✅ Smoke test executed successfully"
+          echo "Smoke tests completed"
 
       - name: Stop API
         if: always()
