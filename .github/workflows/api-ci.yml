@@ -6,10 +6,6 @@ on:
   pull_request:
     branches: [main]
 
-concurrency:
-  group: api-ci-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   api:
     name: Build + Test + Smoke (apps/api)
@@ -31,13 +27,16 @@ jobs:
           --health-retries=30
 
     env:
+      # --- Postgres for CI ---
       NODE_ENV: test
-      DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/sbo_test?schema=public'
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sbo_test?schema=public
 
+      # --- API runtime for smoke ---
       PORT: '4010'
       API_BASE: 'http://127.0.0.1:4010'
       JWT_SECRET: 'test_jwt_secret'
 
+      # --- e2e helpers (tests may read these) ---
       E2E_AUTO_CREATE_ORG: 'true'
       API_EMAIL: 'tester@example.com'
       API_PASS: 'secret123'
@@ -45,20 +44,23 @@ jobs:
 
     steps:
       # --------------------------
-      # Checkout & Tooling
+      # Checkout & Node
       # --------------------------
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node (per .nvmrc)
+      - name: Use Node (per .nvmrc)
         uses: actions/setup-node@v4
         with:
           node-version-file: ./.nvmrc
-          # ⚠️ DO NOT add "cache: pnpm" here
+          # IMPORTANT: do NOT set cache: pnpm here – it tries to run pnpm before it's installed
 
-      - name: Install pnpm globally
+      - name: Install pnpm (global)
+        run: npm install -g pnpm@10.20.0
+
+      - name: Show tool versions
         run: |
-          npm install -g pnpm@10.20.0
+          node -v
           pnpm -v
 
       - name: Enforce Node engines (18.x or 20.x)
@@ -66,13 +68,10 @@ jobs:
           node -e "const maj = +process.version.slice(1).split('.')[0]; if (maj < 18 || maj >= 21) { console.error('Unsupported Node major', maj); process.exit(1); }"
 
       # --------------------------
-      # Install & Prisma prep
+      # Install deps + Prisma prep
       # --------------------------
       - name: Install workspace dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Approve Prisma postinstall
-        run: pnpm approve-builds @prisma/client @prisma/engines prisma || true
 
       - name: Generate Prisma client
         working-directory: apps/api
@@ -100,23 +99,22 @@ jobs:
       - name: Start API (background, compiled on 4010)
         env:
           PORT: 4010
-          API_BASE: ${{ env.API_BASE }}
         run: |
           node apps/api/dist/main.js > api.log 2>&1 &
           echo $! > api.pid
           echo "Server PID: $(cat api.pid)"
 
+          # Wait until health endpoint is ready (45s timeout)
           for i in {1..45}; do
             if curl -fsS "${API_BASE}/health" >/dev/null; then
               echo "Health check OK"
-              exit 0
+              break
             fi
             echo "Waiting for API... ($i/45)"
             sleep 1
           done
 
-          echo "Health check failed after 45s"
-          exit 1
+          curl -fsS "${API_BASE}/health"
 
       - name: Run smoke script
         working-directory: apps/api
@@ -132,7 +130,7 @@ jobs:
       - name: Stop API
         if: always()
         run: |
-          if [[ -f api.pid ]]; then
+          if [ -f api.pid ]; then
             kill "$(cat api.pid)" || true
             sleep 2
             pkill -f "apps/api/dist/main.js" || true
@@ -146,5 +144,3 @@ jobs:
           path: |
             api.log
             apps/api/smoke-output.json
-            apps/api/prisma/migrations
-            apps/api/dist
