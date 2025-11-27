@@ -1,3 +1,4 @@
+# .github/workflows/api-ci.yml
 name: API CI
 
 on:
@@ -41,7 +42,7 @@ jobs:
 
     steps:
       # -------------------------
-      # Checkout & Node
+      # Checkout & Node (NO pnpm cache here)
       # -------------------------
       - name: Checkout
         uses: actions/checkout@v4
@@ -50,7 +51,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version-file: ./.nvmrc
-          # IMPORTANT: no 'cache' here at all
+          # ⚠️ IMPORTANT: NO "cache" INPUT HERE.
+          # This keeps setup-node from trying to run pnpm internally.
 
       - name: Install pnpm (global via npm)
         run: npm install -g pnpm@10.20.0
