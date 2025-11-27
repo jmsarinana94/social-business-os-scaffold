@@ -1,7 +1,9 @@
-name: smoke test
+name: smoke
 
 on:
-  pull_request:
+  workflow_dispatch:
+  push:
+    branches: [main]
     paths:
       - 'apps/api/**'
       - '.github/workflows/smoke.yml'
@@ -9,30 +11,80 @@ on:
 jobs:
   smoke:
     runs-on: ubuntu-latest
+    name: API Smoke (build + smoke)
+
+    env:
+      NODE_ENV: test
+      PORT: '4010'
+      API_BASE: 'http://127.0.0.1:4010'
+      JWT_SECRET: 'test_jwt_secret'
+      E2E_AUTO_CREATE_ORG: 'true'
+      API_EMAIL: 'tester@example.com'
+      API_PASS: 'secret123'
+      ORG: 'demo'
 
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      # 🟢 MUST COME FIRST
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10.0.0
-
-      - name: Setup Node.js
+      - name: Setup Node (per .nvmrc)
         uses: actions/setup-node@v4
         with:
-          node-version-file: '.nvmrc'
-          cache: 'pnpm'
+          node-version-file: ./.nvmrc
+
+      - name: Install pnpm 10.20.0
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.20.0
+          run_install: false
+
+      - name: Show tool versions
+        run: |
+          echo "Node:  $(node -v)"
+          echo "pnpm:  $(pnpm -v)"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Build API
-        working-directory: apps/api
-        run: pnpm build
+        run: pnpm -F @repo/api build
 
       - name: Run smoke test
         working-directory: apps/api
-        run: pnpm smoke
+        env:
+          API_BASE: ${{ env.API_BASE }}
+        run: |
+          node ../..//apps/api/dist/main.js > api.log 2>&1 &
+          echo $! > api.pid
+
+          for i in {1..45}; do
+            if curl -fsS "${API_BASE}/health" >/dev/null; then
+              echo "Health check OK"
+              break
+            fi
+            echo "Waiting for API... ($i/45)"
+            sleep 1
+          done
+
+          curl -fsS "${API_BASE}/health" || (echo "Health endpoint failed" && exit 1)
+
+          bash ./scripts/smoke.sh --json | tee smoke-output.json
+          echo "✅ Smoke test executed successfully"
+
+      - name: Stop API
+        if: always()
+        run: |
+          if [[ -f apps/api/api.pid ]]; then
+            kill "$(cat apps/api/api.pid)" || true
+            sleep 2
+            pkill -f "apps/api/dist/main.js" || true
+          fi
+
+      - name: Upload logs (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-smoke-logs
+          path: |
+            apps/api/api.log
+            apps/api/smoke-output.json
