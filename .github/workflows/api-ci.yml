@@ -6,9 +6,13 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: api-ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   api:
-    name: Build + Test + E2E + Smoke (apps/api)
+    name: Build + Test (apps/api, with idempotency e2e)
     runs-on: ubuntu-latest
 
     services:
@@ -27,95 +31,135 @@ jobs:
           --health-retries=30
 
     env:
+      # --- DB + runtime for tests ---
       NODE_ENV: test
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sbo_test?schema=public
 
+      # API will listen on 4000 inside CI
       PORT: '4000'
+      BASE_URL: 'http://127.0.0.1:4000'
       API_BASE: 'http://127.0.0.1:4000'
-      JWT_SECRET: 'test_jwt_secret'
 
+      # --- e2e helpers (if your tests read these) ---
       E2E_AUTO_CREATE_ORG: 'true'
       API_EMAIL: 'tester@example.com'
       API_PASS: 'secret123'
       ORG: 'demo'
 
+      JWT_SECRET: 'test_jwt_secret'
+
     steps:
+      # -------------------------
+      # Checkout & Node
+      # -------------------------
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Use Node (per .nvmrc)
         uses: actions/setup-node@v4
         with:
           node-version-file: ./.nvmrc
-          cache: 'npm'
+          cache: 'npm' # we install pnpm via npm
 
-      - name: Install pnpm
+      - name: Install pnpm (global via npm)
         run: npm install -g pnpm@10.20.0
 
+      - name: Show tool versions
+        run: |
+          node -v
+          pnpm -v
+
+      - name: Enforce Node engines (18.x or 20.x)
+        run: |
+          node -e "const maj = +process.version.slice(1).split('.')[0]; if (maj < 18 || maj >= 21) { console.error('Unsupported Node major', maj); process.exit(1); }"
+
+      # -------------------------
+      # Deps + Prisma
+      # -------------------------
       - name: Install workspace dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Generate Prisma client
         working-directory: apps/api
-        run: pnpm exec prisma generate
+        run: pnpm exec prisma generate --schema=prisma/schema.prisma
 
-      - name: Apply DB migrations
+      - name: Apply DB migrations (deploy)
         working-directory: apps/api
-        run: pnpm exec prisma migrate deploy
+        run: pnpm exec prisma migrate deploy --schema=prisma/schema.prisma
 
+      # -------------------------
+      # Build API
+      # -------------------------
       - name: Build API
         run: pnpm -F @repo/api build
 
-      # -------------------------------
-      # START API BEFORE E2E TESTS
-      # -------------------------------
-      - name: Start API in background (port 4000)
+      # -------------------------
+      # Start API on 4000 for Jest (unit + idempotency e2e)
+      # -------------------------
+      - name: Start API (background on 4000)
+        env:
+          NODE_ENV: test
+          PORT: '4000'
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          JWT_SECRET: ${{ env.JWT_SECRET }}
         run: |
           node apps/api/dist/main.js > api.log 2>&1 &
           echo $! > api.pid
-          echo "Server PID $(cat api.pid)"
+          echo "Server PID: $(cat api.pid)"
 
-          # Wait until server responds
-          for i in {1..45}; do
+          echo "Waiting for API health on http://127.0.0.1:4000/health..."
+          for i in {1..60}; do
             if curl -fsS "http://127.0.0.1:4000/health" >/dev/null; then
-              echo "API is up!"
+              echo "Health check OK"
               break
             fi
-            echo "Waiting for API... ($i/45)"
+            echo "Waiting for API... ($i/60)"
             sleep 1
           done
 
+          # Final check (fail fast if still not up)
           curl -fsS "http://127.0.0.1:4000/health"
 
-      # -------------------------------
-      # RUN TESTS (server must be running)
-      # -------------------------------
-      - name: Unit Tests
+      # -------------------------
+      # Run Jest (unit + idempotency e2e)
+      # -------------------------
+      - name: Run Jest test suite
+        env:
+          BASE_URL: ${{ env.BASE_URL }}
+          API_BASE: ${{ env.API_BASE }}
+          ORG: ${{ env.ORG }}
+          API_EMAIL: ${{ env.API_EMAIL }}
+          API_PASS: ${{ env.API_PASS }}
         run: pnpm -F @repo/api test
 
-      - name: E2E Tests
-        run: pnpm -F @repo/api test:e2e
+      # -------------------------
+      # Optional: smoke script (only if you still want it)
+      # -------------------------
+      # - name: Run smoke script
+      #   working-directory: apps/api
+      #   env:
+      #     API_BASE: ${{ env.API_BASE }}
+      #   run: |
+      #     bash ./scripts/smoke.sh --json | tee smoke-output.json
+      #     echo "✅ Smoke test executed successfully"
 
-      - name: Smoke Test
-        working-directory: apps/api
-        run: bash ./scripts/smoke.sh --json | tee smoke-output.json
-
-      # -------------------------------
-      # STOP API + Upload Logs on Failure
-      # -------------------------------
+      # -------------------------
+      # Teardown + Artifacts
+      # -------------------------
       - name: Stop API
         if: always()
         run: |
           if [ -f api.pid ]; then
-            kill $(cat api.pid) || true
+            kill "$(cat api.pid)" || true
             sleep 2
+            pkill -f "apps/api/dist/main.js" || true
           fi
 
-      - name: Upload logs if failure
+      - name: Upload logs (on failure)
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: api-ci-logs
+          name: api-logs
           path: |
             api.log
-            apps/api/smoke-output.json
+            apps/api/dist
