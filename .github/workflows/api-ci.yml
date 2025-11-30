@@ -27,13 +27,19 @@ jobs:
           --health-retries=30
 
     env:
+      # --- DB / Node env ---
       NODE_ENV: test
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sbo_test?schema=public
 
+      # --- Ports / bases ---
+      # Jest e2e/idempotency tests expect 127.0.0.1:4000
+      BASE: 'http://127.0.0.1:4000'
+      # Smoke uses a separate server on 4010
       PORT: '4010'
       API_BASE: 'http://127.0.0.1:4010'
-      JWT_SECRET: 'test_jwt_secret'
 
+      # --- Auth / e2e helpers ---
+      JWT_SECRET: 'test_jwt_secret'
       E2E_AUTO_CREATE_ORG: 'true'
       API_EMAIL: 'tester@example.com'
       API_PASS: 'secret123'
@@ -46,22 +52,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Use Node (from .nvmrc)
+      - name: Use Node (per .nvmrc)
         uses: actions/setup-node@v4
         with:
           node-version-file: ./.nvmrc
-          # IMPORTANT: no "cache: npm" here – that was causing the
-          # "Dependencies lock file is not found" error
+          cache: npm
 
       - name: Install pnpm (global via npm)
         run: npm install -g pnpm@10.20.0
 
-      - name: Verify pnpm is on PATH
+      - name: Show tool versions
         run: |
-          which pnpm || (echo "❌ pnpm not found on PATH" && exit 1)
-          echo "✅ pnpm found at: $(which pnpm)"
-          echo "node:  $(node -v)"
-          echo "pnpm:  $(pnpm -v)"
+          node -v
+          pnpm -v
 
       - name: Enforce Node engines (18.x or 20.x)
         run: |
@@ -82,34 +85,63 @@ jobs:
         run: pnpm exec prisma migrate deploy --schema=prisma/schema.prisma
 
       # -------------------------
-      # Build + Tests
+      # Build
       # -------------------------
       - name: Build API
         run: pnpm -F @repo/api build
 
-      - name: Run unit/integration tests
+      # -------------------------
+      # Jest tests (unit + e2e, including idempotency)
+      # Start API on port 4000 so idempotency.e2e can hit 127.0.0.1:4000
+      # -------------------------
+      - name: Start API for Jest e2e (port 4000)
+        env:
+          PORT: 4000
+        run: |
+          node apps/api/dist/main.js > api-test.log 2>&1 &
+          echo $! > api-test.pid
+          echo "Test API PID: $(cat api-test.pid)"
+
+          for i in {1..45}; do
+            if curl -fsS "http://127.0.0.1:4000/health" >/dev/null; then
+              echo "Test API health OK"
+              break
+            fi
+            echo "Waiting for test API on 4000... ($i/45)"
+            sleep 1
+          done
+
+          curl -fsS "http://127.0.0.1:4000/health"
+
+      - name: Run unit/integration + e2e tests
         run: pnpm -F @repo/api test
 
-      - name: Run E2E tests (API)
-        run: pnpm -F @repo/api test:e2e
+      - name: Stop API used for Jest e2e
+        if: always()
+        run: |
+          if [ -f api-test.pid ]; then
+            kill "$(cat api-test.pid)" || true
+            sleep 2
+            pkill -f "apps/api/dist/main.js" || true
+          fi
 
       # -------------------------
-      # Smoke
+      # Smoke (server on 4010 + smoke.sh)
       # -------------------------
-      - name: Start API (background, compiled on 4010)
+      - name: Start API for smoke (port 4010)
         env:
           PORT: 4010
         run: |
           node apps/api/dist/main.js > api.log 2>&1 &
           echo $! > api.pid
-          echo "Server PID: $(cat api.pid)"
+          echo "Smoke API PID: $(cat api.pid)"
 
-          for i in {1..60}; do
+          for i in {1..45}; do
             if curl -fsS "${API_BASE}/health" >/dev/null; then
-              echo "Health check OK"
+              echo "Smoke API health OK"
               break
             fi
-            echo "Waiting for API... ($i/60)"
+            echo "Waiting for API on 4010... ($i/45)"
             sleep 1
           done
 
@@ -123,7 +155,7 @@ jobs:
           bash ./scripts/smoke.sh --json | tee smoke-output.json
           echo "✅ Smoke test executed successfully"
 
-      - name: Stop API
+      - name: Stop API for smoke
         if: always()
         run: |
           if [ -f api.pid ]; then
@@ -132,6 +164,9 @@ jobs:
             pkill -f "apps/api/dist/main.js" || true
           fi
 
+      # -------------------------
+      # Artifacts (on failure)
+      # -------------------------
       - name: Upload logs (on failure)
         if: failure()
         uses: actions/upload-artifact@v4
@@ -139,4 +174,5 @@ jobs:
           name: api-logs
           path: |
             api.log
+            api-test.log
             apps/api/smoke-output.json
