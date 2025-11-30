@@ -2,9 +2,12 @@ name: API CI
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - ci-e2e-fix
   pull_request:
-    branches: [main]
+    branches:
+      - main
 
 concurrency:
   group: api-ci-${{ github.ref }}
@@ -31,7 +34,7 @@ jobs:
           --health-retries=30
 
     env:
-      # --- DB + runtime for tests ---
+      # DB + runtime
       NODE_ENV: test
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sbo_test?schema=public
 
@@ -40,7 +43,7 @@ jobs:
       BASE_URL: 'http://127.0.0.1:4000'
       API_BASE: 'http://127.0.0.1:4000'
 
-      # --- e2e helpers (if your tests read these) ---
+      # e2e helpers
       E2E_AUTO_CREATE_ORG: 'true'
       API_EMAIL: 'tester@example.com'
       API_PASS: 'secret123'
@@ -55,23 +58,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Use Node (per .nvmrc)
+      - name: Setup Node (from .nvmrc)
         uses: actions/setup-node@v4
         with:
           node-version-file: ./.nvmrc
-          # IMPORTANT: no "cache: pnpm" here
+          check-latest: true
+          # IMPORTANT: no cache: 'pnpm' here
 
       # -------------------------
-      # pnpm via corepack
+      # pnpm
       # -------------------------
-      - name: Enable corepack & pnpm
-        run: |
-          corepack enable
-          corepack prepare pnpm@10.2.1 --activate
+      - name: Install pnpm globally via npm
+        run: npm install -g pnpm@10.2.1
 
       - name: Show tool versions
         run: |
           node -v
+          npm -v
           pnpm -v
 
       - name: Enforce Node engines (18.x or 20.x)
@@ -79,7 +82,7 @@ jobs:
           node -e "const maj = +process.version.slice(1).split('.')[0]; if (maj < 18 || maj >= 21) { console.error('Unsupported Node major', maj); process.exit(1); }"
 
       # -------------------------
-      # Deps + Prisma
+      # Dependencies & Prisma
       # -------------------------
       - name: Install workspace dependencies
         run: pnpm install --frozen-lockfile
@@ -93,12 +96,17 @@ jobs:
         run: pnpm exec prisma migrate deploy --schema=prisma/schema.prisma
 
       # -------------------------
-      # Build + Tests
+      # Build + Unit tests
       # -------------------------
       - name: Build API
         run: pnpm -F @repo/api build
 
-      # Start API once for idempotency + e2e tests
+      - name: Run unit tests
+        run: pnpm -F @repo/api test
+
+      # -------------------------
+      # Start API for e2e
+      # -------------------------
       - name: Start API (background on 4000)
         env:
           PORT: 4000
@@ -108,7 +116,7 @@ jobs:
           echo "Server PID: $(cat api.pid)"
 
           for i in {1..60}; do
-            if curl -fsS "${API_BASE}/health" >/dev/null; then
+            if curl -fsS "http://127.0.0.1:4000/health" >/dev/null; then
               echo "Health check OK"
               break
             fi
@@ -116,14 +124,16 @@ jobs:
             sleep 1
           done
 
-          curl -fsS "${API_BASE}/health"
+      # -------------------------
+      # e2e (including idempotency)
+      # -------------------------
+      - name: Run e2e tests
+        working-directory: apps/api
+        run: pnpm test:e2e
 
-      - name: Run unit/integration tests
-        run: pnpm -F @repo/api test
-
-      - name: Run e2e tests (API)
-        run: pnpm -F @repo/api test:e2e
-
+      # -------------------------
+      # Teardown + logs
+      # -------------------------
       - name: Stop API
         if: always()
         run: |
