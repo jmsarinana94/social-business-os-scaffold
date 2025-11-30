@@ -31,15 +31,16 @@ jobs:
           --health-retries=30
 
     env:
+      # --- DB + runtime for tests ---
       NODE_ENV: test
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sbo_test?schema=public
 
-      # API in CI listens on 4000
+      # API will listen on 4000 inside CI
       PORT: '4000'
       BASE_URL: 'http://127.0.0.1:4000'
       API_BASE: 'http://127.0.0.1:4000'
 
-      # test user for e2e
+      # --- e2e helpers (if your tests read these) ---
       E2E_AUTO_CREATE_ORG: 'true'
       API_EMAIL: 'tester@example.com'
       API_PASS: 'secret123'
@@ -49,7 +50,7 @@ jobs:
 
     steps:
       # -------------------------
-      # Setup & Dependencies
+      # Checkout & Node
       # -------------------------
       - name: Checkout
         uses: actions/checkout@v4
@@ -58,55 +59,86 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version-file: ./.nvmrc
-          # ❗ Removed cache: 'npm' because this repo uses PNPM, not npm
+          cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
 
-      - name: Install pnpm (global)
-        run: npm install -g pnpm
+      - name: Install pnpm (global via npm)
+        run: npm install -g pnpm@10.20.0
 
-      - name: Show Node + pnpm versions
+      - name: Show tool versions
         run: |
           node -v
           pnpm -v
 
+      - name: Enforce Node engines (18.x or 20.x)
+        run: |
+          node -e "const maj = +process.version.slice(1).split('.')[0]; if (maj < 18 || maj >= 21) { console.error('Unsupported Node major', maj); process.exit(1); }"
+
       # -------------------------
-      # Install deps (monorepo)
+      # Install deps + Prisma
       # -------------------------
-      - name: Install dependencies
+      - name: Install workspace dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Enforce Node engines
-        run: node -e "console.log('Node OK')" # simple gate
-
-      # -------------------------
-      # Prepare API app
-      # -------------------------
-      - name: Generate Prisma Client
-        run: pnpm -F @repo/api prisma generate
-
-      - name: Run DB migrations
-        run: pnpm -F @repo/api prisma migrate deploy
-
-      - name: Seed database
-        run: pnpm -F @repo/api exec ts-node prisma/seed.ts
+      - name: Generate Prisma client
         working-directory: apps/api
+        run: pnpm exec prisma generate --schema=prisma/schema.prisma
+
+      - name: Apply DB migrations (deploy)
+        working-directory: apps/api
+        run: pnpm exec prisma migrate deploy --schema=prisma/schema.prisma
 
       # -------------------------
-      # Start API before tests
+      # Start API for e2e (port 4000)
       # -------------------------
+      - name: Build API
+        run: pnpm -F @repo/api build
+
       - name: Start API (background)
+        env:
+          PORT: 4000
         run: |
-          pnpm -F @repo/api start:prod &
-          sleep 8
-          echo "API started on port 4000"
+          node apps/api/dist/main.js > api.log 2>&1 &
+          echo $! > api.pid
+          echo "Server PID: $(cat api.pid)"
 
-      - name: Check API is healthy
-        run: curl -f http://127.0.0.1:4000/health
+          for i in {1..60}; do
+            if curl -fsS "http://127.0.0.1:4000/health" >/dev/null; then
+              echo "Health check OK"
+              break
+            fi
+            echo "Waiting for API... ($i/60)"
+            sleep 1
+          done
 
       # -------------------------
-      # Run Tests
+      # Tests
       # -------------------------
-      - name: Run unit tests
-        run: pnpm -F @repo/api test:unit
+      - name: Run unit tests (@repo/api)
+        working-directory: apps/api
+        run: pnpm test
 
-      - name: Run e2e tests
-        run: pnpm -F @repo/api test:e2e
+      - name: Run e2e tests (@repo/api)
+        working-directory: apps/api
+        run: pnpm test:e2e
+
+      # -------------------------
+      # Teardown + artifacts
+      # -------------------------
+      - name: Stop API
+        if: always()
+        run: |
+          if [ -f api.pid ]; then
+            kill "$(cat api.pid)" || true
+            sleep 2
+            pkill -f "apps/api/dist/main.js" || true
+          fi
+
+      - name: Upload logs (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-logs
+          path: |
+            api.log
+            apps/api/smoke-output.json
