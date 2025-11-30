@@ -59,11 +59,15 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version-file: ./.nvmrc
-          cache: 'pnpm'
-          cache-dependency-path: pnpm-lock.yaml
+          # IMPORTANT: no "cache: pnpm" here
 
-      - name: Install pnpm (global via npm)
-        run: npm install -g pnpm@10.20.0
+      # -------------------------
+      # pnpm via corepack
+      # -------------------------
+      - name: Enable corepack & pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.2.1 --activate
 
       - name: Show tool versions
         run: |
@@ -75,7 +79,7 @@ jobs:
           node -e "const maj = +process.version.slice(1).split('.')[0]; if (maj < 18 || maj >= 21) { console.error('Unsupported Node major', maj); process.exit(1); }"
 
       # -------------------------
-      # Install deps + Prisma
+      # Deps + Prisma
       # -------------------------
       - name: Install workspace dependencies
         run: pnpm install --frozen-lockfile
@@ -89,12 +93,13 @@ jobs:
         run: pnpm exec prisma migrate deploy --schema=prisma/schema.prisma
 
       # -------------------------
-      # Start API for e2e (port 4000)
+      # Build + Tests
       # -------------------------
       - name: Build API
         run: pnpm -F @repo/api build
 
-      - name: Start API (background)
+      # Start API once for idempotency + e2e tests
+      - name: Start API (background on 4000)
         env:
           PORT: 4000
         run: |
@@ -103,7 +108,7 @@ jobs:
           echo "Server PID: $(cat api.pid)"
 
           for i in {1..60}; do
-            if curl -fsS "http://127.0.0.1:4000/health" >/dev/null; then
+            if curl -fsS "${API_BASE}/health" >/dev/null; then
               echo "Health check OK"
               break
             fi
@@ -111,20 +116,14 @@ jobs:
             sleep 1
           done
 
-      # -------------------------
-      # Tests
-      # -------------------------
-      - name: Run unit tests (@repo/api)
-        working-directory: apps/api
-        run: pnpm test
+          curl -fsS "${API_BASE}/health"
 
-      - name: Run e2e tests (@repo/api)
-        working-directory: apps/api
-        run: pnpm test:e2e
+      - name: Run unit/integration tests
+        run: pnpm -F @repo/api test
 
-      # -------------------------
-      # Teardown + artifacts
-      # -------------------------
+      - name: Run e2e tests (API)
+        run: pnpm -F @repo/api test:e2e
+
       - name: Stop API
         if: always()
         run: |
