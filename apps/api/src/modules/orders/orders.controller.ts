@@ -1,3 +1,5 @@
+// apps/api/src/modules/orders/orders.controller.ts
+
 import {
   BadRequestException,
   Body,
@@ -19,11 +21,13 @@ export class OrdersController {
     return this.orders.health();
   }
 
+  /**
+   * Helper to ensure we always have an org id from the X-Org header.
+   */
   private getOrgIdOrThrow(orgHeader?: string): string {
     if (!orgHeader) {
       throw new BadRequestException('X-Org header is required');
     }
-
     return orgHeader;
   }
 

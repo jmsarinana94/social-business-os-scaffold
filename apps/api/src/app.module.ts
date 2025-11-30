@@ -3,10 +3,11 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 
+// Root controllers & services
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
-// Core modules
+// Core infrastructure modules
 import { AuthModule } from './modules/auth/auth.module';
 import { OrgsModule } from './modules/orgs/orgs.module';
 import { PrismaModule } from './modules/prisma/prisma.module';
@@ -16,38 +17,49 @@ import { ProductsModule } from './modules/products/products.module';
 import { AccountsModule } from './modules/accounts/accounts.module';
 import { ContactsModule } from './modules/contacts/contacts.module';
 
-// System / infra
+// Infra / system modules
 import { HealthModule } from './modules/health/health.module';
 import { VersionModule } from './modules/version/version.module';
 
-// Biz modules we’re wiring up now
+// Business modules
 import { BillingModule } from './modules/billing/billing.module';
 import { CategoriesModule } from './modules/categories/categories.module';
 import { OrdersModule } from './modules/orders/orders.module';
 
 @Module({
   imports: [
-    // Load env variables globally
+    /**
+     * Load .env globally (Nest best practice)
+     * - Looks for .env and prisma/.env
+     */
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: ['.env', 'prisma/.env'],
     }),
 
-    // Core infra
+    /**
+     * Core backend infrastructure
+     */
     PrismaModule,
     AuthModule,
     OrgsModule,
     ProductsModule,
 
-    // CRM
+    /**
+     * CRM modules
+     */
     AccountsModule,
     ContactsModule,
 
-    // System
+    /**
+     * System / infra endpoints
+     */
     HealthModule,
     VersionModule,
 
-    // Biz modules
+    /**
+     * Business modules (billing, categories, orders)
+     */
     BillingModule,
     CategoriesModule,
     OrdersModule,

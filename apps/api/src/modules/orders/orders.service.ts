@@ -1,13 +1,13 @@
 // apps/api/src/modules/orders/orders.service.ts
 
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { OrderStatus } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
+import { OrderStatus, PrismaClient } from '@prisma/client';
 import { CreateOrderDto } from './dto/create-order.dto';
 
 @Injectable()
 export class OrdersService {
-  constructor(private readonly prisma: PrismaService) {}
+  // Temporary: use a local PrismaClient instead of DI
+  private readonly prisma = new PrismaClient();
 
   health() {
     return { ok: true, scope: 'orders' };
