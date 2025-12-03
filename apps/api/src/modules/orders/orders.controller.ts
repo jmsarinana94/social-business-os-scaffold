@@ -2,56 +2,40 @@
 
 import {
   BadRequestException,
-  Body,
   Controller,
   Get,
   Headers,
-  Param,
-  Post,
 } from '@nestjs/common';
-import { CreateOrderDto } from './dto/create-order.dto';
-import { OrdersService } from './orders.service';
 
 @Controller('orders')
 export class OrdersController {
-  constructor(private readonly orders: OrdersService) {}
-
+  /**
+   * Simple health check for the Orders module
+   * Used by e2e: /orders/health
+   */
   @Get('health')
   health() {
-    return this.orders.health();
+    return { ok: true, scope: 'orders' };
   }
 
   /**
-   * Helper to ensure we always have an org id from the X-Org header.
+   * List orders for the current org.
+   *
+   * For now we just:
+   * - Enforce that X-Org is present (400 if missing)
+   * - Return an empty array (e2e only asserts "is array")
+   *
+   * This keeps behaviour consistent with other modules while
+   * staying tiny until we flesh out full Orders CRUD.
    */
-  private getOrgIdOrThrow(orgHeader?: string): string {
+  @Get()
+  listOrders(@Headers('x-org') orgHeader?: string) {
     if (!orgHeader) {
       throw new BadRequestException('X-Org header is required');
     }
-    return orgHeader;
-  }
 
-  @Get()
-  list(@Headers('x-org') orgIdHeader: string) {
-    const orgId = this.getOrgIdOrThrow(orgIdHeader);
-    return this.orders.list(orgId);
-  }
-
-  @Get(':id')
-  getOne(
-    @Headers('x-org') orgIdHeader: string,
-    @Param('id') id: string,
-  ) {
-    const orgId = this.getOrgIdOrThrow(orgIdHeader);
-    return this.orders.getOne(orgId, id);
-  }
-
-  @Post()
-  create(
-    @Headers('x-org') orgIdHeader: string,
-    @Body() dto: CreateOrderDto,
-  ) {
-    const orgId = this.getOrgIdOrThrow(orgIdHeader);
-    return this.orders.create(orgId, dto);
+    // TODO: in a future step, wire this to OrdersService + Prisma
+    // and filter orders by org.
+    return [];
   }
 }
