@@ -15,14 +15,17 @@ const FORCE_E2E_ACCOUNTS =
   process.env.FORCE_E2E_ACCOUNTS === '1' ||
   process.env.FORCE_E2E_ACCOUNTS === 'true';
 
-const isEchoBase =
-  BASE.includes('127.0.0.1:4010') ||
-  BASE.includes('localhost:4010');
-
-const SKIP = isEchoBase && !FORCE_E2E_ACCOUNTS;
+/**
+ * By default, do NOT skip this suite.
+ * You can skip via SKIP_E2E_ACCOUNTS=1, unless FORCE_E2E_ACCOUNTS is set.
+ */
+const SKIP =
+  (process.env.SKIP_E2E_ACCOUNTS === '1' ||
+    process.env.SKIP_E2E_ACCOUNTS === 'true') &&
+  !FORCE_E2E_ACCOUNTS;
 
 if (process.env.DEBUG_E2E_ACCOUNTS) {
-  // This is the line that produced:
+  // Example:
   // [e2e][accounts] BASE=http://127.0.0.1:4010 ORG=demo SKIP=false FORCE=true
   console.log(
     `[e2e][accounts] BASE=${BASE} ORG=${ORG} SKIP=${SKIP} FORCE=${FORCE_E2E_ACCOUNTS}`,
