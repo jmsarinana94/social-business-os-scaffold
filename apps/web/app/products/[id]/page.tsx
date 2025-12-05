@@ -1,13 +1,13 @@
 'use client';
 
+import { useParams, useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+
 import {
   deleteProduct,
   getProductById,
-  updateProduct,
-  type Product
-} from '@/lib/api';
-import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+  Product,
+  updateProduct} from '@/lib/api';
 
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();

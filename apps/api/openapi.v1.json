@@ -1,1 +1,138 @@
-{"openapi":"3.0.0","paths":{"/v1/auth/signup":{"post":{"operationId":"AuthController_signup_v1","parameters":[],"responses":{"201":{"description":""}},"tags":["Auth"]}},"/v1/auth/login":{"post":{"operationId":"AuthController_login_v1","parameters":[],"responses":{"200":{"description":""}},"tags":["Auth"]}},"/v1/auth/me":{"get":{"operationId":"AuthController_me_v1","parameters":[],"responses":{"200":{"description":""}},"tags":["Auth"]}},"/v1/products":{"get":{"operationId":"ProductsController_list_v1","parameters":[],"responses":{"200":{"description":""}},"tags":["Products"]},"post":{"operationId":"ProductsController_create_v1","parameters":[],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/CreateProductDto"}}}},"responses":{"201":{"description":""}},"tags":["Products"]}},"/v1/products/{id}":{"get":{"operationId":"ProductsController_getOne_v1","parameters":[{"name":"id","required":true,"in":"path","schema":{"type":"string"}}],"responses":{"200":{"description":""}},"tags":["Products"]},"put":{"operationId":"ProductsController_update_v1","parameters":[{"name":"id","required":true,"in":"path","schema":{"type":"string"}}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/UpdateProductDto"}}}},"responses":{"200":{"description":""}},"tags":["Products"]},"delete":{"operationId":"ProductsController_remove_v1","parameters":[{"name":"id","required":true,"in":"path","schema":{"type":"string"}}],"responses":{"200":{"description":""}},"tags":["Products"]}},"/v1/products/{id}/inventory":{"get":{"operationId":"ProductsController_getInventory_v1","parameters":[{"name":"id","required":true,"in":"path","schema":{"type":"string"}}],"responses":{"200":{"description":""}},"tags":["Products"]},"post":{"operationId":"ProductsController_addInventory_v1","parameters":[{"name":"id","required":true,"in":"path","schema":{"type":"string"}}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/AdjustInventoryDto"}}}},"responses":{"200":{"description":""}},"tags":["Products"]}},"/v1/health":{"get":{"operationId":"HealthController_basic_v1","parameters":[],"responses":{"200":{"description":""}},"tags":["Health"]}},"/v1/health/z":{"get":{"operationId":"HealthController_healthz_v1","parameters":[],"responses":{"200":{"description":""}},"tags":["Health"]}}},"info":{"title":"Social Business OS – API","description":"Public API (v1)","version":"1.0.0","contact":{}},"tags":[],"servers":[],"components":{"securitySchemes":{"bearer":{"scheme":"bearer","bearerFormat":"JWT","type":"http"}},"schemas":{"CreateProductDto":{"type":"object","properties":{}},"UpdateProductDto":{"type":"object","properties":{}},"AdjustInventoryDto":{"type":"object","properties":{}}}},"security":[{"bearer":[]}]}
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/v1/auth/signup": {
+      "post": {
+        "operationId": "AuthController_signup_v1",
+        "parameters": [],
+        "responses": { "201": { "description": "" } },
+        "tags": ["Auth"]
+      }
+    },
+    "/v1/auth/login": {
+      "post": {
+        "operationId": "AuthController_login_v1",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Auth"]
+      }
+    },
+    "/v1/auth/me": {
+      "get": {
+        "operationId": "AuthController_me_v1",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Auth"]
+      }
+    },
+    "/v1/products": {
+      "get": {
+        "operationId": "ProductsController_list_v1",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Products"]
+      },
+      "post": {
+        "operationId": "ProductsController_create_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/CreateProductDto" } }
+          }
+        },
+        "responses": { "201": { "description": "" } },
+        "tags": ["Products"]
+      }
+    },
+    "/v1/products/{id}": {
+      "get": {
+        "operationId": "ProductsController_getOne_v1",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Products"]
+      },
+      "put": {
+        "operationId": "ProductsController_update_v1",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/UpdateProductDto" } }
+          }
+        },
+        "responses": { "200": { "description": "" } },
+        "tags": ["Products"]
+      },
+      "delete": {
+        "operationId": "ProductsController_remove_v1",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Products"]
+      }
+    },
+    "/v1/products/{id}/inventory": {
+      "get": {
+        "operationId": "ProductsController_getInventory_v1",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Products"]
+      },
+      "post": {
+        "operationId": "ProductsController_addInventory_v1",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/AdjustInventoryDto" } }
+          }
+        },
+        "responses": { "200": { "description": "" } },
+        "tags": ["Products"]
+      }
+    },
+    "/v1/health": {
+      "get": {
+        "operationId": "HealthController_basic_v1",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Health"]
+      }
+    },
+    "/v1/health/z": {
+      "get": {
+        "operationId": "HealthController_healthz_v1",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Health"]
+      }
+    }
+  },
+  "info": {
+    "title": "Social Business OS – API",
+    "description": "Public API (v1)",
+    "version": "1.0.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": { "bearer": { "scheme": "bearer", "bearerFormat": "JWT", "type": "http" } },
+    "schemas": {
+      "CreateProductDto": { "type": "object", "properties": {} },
+      "UpdateProductDto": { "type": "object", "properties": {} },
+      "AdjustInventoryDto": { "type": "object", "properties": {} }
+    }
+  },
+  "security": [{ "bearer": [] }]
+}

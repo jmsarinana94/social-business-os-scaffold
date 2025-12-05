@@ -1,8 +1,9 @@
 // apps/web/app/products/components/AddProductModal.tsx
 'use client';
 
-import { createProduct } from '@/lib/api';
 import { useState } from 'react';
+
+import { createProduct } from '@/lib/api';
 
 type Props = {
   open: boolean;

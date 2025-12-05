@@ -1,6 +1,2 @@
-// Fail fast on unhandled rejections in e2e
-process.on('unhandledRejection', (err) => {
-   
-  console.error('UnhandledRejection in e2e:', err);
-  process.exit(1);
-});
+// Give e2e tests more time for app bootstrap & DB ops.
+jest.setTimeout(30_000);

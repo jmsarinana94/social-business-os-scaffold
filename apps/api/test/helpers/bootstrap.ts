@@ -1,5 +1,6 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+
 import { AppModule } from '../../src/app.module';
 
 export async function bootstrapE2E(): Promise<INestApplication> {
@@ -9,12 +10,13 @@ export async function bootstrapE2E(): Promise<INestApplication> {
 
   const app = moduleRef.createNestApplication();
 
-  // Match production/global setup that other suites expect
+  // Validation to match tests (reject extra props, transform types)
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
+      transformOptions: { enableImplicitConversion: true },
     }),
   );
 

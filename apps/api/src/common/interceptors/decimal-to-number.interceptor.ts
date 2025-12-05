@@ -4,7 +4,7 @@ import {
     Injectable,
     NestInterceptor,
 } from '@nestjs/common';
-import { Observable, map } from 'rxjs';
+import { map,Observable } from 'rxjs';
 
 // Only coerce for these fields to avoid touching IDs etc.
 const NUMERIC_FIELD_WHITELIST = new Set(['price']);

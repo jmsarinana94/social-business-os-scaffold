@@ -1,56 +1,55 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Injectable } from '@nestjs/common';
+import { Organization, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class OrgsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll() {
-    return this.prisma.organization.findMany({ orderBy: { createdAt: 'desc' } });
+  /** Primary finder used across modules */
+  async findBySlug(slug: string): Promise<Organization | null> {
+    if (!slug) return null;
+    return this.prisma.organization.findUnique({ where: { slug } });
   }
 
-  async findById(id: string) {
-    const org = await this.prisma.organization.findUnique({ where: { id } });
-    if (!org) throw new NotFoundException('Organization not found');
-    return org;
+  /** Idempotent ensure by slug (kept from earlier step) */
+  async ensure(slug: string, name: string): Promise<Organization> {
+    return this.prisma.organization.upsert({
+      where: { slug },
+      update: { name },
+      create: { slug, name },
+    });
   }
 
-  async findBySlug(slug: string) {
-    const org = await this.prisma.organization.findUnique({ where: { slug } });
-    if (!org) throw new NotFoundException('Organization not found');
-    return org;
+  /** Create via object (original shape) */
+  async create(input: { slug: string; name: string }): Promise<Organization>;
+
+  /** Create via (slug, name) — used by your controller/tests */
+  async create(slug: string, name?: string): Promise<Organization>;
+
+  /** Impl for both create signatures */
+  async create(
+    arg1: { slug: string; name: string } | string,
+    nameMaybe?: string,
+  ): Promise<Organization> {
+    const data: Prisma.OrganizationCreateInput =
+      typeof arg1 === 'string'
+        ? { slug: arg1, name: nameMaybe ?? arg1 }
+        : { slug: arg1.slug, name: arg1.name };
+
+    return this.prisma.organization.create({ data });
   }
 
-  async create(data: { name: string; slug?: string }) {
-    // prisma type requires slug, but schema often has slug unique & required
-    // if slug omitted, derive a simple one
-    const payload: Prisma.OrganizationCreateInput = {
-      name: data.name,
-      slug:
-        (data.slug ?? data.name ?? 'org')
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, '-')
-          .replace(/(^-|-$)/g, '') || 'org',
-    };
-    return this.prisma.organization.create({ data: payload });
+  /** Controller/tests call this.orgs.get(slug) */
+  async get(slug: string): Promise<Organization | null> {
+    return this.findBySlug(slug);
   }
 
-  async update(id: string, data: Partial<{ name: string; slug: string }>) {
-    const existing = await this.prisma.organization.findUnique({ where: { id } });
-    if (!existing) throw new NotFoundException('Organization not found');
-
-    const payload: Prisma.OrganizationUpdateInput = {};
-    if (data.name !== undefined) payload.name = data.name;
-    if (data.slug !== undefined) payload.slug = data.slug;
-
-    return this.prisma.organization.update({ where: { id }, data: payload });
-  }
-
-  async remove(id: string) {
-    const existing = await this.prisma.organization.findUnique({ where: { id } });
-    if (!existing) throw new NotFoundException('Organization not found');
-    await this.prisma.organization.delete({ where: { id } });
-    return { deleted: true };
+  /** Helper: orgs for a given user */
+  async listForUser(userId: string) {
+    return this.prisma.organization.findMany({
+      where: { members: { some: { userId } } },
+      orderBy: { createdAt: 'asc' },
+    });
   }
 }

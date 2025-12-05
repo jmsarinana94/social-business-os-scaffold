@@ -1,0 +1,47 @@
+name: Quality Gate (Format, Lint, Types)
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - develop
+      - feat/**
+      - fix/**
+      - chore/**
+
+concurrency:
+  group: quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.20.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install deps
+        run: pnpm -w install --frozen-lockfile
+
+      - name: Prettier format check
+        run: pnpm -w run fmt:check
+
+      - name: ESLint (fail on warnings)
+        run: pnpm -w run lint
+
+      - name: Type check (if present in any package)
+        run: pnpm -w run -r --if-present typecheck

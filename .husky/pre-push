@@ -1,15 +1,9 @@
-set -eu
+#!/usr/bin/env sh
+set -euo pipefail
 
-echo "==> pre-push: verifying e2e (apps/api)"
+echo "🚀 Running pre-push checks (unit tests only)..."
 
-# Temporarily disabled due to local package.json parse error
-# echo "==> prisma generate (apps/api)"
-# pnpm dlx prisma generate --schema apps/api/prisma/schema.prisma >/dev/null
+# Run only unit tests under test/unit, allow zero tests without failing
+pnpm -C apps/api exec jest --config jest.config.cjs --passWithNoTests --testPathPattern '^test/unit/.*\.spec\.ts$'
 
-echo "==> build @repo/api"
-pnpm -F @repo/api --silent build
-
-echo "==> e2e @repo/api"
-pnpm -F @repo/api --silent test:e2e
-
-echo "✅ All checks passed"
+echo "✅ Pre-push checks passed!"

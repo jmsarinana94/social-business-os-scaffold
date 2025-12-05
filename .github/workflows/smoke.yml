@@ -1,0 +1,41 @@
+name: smoke
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+
+    env:
+      NODE_ENV: test
+      API_BASE: 'http://127.0.0.1:4010'
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js (per .nvmrc)
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ./.nvmrc
+          # no cache here
+
+      - name: Install pnpm (global via npm)
+        run: npm install -g pnpm@10.20.0
+
+      - name: Show tool versions
+        run: |
+          node -v
+          pnpm -v
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build API
+        run: pnpm -F @repo/api build
+
+      - name: Run smoke test
+        run: pnpm -F @repo/api smoke

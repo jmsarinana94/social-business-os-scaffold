@@ -1,29 +1,43 @@
 {
-  "name": "web",
+  "name": "@repo/web",
   "private": true,
+  "version": "1.0.0",
+  "description": "Next.js frontend for the Social Business OS monorepo",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "eslint ."
+    "fmt": "prettier --write ."
   },
   "dependencies": {
     "@repo/ui": "workspace:*",
     "next": "14.2.6",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "zod": "^3.23.8"
+    "zod": "^3.23.8",
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^2.5.1"
   },
   "devDependencies": {
     "@types/node": "^20.14.10",
-    "@types/react": "19.1.10",
+    "@types/react": "^19.1.10",
     "@typescript-eslint/eslint-plugin": "^8.0.1",
     "@typescript-eslint/parser": "^8.0.1",
     "autoprefixer": "^10.4.21",
     "eslint": "^9.8.0",
+    "eslint-config-next": "14.2.6",
+    "eslint-plugin-jsx-a11y": "^6.8.0",
+    "eslint-plugin-react": "^7.35.0",
+    "eslint-plugin-react-hooks": "^5.1.0",
     "postcss": "^8.5.6",
+    "prettier": "^3.3.3",
+    "prettier-plugin-tailwindcss": "^0.7.1",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.5.4"
+  },
+  "engines": {
+    "node": ">=18.17.0"
   }
 }

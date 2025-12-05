@@ -5,13 +5,10 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite" // uses DATABASE_URL from .env
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-//
-// Enums
-//
 enum ProductType {
   PHYSICAL
   DIGITAL
@@ -22,50 +19,90 @@ enum ProductStatus {
   INACTIVE
 }
 
-//
-// Models
-//
-model User {
-  id            String      @id @default(cuid())
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-  email         String      @unique
-  passwordHash  String      @map("passwordHash")
-  lastLoginAt   DateTime?
+enum SubscriptionPlan {
+  FREE
+  STARTER
+  GROWTH
+  ENTERPRISE
+}
 
-  memberships   OrgMember[]
+enum ActivityType {
+  NOTE
+  TASK
+  CALL
+  EMAIL
+  MEETING
+}
+
+enum OrderStatus {
+  DRAFT
+  PENDING
+  PAID
+  CANCELED
+}
+
+/**
+ * =========================
+ * Core auth / org models
+ * =========================
+ */
+
+model User {
+  id           String      @id @default(cuid())
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  email        String      @unique
+  passwordHash String      @map("passwordHash")
+  lastLoginAt  DateTime?
+  memberships  OrgMember[]
+  activities   Activity[]  // author of activities (optional usage)
+  Account      Account[]
+  Contact      Contact[]
+  AuditLog     AuditLog[]
 
   @@map("User")
 }
 
 model Organization {
-  id        String      @id @default(cuid())
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
-
-  slug      String      @unique
-  name      String
-
-  members   OrgMember[]
-  products  Product[]
-  categories Category[]
+  id                   String           @id @default(cuid())
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+  slug                 String           @unique
+  name                 String
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  subscriptionPlan     SubscriptionPlan @default(FREE)
+  subscriptionStatus   String?
+  subscriptionRenewsAt DateTime?
+  members              OrgMember[]
+  products             Product[]
+  categories           Category[]
+  // CRM relations
+  accounts             Account[]
+  contacts             Contact[]
+  pipelines            Pipeline[]
+  deals                Deal[]
+  activities           Activity[]
+  auditLogs            AuditLog[]
+  // Orders
+  orders               Order[]
 
   @@map("Org")
 }
 
 model OrgMember {
-  id             String        @id @default(cuid())
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-
+  id             String       @id @default(cuid())
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
   organizationId String
   userId         String
-  role           String        @default("MEMBER")
-
-  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role           String       @default("MEMBER")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([organizationId, userId])
+  @@index([organizationId])
+  @@index([userId])
   @@map("OrgMember")
 }
 
@@ -73,42 +110,244 @@ model Category {
   id             String       @id @default(cuid())
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
-
   organizationId String
   name           String
-  description    String?      // <-- this line must exist
-
+  description    String?
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   products       Product[]
 
   @@unique([organizationId, name])
+  @@index([organizationId])
   @@map("Category")
 }
 
 model Product {
-  id              String         @id @default(cuid())
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-
+  id              String        @id @default(cuid())
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
   organizationId  String
-  organization    Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-
-  // Optional link to Category (same org)
+  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   categoryId      String?
-  category        Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-
+  category        Category?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   title           String
   sku             String
-
   description     String?
   type            ProductType
   status          ProductStatus
-
-  price           Decimal
-
-  inventoryQty    Int            @default(0)
+  // Postgres: use Decimal without @db.Native for portability across providers
+  price           Decimal       @default(0)
+  inventoryQty    Int           @default(0)
   lastPurchasedAt DateTime?
+  // Order items
+  orderItems      OrderItem[]
 
   @@unique([organizationId, sku])
+  @@index([organizationId])
+  @@index([categoryId])
   @@map("Product")
+}
+
+/**
+ * =========================
+ * CRM: Accounts & Contacts
+ * =========================
+ */
+
+model Account {
+  id             String       @id @default(cuid())
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organizationId String
+  name           String
+  // Full website URL, e.g. "https://example.com"
+  website        String?      @db.VarChar(2048)
+  // Bare domain, e.g. "example.com"
+  domain         String?
+  description    String?
+  ownerUserId    String?
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  owner          User?        @relation(fields: [ownerUserId], references: [id], onDelete: SetNull)
+  contacts       Contact[]
+  deals          Deal[]
+  orders         Order[]
+
+  @@unique([organizationId, domain])
+  @@index([organizationId, name])
+  @@map("Account")
+}
+
+model Contact {
+  id             String       @id @default(cuid())
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organizationId String
+  accountId      String?
+  email          String?
+  phone          String?
+  firstName      String
+  lastName       String
+  title          String?
+  ownerUserId    String?
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  account        Account?     @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  owner          User?        @relation(fields: [ownerUserId], references: [id], onDelete: SetNull)
+  deals          Deal[]
+  activities     Activity[]
+  orders         Order[]
+
+  @@unique([organizationId, email])
+  @@index([organizationId, lastName, firstName])
+  @@map("Contact")
+}
+
+/**
+ * =========================
+ * Sales scaffolding
+ * =========================
+ */
+
+model Pipeline {
+  id             String       @id @default(cuid())
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organizationId String
+  name           String
+  stages         Stage[]
+  deals          Deal[]
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("Pipeline")
+}
+
+model Stage {
+  id         String   @id @default(cuid())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  pipelineId String
+  name       String
+  order      Int      @default(0)
+  pipeline   Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  deals      Deal[]
+
+  @@unique([pipelineId, name])
+  @@index([pipelineId, order])
+  @@map("Stage")
+}
+
+model Deal {
+  id             String       @id @default(cuid())
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organizationId String
+  pipelineId     String
+  stageId        String?
+  accountId      String?
+  contactId      String?
+  name           String
+  amount         Decimal      @default(0)
+  closeDate      DateTime?
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  pipeline       Pipeline     @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  stage          Stage?       @relation(fields: [stageId], references: [id], onDelete: SetNull)
+  account        Account?     @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  contact        Contact?     @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  activities     Activity[]
+
+  @@index([organizationId])
+  @@index([pipelineId])
+  @@index([stageId])
+  @@map("Deal")
+}
+
+/**
+ * =========================
+ * Orders
+ * =========================
+ */
+
+model Order {
+  id             String       @id @default(cuid())
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organizationId String
+  accountId      String?
+  contactId      String?
+  status         OrderStatus  @default(PENDING)
+  currency       String       @default("USD")
+  total          Decimal      @default(0)
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  account        Account?     @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  contact        Contact?     @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  items          OrderItem[]
+
+  @@index([organizationId])
+  @@index([accountId])
+  @@index([contactId])
+  @@map("Order")
+}
+
+model OrderItem {
+  id         String   @id @default(cuid())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  orderId    String
+  productId  String
+  quantity   Int      @default(1)
+  unitPrice  Decimal  @default(0)
+  lineTotal  Decimal  @default(0)
+
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([productId])
+  @@map("OrderItem")
+}
+
+/**
+ * =========================
+ * Activity & Audit
+ * =========================
+ */
+
+model Activity {
+  id             String       @id @default(cuid())
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organizationId String
+  authorUserId   String?
+  type           ActivityType @default(NOTE)
+  summary        String
+  details        String?
+  // Optional relations for flexible logging
+  contactId      String?
+  dealId         String?
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  author         User?        @relation(fields: [authorUserId], references: [id], onDelete: SetNull)
+  contact        Contact?     @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  deal           Deal?        @relation(fields: [dealId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, type])
+  @@index([contactId])
+  @@index([dealId])
+  @@map("Activity")
+}
+
+model AuditLog {
+  id             String       @id @default(cuid())
+  createdAt      DateTime     @default(now())
+  organizationId String
+  userId         String?
+  entity         String // e.g., 'Product', 'Account'
+  entityId       String
+  action         String // e.g., 'CREATE', 'UPDATE', 'DELETE'
+  diff           Json?
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, entity, action])
+  @@map("AuditLog")
 }

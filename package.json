@@ -2,32 +2,93 @@
   "name": "social-business-os-scaffold-v0.2",
   "version": "0.1.0",
   "private": true,
-  "scripts": {
-    "build": "turbo run build",
-    "dev": "turbo run dev --parallel",
-    "lint": "turbo run lint",
-    "test": "turbo run test",
-    "format": "prettier --write .",
-    "api:dev": "pnpm -C apps/api start",
-    "api:build": "pnpm -C apps/api build",
-    "api:smoke": "./apps/api/scripts/smoke.sh",
-    "api:e2e": "pnpm -C apps/api run e2e:quick",
-    "api:reset": "./apps/api/scripts/prisma-reset.sh && ./apps/api/scripts/prisma-seed-demo.sh",
-    "prisma:generate": "pnpm -C apps/api prisma generate",
-    "prisma:studio": "pnpm -C apps/api prisma studio",
-    "prisma:migrate": "pnpm -C apps/api prisma migrate dev"
-  },
-  "devDependencies": {
-    "prettier": "^3.3.3",
-    "prisma": "6.17.1",
-    "turbo": "^2.1.1"
-  },
+  "packageManager": "pnpm@10.20.0",
   "workspaces": [
     "apps/*",
     "packages/*"
   ],
   "engines": {
     "node": ">=20.0.0",
-    "pnpm": ">=9.0.0"
+    "pnpm": ">=10.0.0"
+  },
+  "scripts": {
+    "// ---------------------------------------------------------------------": "",
+    "// Core monorepo scripts": "",
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "test:coverage": "turbo run test -- --coverage",
+    "test:unit:api": "pnpm -C apps/api exec jest --config jest.config.cjs --passWithNoTests --testPathPattern '^test/unit/.*\\.spec\\.ts$'",
+    "test:e2e": "dotenv -e .env.test -- jest --config ./jest-e2e.config.cjs --runInBand",
+    "test:e2e:cov": "dotenv -e .env.test -- jest --config ./jest-e2e.config.cjs --runInBand --coverage",
+    "clean": "turbo run clean && pnpm -r exec rimraf dist node_modules .turbo",
+    "prepare": "husky install",
+    "// ---------------------------------------------------------------------": "",
+    "// Linting & formatting": "",
+    "lint": "eslint . --ext .js,.jsx,.ts,.tsx --max-warnings 0",
+    "lint:fix": "eslint . --ext .js,.jsx,.ts,.tsx --fix",
+    "format": "prettier --plugin-search-dir=. --write .",
+    "format:check": "prettier --plugin-search-dir=. --check .",
+    "typecheck": "pnpm -r --parallel --if-present run typecheck",
+    "// ---------------------------------------------------------------------": "",
+    "// Husky / lint-staged hooks": "",
+    "precommit": "pnpm exec lint-staged",
+    "// ---------------------------------------------------------------------": "",
+    "// API / Prisma utilities": "",
+    "api:dev": "pnpm --filter @repo/api dev",
+    "api:build": "pnpm --filter @repo/api build",
+    "api:smoke": "bash ./apps/api/scripts/smoke.sh",
+    "api:e2e": "pnpm --filter @repo/api run test:e2e",
+    "api:reset": "bash ./apps/api/scripts/prisma-reset.sh && bash ./apps/api/scripts/prisma-seed-demo.sh",
+    "db:seed:products": "pnpm --filter @repo/api exec ts-node packages/db/prisma/seed-products.ts",
+    "prisma:generate": "pnpm --filter @repo/api exec prisma generate",
+    "prisma:studio": "pnpm --filter @repo/api exec prisma studio",
+    "prisma:migrate": "pnpm --filter @repo/api exec prisma migrate dev",
+    "// ---------------------------------------------------------------------": "",
+    "// Prettier wrappers": "",
+    "fmt": "node ./scripts/prettier.mjs --write .",
+    "fmt:check": "node ./scripts/prettier.mjs --check .",
+    "typecheck": "tsc -p tsconfig.json --noEmit --pretty false"
+  },
+  "dependencies": {
+    "@prisma/client": "6.18.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.38.0",
+    "@next/eslint-plugin-next": "16.0.1",
+    "@types/node": "24.9.2",
+    "@typescript-eslint/eslint-plugin": "^8.46.2",
+    "@typescript-eslint/parser": "^8.46.2",
+    "eslint": "^9.38.0",
+    "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-import": "2.32.0",
+    "eslint-plugin-jsx-a11y": "6.10.2",
+    "eslint-plugin-react": "7.37.5",
+    "eslint-plugin-react-hooks": "7.0.1",
+    "eslint-plugin-simple-import-sort": "12.1.1",
+    "eslint-plugin-unused-imports": "4.3.0",
+    "husky": "9.1.7",
+    "lint-staged": "15.2.10",
+    "prettier": "^3.6.2",
+    "prettier-plugin-prisma": "5.0.0",
+    "prettier-plugin-tailwindcss": "0.7.1",
+    "prisma": "6.18.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "rimraf": "6.1.0",
+    "turbo": "^2.5.8",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.46.2"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx}": [
+      "eslint --fix"
+    ],
+    "*.{ts,tsx}": [
+      "tsc -p tsconfig.json --noEmit --pretty false"
+    ],
+    "*.{json,md,css,scss,html,yml,yaml}": [
+      "prettier --write"
+    ]
   }
 }

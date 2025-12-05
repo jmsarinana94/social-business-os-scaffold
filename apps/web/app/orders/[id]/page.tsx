@@ -1,13 +1,14 @@
 'use client';
 
-import {
-  getOrder,
-  updateOrderStatus,
-  type Order,
-  type OrderStatus,
-} from '@/lib/api';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
+
+import {
+  getOrder,
+  Order,
+  OrderStatus,
+  updateOrderStatus,
+} from '@/lib/api';
 
 const STATUS_OPTIONS: OrderStatus[] = ['PENDING', 'PAID', 'FULFILLED', 'CANCELLED'];
 

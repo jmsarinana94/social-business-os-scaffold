@@ -1,36 +1,80 @@
+// apps/api/src/modules/auth/auth.controller.ts
 import {
-  BadRequestException,
   Body,
   Controller,
   Get,
+  Headers,
   HttpCode,
+  HttpStatus,
   Post,
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
-import { AuthService, LoginDto } from './auth.service';
+import { AuthService } from './auth.service';
+import { JwtAuthGuard } from './jwt-auth.guard';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly auth: AuthService) {}
+  constructor(private readonly authService: AuthService) {}
+
+  private resolveOrg(fromBody?: string, fromHeader?: string): string {
+    return (
+      fromBody ||
+      fromHeader ||
+      process.env.E2E_ORG_SLUG ||
+      'demo'
+    );
+  }
+
+  @Post('signup')
+  @HttpCode(HttpStatus.CREATED)
+  async signup(
+    @Body() body: any,
+    @Headers('x-org') orgHeader?: string,
+  ) {
+    const { email, password, org } = body ?? {};
+    const orgSlug = this.resolveOrg(org, orgHeader);
+
+    const { token, user } = await this.authService.signup(
+      email,
+      password,
+      orgSlug,
+    );
+
+    // Expose both "token" and "access_token" to satisfy all tests
+    return {
+      token,
+      access_token: token,
+      user,
+    };
+  }
 
   @Post('login')
-  @HttpCode(200)
-  async login(@Body() body: LoginDto) {
-    const { email, password } = body ?? {};
-    if (!email || !password) {
-      throw new BadRequestException('email and password are required');
-    }
-    const token = await this.auth.issueToken({ email });
-    return { access_token: token };
+  @HttpCode(HttpStatus.OK)
+  async login(
+    @Body() body: any,
+    @Headers('x-org') orgHeader?: string,
+  ) {
+    const { email, password, org } = body ?? {};
+    const orgSlug = this.resolveOrg(org, orgHeader);
+
+    const { token } = await this.authService.login(
+      email,
+      password,
+      orgSlug,
+    );
+
+    // Again, keep both keys
+    return {
+      token,
+      access_token: token,
+    };
   }
 
   @Get('me')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard)
   async me(@Req() req: any) {
-    // req.user is populated by JwtStrategy.validate
-    const user = req.user ?? {};
-    return { id: user.sub ?? user.id ?? 'me', email: user.email ?? null };
+    // JwtAuthGuard should attach the user to req.user
+    return req.user;
   }
 }

@@ -1,123 +1,144 @@
-// eslint.config.mjs
-import js from '@eslint/js';
-import nextPlugin from '@next/eslint-plugin-next';
-import eslintConfigPrettier from 'eslint-config-prettier';
-import importPlugin from 'eslint-plugin-import';
-import jsxA11y from 'eslint-plugin-jsx-a11y';
-import reactPlugin from 'eslint-plugin-react';
-import reactHooks from 'eslint-plugin-react-hooks';
-import simpleImportSort from 'eslint-plugin-simple-import-sort';
-import unusedImports from 'eslint-plugin-unused-imports';
-import * as tseslint from 'typescript-eslint';
+// eslint.config.mjs — Flat config for monorepo (development-friendly)
+
+import js from "@eslint/js";
+import jsxA11y from "eslint-plugin-jsx-a11y";
+import reactPlugin from "eslint-plugin-react";
+import reactHooks from "eslint-plugin-react-hooks";
+import tseslint from "typescript-eslint";
 
 export default [
-  // 0) Ignore stuff
+  // Global ignores (replacement for .eslintignore)
   {
     ignores: [
-      '**/node_modules/**',
-      '**/dist/**',
-      '**/.next/**',
-      '**/coverage/**',
-      'pnpm-lock.yaml',
+      "**/node_modules/**",
+      "**/.next/**",
+      "**/out/**",
+      "**/dist/**",
+      "**/build/**",
+      "**/coverage/**",
+      "**/.turbo/**",
+      "**/.vercel/**",
+      "**/*.min.js",
     ],
   },
 
-  // 1) JS recommended
+  // Base JS & TS recommended
   js.configs.recommended,
-
-  // 2) TS recommended
   ...tseslint.configs.recommended,
 
-  // 3) Base rules for TS/JS
   {
-    files: ['**/*.{ts,tsx,js,jsx}'],
     languageOptions: {
-      ecmaVersion: 2023,
-      sourceType: 'module',
-      parser: tseslint.parser,
-    },
-    plugins: {
-      '@typescript-eslint': tseslint.plugin,
-      import: importPlugin,
-      'simple-import-sort': simpleImportSort,
-      'unused-imports': unusedImports,
+      ecmaVersion: 2022,
+      sourceType: "module",
     },
     rules: {
-      // ✅ Prefer VALUE imports (no `import type`)
-      '@typescript-eslint/consistent-type-imports': [
-        'error',
-        { prefer: 'no-type-imports', disallowTypeAnnotations: false },
+      // General JS/TS hygiene
+      "no-empty": ["error", { allowEmptyCatch: true }],
+      "no-console": ["warn", { allow: ["warn", "error", "info"] }],
+
+      // Relax noisy TS rules for faster iteration
+      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
       ],
-
-      // Keep imports tidy
-      'simple-import-sort/imports': 'error',
-      'simple-import-sort/exports': 'error',
-      'import/no-duplicates': 'error',
-
-      // Unused cleanup
-      '@typescript-eslint/no-unused-vars': 'off',
-      'unused-imports/no-unused-imports': 'error',
-      'unused-imports/no-unused-vars': [
-        'warn',
-        { vars: 'all', varsIgnorePattern: '^_', args: 'after-used', argsIgnorePattern: '^_' },
-      ],
-
-      // Noise control
-      'no-console': ['warn', { allow: ['warn', 'error'] }],
     },
   },
 
-  // 4) Web app (React/Next)
+  // Node/CommonJS style files (configs, scripts, seeders, etc.)
   {
-    files: ['apps/web/**/*.{ts,tsx,js,jsx}'],
+    files: [
+      "**/*.{cjs,cts,mjs,js}",
+      "scripts/**/*.{js,ts,mjs,cjs}",
+      "**/jest*.{js,ts}",
+      "**/postcss.config.js",
+      "**/tailwind.config.js",
+      "**/prisma/**/*.{js,ts,cjs,mjs}",
+    ],
     languageOptions: {
-      ecmaVersion: 2023,
-      sourceType: 'module',
-      parser: tseslint.parser,
+      sourceType: "script",
       globals: {
-        window: 'readonly',
-        document: 'readonly',
-        navigator: 'readonly',
+        module: "readonly",
+        require: "readonly",
+        process: "readonly",
+        __dirname: "readonly",
+        exports: "readonly",
+        console: "readonly",
       },
     },
+    rules: {
+      "no-console": "off",
+      "@typescript-eslint/no-require-imports": "off",
+      "no-redeclare": "off",
+      "@typescript-eslint/no-unused-vars": "off",
+    },
+  },
+
+  // k6 load tests
+  {
+    files: ["apps/api/k6/**/*.js"],
+    languageOptions: {
+      globals: {
+        __ENV: "readonly",
+        console: "readonly",
+      },
+    },
+    rules: {
+      "no-console": "off",
+      "no-undef": "off",
+      "@typescript-eslint/no-require-imports": "off",
+    },
+  },
+
+  // API backend — keep relaxed during dev
+  {
+    files: ["apps/api/**/*.{ts,js}"],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-unused-vars": "warn",
+      "@typescript-eslint/ban-ts-comment": "off",
+      "@typescript-eslint/no-namespace": "off",
+    },
+  },
+
+  // Worker/queue
+  {
+    files: [
+      "apps/worker/**/*.{ts,js}",
+      "apps/api/src/modules/queue/**/*.{ts,js}",
+    ],
+    rules: {
+      "no-console": "off",
+      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-unused-vars": "warn",
+    },
+  },
+
+  // Web (React + Hooks + A11y)
+  {
+    files: ["apps/web/**/*.{ts,tsx}"],
     plugins: {
       react: reactPlugin,
-      'react-hooks': reactHooks,
-      'jsx-a11y': jsxA11y,
-      '@next/next': nextPlugin, // rule namespace must match
+      "react-hooks": reactHooks,
+      "jsx-a11y": jsxA11y,
     },
     settings: {
-      react: { version: 'detect' },
-      // next: { rootDir: ['apps/web'] }, // if you need it later
+      react: { version: "detect" },
+    },
+    languageOptions: {
+      parserOptions: { ecmaFeatures: { jsx: true } },
     },
     rules: {
       ...reactPlugin.configs.recommended.rules,
-      ...reactHooks.configs.recommended.rules,
       ...jsxA11y.configs.recommended.rules,
-      ...(nextPlugin.configs?.recommended?.rules ?? {}),
-      '@next/next/no-html-link-for-pages': 'off',
-      'react/react-in-jsx-scope': 'off',
+      "react/react-in-jsx-scope": "off",
+      "react/jsx-uses-react": "off",
+      "react-hooks/rules-of-hooks": "error",
+      "react-hooks/exhaustive-deps": "warn",
+
+      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-unused-vars": "warn",
+      "jsx-a11y/label-has-associated-control": "warn",
     },
   },
-
-  // 5) Worker (Node-only)
-  {
-    files: ['apps/worker/**/*.{ts,js}'],
-    languageOptions: {
-      ecmaVersion: 2023,
-      sourceType: 'module',
-      parser: tseslint.parser,
-      globals: {
-        process: 'readonly',
-        __dirname: 'readonly',
-        module: 'readonly',
-      },
-    },
-    rules: {
-      'no-console': 'off',
-    },
-  },
-
-  // 6) Prettier compatibility
-  eslintConfigPrettier,
 ];

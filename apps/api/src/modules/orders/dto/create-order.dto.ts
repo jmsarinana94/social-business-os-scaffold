@@ -1,53 +1,45 @@
-// src/modules/orders/dto/create-order.dto.ts
+// apps/api/src/modules/orders/dto/create-order.dto.ts
+
+import { OrderStatus } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
-  ArrayMinSize,
   IsArray,
+  IsEnum,
   IsInt,
-  IsNotEmpty,
   IsOptional,
-  IsPositive,
   IsString,
+  Min,
   ValidateNested,
 } from 'class-validator';
 
-export class OrderItemInputDto {
+export class CreateOrderItemDto {
   @IsString()
-  @IsNotEmpty()
   productId!: string;
 
-  // qty required, >= 1
   @IsInt()
-  @IsPositive()
+  @Min(1)
   quantity!: number;
 
-  // NOTE: client may send unitPrice, but the server will ignore it and
-  // always use the product’s current DB price. Kept here only for forward-compat.
-  @IsOptional()
-  unitPrice?: number;
+  @IsInt()
+  @Min(0)
+  unitPriceCents!: number;
 }
 
 export class CreateOrderDto {
-  @IsArray()
-  @ArrayMinSize(1)
-  @ValidateNested({ each: true })
-  @Type(() => OrderItemInputDto)
-  items!: OrderItemInputDto[];
-
-  // Optional customer email etc. (not persisted in this minimal schema)
   @IsOptional()
   @IsString()
-  customerEmail?: string;
-}
-
-export class ListOrdersQueryDto {
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  offset?: number;
+  accountId?: string;
 
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  limit?: number;
+  @IsString()
+  contactId?: string;
+
+  @IsOptional()
+  @IsEnum(OrderStatus)
+  status?: OrderStatus;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateOrderItemDto)
+  items!: CreateOrderItemDto[];
 }
