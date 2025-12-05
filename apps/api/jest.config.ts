@@ -1,4 +1,4 @@
-import type { Config } from 'jest';
+import { Config } from 'jest';
 
 const e2e: Config = {
   displayName: 'e2e',

@@ -1,8 +1,9 @@
 'use client';
 
-import { listOrders, type Order, type OrderStatus } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
+
+import { listOrders, Order, OrderStatus } from '@/lib/api';
 
 const STATUS_OPTIONS: Array<OrderStatus | 'ALL'> = [
   'ALL',

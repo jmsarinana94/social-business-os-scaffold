@@ -1,8 +1,9 @@
 // apps/api/src/openapi/openapi.module.ts
-import { Module, OnModuleInit } from '@nestjs/common';
-import { NestApplication } from '@nestjs/core';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+
+import { Module, OnModuleInit } from '@nestjs/common';
+import { NestApplication } from '@nestjs/core';
 import * as swaggerUi from 'swagger-ui-express';
 import * as yaml from 'yaml';
 

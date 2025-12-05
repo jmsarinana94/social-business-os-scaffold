@@ -1,6 +1,12 @@
 'use client';
 
-import { getProduct, Product, ProductStatus, ProductType, updateProduct } from '@/lib/api';
+import {
+  getProduct,
+  Product,
+  ProductStatus,
+  ProductType,
+  updateProduct,
+} from '@/lib/api';
 import { useEffect, useState } from 'react';
 
 type Props = {
@@ -22,8 +28,9 @@ export default function EditProductModal({ id, open, onClose, onUpdated }: Props
         setBusy(true);
         const p = await getProduct(id);
         setModel(p);
-      } catch (e: any) {
-        setErr(e?.message || 'Failed to load product');
+      } catch (e: unknown) {
+        const error = e as { message?: string };
+        setErr(error?.message || 'Failed to load product');
       } finally {
         setBusy(false);
       }
@@ -53,8 +60,9 @@ export default function EditProductModal({ id, open, onClose, onUpdated }: Props
       });
       onUpdated?.();
       onClose();
-    } catch (e: any) {
-      setErr(e?.message || 'Failed to update product');
+    } catch (e: unknown) {
+      const error = e as { message?: string };
+      setErr(error?.message || 'Failed to update product');
     } finally {
       setBusy(false);
     }
@@ -65,60 +73,134 @@ export default function EditProductModal({ id, open, onClose, onUpdated }: Props
       <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-lg font-semibold">Edit Product</h3>
-          <button onClick={onClose} className="text-sm text-gray-500">Esc</button>
+          <button onClick={onClose} className="text-sm text-gray-500">
+            Esc
+          </button>
         </div>
 
         {!model ? (
-          <div className="py-8 text-center text-gray-500">{busy ? 'Loading…' : (err || 'Not found')}</div>
+          <div className="py-8 text-center text-gray-500">
+            {busy ? 'Loading…' : err || 'Not found'}
+          </div>
         ) : (
           <>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
-                <label className="block text-xs text-gray-500">Title</label>
-                <input className="mt-1 w-full rounded-lg border px-3 py-2"
-                  value={model.title} onChange={(e) => patch('title', e.target.value)} />
-              </div>
-              <div>
-                <label className="block text-xs text-gray-500">SKU</label>
-                <input className="mt-1 w-full rounded-lg border px-3 py-2"
-                  value={model.sku ?? ''} onChange={(e) => patch('sku', e.target.value)} />
+                <label
+                  htmlFor="edit-product-title"
+                  className="block text-xs text-gray-500"
+                >
+                  Title
+                </label>
+                <input
+                  id="edit-product-title"
+                  className="mt-1 w-full rounded-lg border px-3 py-2"
+                  value={model.title}
+                  onChange={(e) => patch('title', e.target.value)}
+                />
               </div>
 
               <div>
-                <label className="block text-xs text-gray-500">Price</label>
-                <input type="number" className="mt-1 w-full rounded-lg border px-3 py-2"
-                  value={model.price} onChange={(e) => patch('price', Number(e.target.value))} />
+                <label
+                  htmlFor="edit-product-sku"
+                  className="block text-xs text-gray-500"
+                >
+                  SKU
+                </label>
+                <input
+                  id="edit-product-sku"
+                  className="mt-1 w-full rounded-lg border px-3 py-2"
+                  value={model.sku ?? ''}
+                  onChange={(e) => patch('sku', e.target.value)}
+                />
               </div>
+
               <div>
-                <label className="block text-xs text-gray-500">Type</label>
-                <select className="mt-1 w-full rounded-lg border px-3 py-2"
-                  value={model.type} onChange={(e) => patch('type', e.target.value as ProductType)}>
+                <label
+                  htmlFor="edit-product-price"
+                  className="block text-xs text-gray-500"
+                >
+                  Price
+                </label>
+                <input
+                  id="edit-product-price"
+                  type="number"
+                  className="mt-1 w-full rounded-lg border px-3 py-2"
+                  value={model.price}
+                  onChange={(e) => patch('price', Number(e.target.value))}
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="edit-product-type"
+                  className="block text-xs text-gray-500"
+                >
+                  Type
+                </label>
+                <select
+                  id="edit-product-type"
+                  className="mt-1 w-full rounded-lg border px-3 py-2"
+                  value={model.type}
+                  onChange={(e) => patch('type', e.target.value as ProductType)}
+                >
                   <option value="PHYSICAL">PHYSICAL</option>
                   <option value="DIGITAL">DIGITAL</option>
                 </select>
               </div>
 
               <div>
-                <label className="block text-xs text-gray-500">Status</label>
-                <select className="mt-1 w-full rounded-lg border px-3 py-2"
-                  value={model.status} onChange={(e) => patch('status', e.target.value as ProductStatus)}>
+                <label
+                  htmlFor="edit-product-status"
+                  className="block text-xs text-gray-500"
+                >
+                  Status
+                </label>
+                <select
+                  id="edit-product-status"
+                  className="mt-1 w-full rounded-lg border px-3 py-2"
+                  value={model.status}
+                  onChange={(e) =>
+                    patch('status', e.target.value as ProductStatus)
+                  }
+                >
                   <option value="ACTIVE">ACTIVE</option>
                   <option value="INACTIVE">INACTIVE</option>
                 </select>
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-xs text-gray-500">Description</label>
-                <textarea className="mt-1 w-full rounded-lg border px-3 py-2" rows={3}
-                  value={model.description ?? ''} onChange={(e) => patch('description', e.target.value)} />
+                <label
+                  htmlFor="edit-product-description"
+                  className="block text-xs text-gray-500"
+                >
+                  Description
+                </label>
+                <textarea
+                  id="edit-product-description"
+                  className="mt-1 w-full rounded-lg border px-3 py-2"
+                  rows={3}
+                  value={model.description ?? ''}
+                  onChange={(e) => patch('description', e.target.value)}
+                />
               </div>
             </div>
 
-            {err && <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{err}</div>}
+            {err && (
+              <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+                {err}
+              </div>
+            )}
 
             <div className="mt-6 flex justify-end gap-2">
-              <button onClick={onClose} className="rounded-lg border px-3 py-2">Cancel</button>
-              <button onClick={save} disabled={busy} className="rounded-lg bg-black px-4 py-2 text-white disabled:opacity-50">
+              <button onClick={onClose} className="rounded-lg border px-3 py-2">
+                Cancel
+              </button>
+              <button
+                onClick={save}
+                disabled={busy}
+                className="rounded-lg bg-black px-4 py-2 text-white disabled:opacity-50"
+              >
                 {busy ? 'Saving…' : 'Save Changes'}
               </button>
             </div>

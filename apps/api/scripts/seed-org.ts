@@ -21,7 +21,7 @@ async function main() {
     create: { slug, name },
   });
 
-  console.log('Seeded organization:', slug);
+  console.info('Seeded organization:', slug);
   await prisma.$disconnect();
 }
 

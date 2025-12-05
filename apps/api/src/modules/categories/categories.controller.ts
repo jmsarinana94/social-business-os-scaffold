@@ -1,16 +1,18 @@
 // apps/api/src/modules/categories/categories.controller.ts
+
 import {
-    Body,
-    Controller,
-    Delete,
-    Get,
-    Headers,
-    NotFoundException,
-    Param,
-    Post,
-    Put,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Headers,
+  NotFoundException,
+  Param,
+  Post,
+  Put,
 } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
+
 import { CategoriesService } from './categories.service';
 import { CreateCategoryDto, UpdateCategoryDto } from './dto/category.dto';
 
@@ -23,6 +25,12 @@ export class CategoriesController {
     const slug = xOrg ?? '';
     if (!slug) throw new NotFoundException('X-Org header (org slug) is required');
     return slug;
+  }
+
+  @Get('health')
+  @ApiOperation({ summary: 'Health check for categories module' })
+  health() {
+    return { ok: true, scope: 'categories' };
   }
 
   @Get()

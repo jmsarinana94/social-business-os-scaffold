@@ -2,7 +2,8 @@
 
 _Last updated: today_
 
-This document describes how the API currently behaves, including request/response contracts, headers, idempotency, enum handling, validation, persistence, and operational concerns.
+This document describes how the API currently behaves, including request/response contracts,
+headers, idempotency, enum handling, validation, persistence, and operational concerns.
 
 ---
 
@@ -31,7 +32,8 @@ Middleware resolves the organization row by `slug`:
   - Missing header → `400 Bad Request` (`Missing x-org header`)
   - Not found → `400 Bad Request` (`Unknown org`)
 
-> **Note:** Organizations are stored with UUID primary keys; we resolve by slug, then pass the organization `id` to all queries/mutations.
+> **Note:** Organizations are stored with UUID primary keys; we resolve by slug, then pass the
+> organization `id` to all queries/mutations.
 
 ---
 

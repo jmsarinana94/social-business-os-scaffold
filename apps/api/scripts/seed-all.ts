@@ -1,7 +1,8 @@
 // apps/api/scripts/seed-all.ts
+import 'reflect-metadata';
+
 import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
-import 'reflect-metadata';
 
 const prisma = new PrismaClient();
 
@@ -29,7 +30,7 @@ async function main() {
     create: { orgId: org.id, userId: user.id, role: 'admin' },
   });
 
-  console.log(`Seeded org=${org.slug}, user=${user.email}`);
+  console.info(`Seeded org=${org.slug}, user=${user.email}`);
 }
 
 main()

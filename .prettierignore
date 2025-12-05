@@ -7,3 +7,8 @@ pnpm-lock.yaml
 **/.turbo
 **/generated
 **/*.min.js
+**/node_modules
+**/*.lock
+*.log
+apps/api/openapi*.{json,yaml}
+scripts/prettier.mjs

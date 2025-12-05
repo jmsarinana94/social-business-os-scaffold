@@ -1,27 +1,61 @@
-import { Body, Controller, Get, HttpCode, NotFoundException, Post, Req } from '@nestjs/common';
-import { CreateOrgDto } from './dto/create-org.dto';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Headers,
+  Param,
+  Post,
+} from '@nestjs/common';
 import { OrgsService } from './orgs.service';
 
 @Controller('orgs')
 export class OrgsController {
   constructor(private readonly orgs: OrgsService) {}
 
+  /**
+   * POST /orgs
+   * Create a new organization.
+   *
+   * Body: { slug: string, name: string }
+   */
   @Post()
-  @HttpCode(201)
-  create(@Body() dto: CreateOrgDto) {
-    return this.orgs.create(dto);
+  async create(@Body() body: { slug?: string; name?: string }) {
+    const { slug, name } = body || {};
+    if (!slug || !name) {
+      throw new BadRequestException('Both "slug" and "name" are required');
+    }
+    return this.orgs.create(slug, name);
   }
 
+  /**
+   * GET /orgs/me
+   * Returns the organization for the current X-Org or X-Org-Slug header.
+   * Declared BEFORE /orgs/:slug to prevent routing conflicts.
+   */
   @Get('me')
-  async me(@Req() req: any) {
+  async me(@Headers() headers: Record<string, any>) {
     const slug =
-      (req?.org?.slug as string | undefined) ||
-      (req?.headers?.['x-org'] as string | undefined);
+      (headers['x-org'] as string) || (headers['x-org-slug'] as string);
 
-    if (!slug) throw new NotFoundException('Organization not specified');
+    if (!slug) {
+      throw new BadRequestException(
+        'Missing X-Org or X-Org-Slug header to identify organization',
+      );
+    }
 
-    const org = await this.orgs.findBySlug(slug);
-    if (!org) throw new NotFoundException('Organization not found');
-    return org;
+    return this.orgs.get(slug);
+  }
+
+  /**
+   * GET /orgs/:slug
+   * Retrieve an organization by slug.
+   */
+  @Get(':slug')
+  async get(@Param('slug') slug: string) {
+    if (!slug) {
+      throw new BadRequestException('Organization slug is required');
+    }
+    return this.orgs.get(slug);
   }
 }

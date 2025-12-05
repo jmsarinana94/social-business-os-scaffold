@@ -1,5 +1,8 @@
+// apps/api/src/modules/categories/categories.module.ts
+
 import { Module } from '@nestjs/common';
-import { PrismaModule } from '../../common/prisma.module';
+
+import { PrismaModule } from '../prisma/prisma.module';
 import { CategoriesController } from './categories.controller';
 import { CategoriesService } from './categories.service';
 

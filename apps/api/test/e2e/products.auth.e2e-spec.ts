@@ -1,8 +1,9 @@
 // apps/api/test/e2e/products.auth.e2e-spec.ts
-import { AppModule } from '@/app.module';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
+
+import { AppModule } from '@/app.module';
 
 const ORG = process.env.E2E_ORG_SLUG || 'demo-9bsfct';
 const baseHeaders = { 'X-Org': ORG, 'Content-Type': 'application/json' };

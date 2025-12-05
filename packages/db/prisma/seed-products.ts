@@ -1,10 +1,27 @@
 // packages/db/prisma/seed-products.ts
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-async function main() {
+type ProductSeed = {
+  title: string;
+  description: string;
+  price: number | string;
+  type: 'PHYSICAL' | 'DIGITAL';
+  status: 'ACTIVE' | 'INACTIVE';
+  sku: string;
+};
+
+/**
+ * Convert a string or number into a Prisma.Decimal
+ */
+function toDecimal(value: ProductSeed['price']): Prisma.Decimal {
+  return new Prisma.Decimal(typeof value === 'number' ? value.toFixed(2) : value);
+}
+
+async function main(): Promise<void> {
   console.log('🌱 Seeding demo products...');
+
   const org = await prisma.organization.findUnique({
     where: { slug: 'demo' },
     select: { id: true },
@@ -14,7 +31,7 @@ async function main() {
     throw new Error('Demo organization not found. Run: pnpm run db:seed:demo');
   }
 
-  const items = [
+  const items: ProductSeed[] = [
     {
       title: 'Sticker',
       description: 'Vinyl',
@@ -41,36 +58,39 @@ async function main() {
     },
   ];
 
-  // Upsert each so the script is idempotent
   for (const item of items) {
-  await prisma.product.upsert({
-    where: { sku: item.sku }, // <- use sku (unique)
-    update: {
-      title: item.title,
-      description: item.description,
-      price: item.price,
-      status: item.status.toLowerCase() as any,
-      type: item.type.toLowerCase() as any,
-      orgId: org.id, // keep it aligned if org changed
-    },
-    create: {
-      orgId: org.id,
-      title: item.title,
-      description: item.description,
-      price: item.price,
-      status: item.status.toLowerCase() as any,
-      type: item.type.toLowerCase() as any,
-      sku: item.sku,
-    },
-  });
-}
+    // Idempotent upsert by SKU
+    await prisma.product.upsert({
+      where: { sku: item.sku },
+      update: {
+        title: item.title,
+        description: item.description,
+        price: toDecimal(item.price),
+        status: item.status,
+        type: item.type,
+        orgId: org.id,
+      },
+      create: {
+        orgId: org.id,
+        title: item.title,
+        description: item.description,
+        price: toDecimal(item.price),
+        status: item.status,
+        type: item.type,
+        sku: item.sku,
+      },
+    });
 
-  console.log('✅ Products seeded/updated');
+    console.log(`✅ Upserted: ${item.title} (${item.sku})`);
+  }
+
+  console.log('🌱 Done seeding products.');
 }
 
 main()
-  .catch((e) => {
-    console.error(e);
+  .catch((err: unknown) => {
+     
+    console.error(err);
     process.exit(1);
   })
   .finally(async () => {

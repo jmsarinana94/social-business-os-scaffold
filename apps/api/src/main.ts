@@ -1,13 +1,22 @@
-// apps/api/src/main.ts
-import { ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { cors: true });
+  const logger = new Logger('Bootstrap');
 
-  // Global pipes (strict validation like you use in tests)
+  // Create the NestJS app
+  const app = await NestFactory.create(AppModule, {
+    logger: ['error', 'warn', 'log'],
+  });
+
+  // Enable CORS (important for Next.js local dev)
+  app.enableCors({
+    origin: true,
+    credentials: true,
+  });
+
+  // Global validation pipe
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -16,32 +25,27 @@ async function bootstrap() {
     }),
   );
 
-  // Swagger/OpenAPI
-  const config = new DocumentBuilder()
-    .setTitle('Social Business OS – API')
-    .setDescription('Auth, Orgs, Categories, Products, Inventory')
-    .setVersion('0.3.0')
-    .addBearerAuth(
-      { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
-      'JWT',
-    )
-    .addApiKey(
-      {
-        type: 'apiKey',
-        in: 'header',
-        name: 'X-Org',
-        description: 'Organization slug for multi-tenant scoping',
-      },
-      'X-Org',
-    )
-    .build();
+  // Allow an optional global prefix (e.g. GLOBAL_PREFIX=v1)
+  const rawPrefix = process.env.GLOBAL_PREFIX ?? '';
+  const normalizedPrefix = rawPrefix.replace(/^\/|\/$/g, ''); // trim slashes
+  if (normalizedPrefix) {
+    app.setGlobalPrefix(normalizedPrefix);
+  }
 
-  const doc = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('docs', app, doc);
+  // Determine port
+  const port = Number(process.env.PORT) || 4000;
 
-  const port = process.env.PORT ?? 3000;
-  await app.listen(port);
-  console.log(`✅ API listening on http://localhost:${port}`);
-  console.log(`📘 Swagger docs at       http://localhost:${port}/docs`);
+  // Start server
+  await app.listen(port, '0.0.0.0');
+  const baseUrl = await app.getUrl();
+  const fullUrl = normalizedPrefix ? `${baseUrl}/${normalizedPrefix}` : baseUrl;
+
+  logger.log(`✅ API listening at ${fullUrl}`);
+  console.info(`[Bootstrap] API listening at ${fullUrl}`);
 }
-bootstrap();
+
+bootstrap().catch((err) => {
+   
+  console.error('❌ Fatal bootstrap error:', err);
+  process.exit(1);
+});

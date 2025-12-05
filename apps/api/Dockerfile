@@ -1,40 +1,58 @@
-# -------- builder --------
+# ---------------------------------------
+# STAGE 1 — builder
+# ---------------------------------------
 FROM node:20-alpine AS builder
-WORKDIR /app
+WORKDIR /repo
 
-# enable pnpm
+# Enable pnpm via Corepack
 RUN corepack enable
 
-# copy root manifests
-COPY package.json pnpm-lock.yaml ./
+# Install basic build deps (openssl required for Prisma on alpine)
+RUN apk add --no-cache openssl
 
-# install deps
+# Copy workspace manifests FIRST for better layer caching
+COPY pnpm-lock.yaml package.json pnpm-workspace.yaml ./
+
+# Install all workspace deps (dev + prod) for building
 RUN pnpm install --frozen-lockfile
 
-# copy source + prisma
+# Copy only the API app and anything it needs to build (src + prisma + ts configs)
 COPY apps/api ./apps/api
-COPY prisma ./prisma
 
-# build API
+# Build the Nest app (outputs CJS to apps/api/dist/**)
 RUN pnpm -C apps/api build
 
-# generate Prisma Client (uses /prisma/schema.prisma)
-RUN npx prisma@6.14.0 generate --schema=prisma/schema.prisma
+# Generate Prisma Client targeting alpine (musl) — run from the API app folder
+# so prisma picks up apps/api/prisma/schema.prisma and writes node_modules/@prisma/client
+RUN pnpm -C apps/api exec prisma generate --schema=prisma/schema.prisma
 
-# -------- runtime --------
-FROM node:20-alpine
+# Optional: minimize node_modules to production only after build
+# (Keeps what's needed for runtime while allowing dev deps for the build step above)
+RUN pnpm prune --prod
+
+
+# ---------------------------------------
+# STAGE 2 — runtime
+# ---------------------------------------
+FROM node:20-alpine AS runtime
 WORKDIR /app
 
 ENV NODE_ENV=production \
     PORT=4000
 
-# copy runtime artifacts
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/apps/api/dist ./dist
-COPY --from=builder /app/prisma ./prisma
-COPY package.json ./
+# Copy production node_modules (already pruned), built dist, prisma folder, and API package.json
+COPY --from=builder /repo/node_modules ./node_modules
+COPY --from=builder /repo/apps/api/dist ./dist
+COPY --from=builder /repo/apps/api/prisma ./prisma
+COPY --from=builder /repo/apps/api/package.json ./package.json
+
+# If you read env vars from prisma/.env at runtime, you can mount one or bake it in:
+# COPY apps/api/prisma/.env ./prisma/.env
 
 EXPOSE 4000
 
-# You can add an entrypoint to migrate on boot if desired. We keep it simple:
+# Healthcheck is optional but handy in containers/compose
+# HEALTHCHECK --interval=10s --timeout=3s --retries=5 CMD wget -qO- http://127.0.0.1:4000/health || exit 1
+
+# Run the compiled CommonJS bundle
 CMD ["node", "dist/main.js"]

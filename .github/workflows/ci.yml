@@ -1,10 +1,28 @@
 name: CI
+
 on:
-  push: { branches: [ main ] }
-  pull_request: { branches: [ main ] }
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   api:
+    name: 🧩 API – Test & Build Matrix
     runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [18, 20, 22]
+
     services:
       postgres:
         image: postgres:16-alpine
@@ -12,24 +30,123 @@ jobs:
           POSTGRES_USER: sbo
           POSTGRES_PASSWORD: sbo
           POSTGRES_DB: sbo
-        ports: [ '5432:5432' ]
+        ports: ['5432:5432']
         options: >-
-          --health-cmd="pg_isready -U sbo" --health-interval=10s --health-timeout=5s --health-retries=5
+          --health-cmd="pg_isready -U sbo"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: 'pnpm'
+
+      - name: Enable Corepack (pnpm)
+        run: corepack enable && corepack prepare pnpm@10.20.0 --activate
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Set DATABASE_URL
+        run: echo "DATABASE_URL=postgresql://sbo:sbo@localhost:5432/sbo" >> $GITHUB_ENV
+
+      - name: Generate Prisma Client
+        run: pnpm -w -F @repo/api prisma generate
+
+      - name: Push DB Schema
+        run: pnpm -w -F @repo/api prisma db push
+
+      - name: Build API
+        run: pnpm -w -F @repo/api build
+
+      - name: Run e2e tests with coverage
+        run: pnpm -w -F @repo/api test:e2e -- --coverage
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-coverage-${{ matrix.node }}
+          path: apps/api/coverage
+
+  web:
+    name: 🌐 Web – Build & Typecheck
+    runs-on: ubuntu-latest
+    needs: [api]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Enable Corepack
+        run: corepack enable && corepack prepare pnpm@10.20.0 --activate
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck Web
+        run: pnpm -F @repo/web run typecheck || pnpm -w exec tsc -p apps/web/tsconfig.json --noEmit
+
+      - name: Build Web
+        run: pnpm -F @repo/web run build
+
+  lint:
+    name: 🧹 Lint & Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Enable Corepack
+        run: corepack enable && corepack prepare pnpm@10.20.0 --activate
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint (no warnings)
+        run: pnpm -w exec eslint . --ext .ts,.tsx --max-warnings 0
+
+      - name: Check formatting
+        run: pnpm format --check
+
+  typecheck:
+    name: 🔍 Global Typecheck
+    runs-on: ubuntu-latest
+    needs: [lint]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: 20 }
+        with:
+          node-version: 20
+          cache: 'pnpm'
       - name: Enable Corepack
-        run: corepack enable && corepack prepare pnpm@9.12.2 --activate
-      - name: Install deps
+        run: corepack enable && corepack prepare pnpm@10.20.0 --activate
+      - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Set DATABASE_URL
-        run: echo "DATABASE_URL=postgresql://sbo:sbo@localhost:5432/sbo" >> $GITHUB_ENV
-      - name: Generate Prisma Client
-        run: pnpm -w -F @repo/api prisma generate
-      - name: DB Push
-        run: pnpm -w -F @repo/api prisma db push
-      - name: Build
-        run: pnpm -w -F @repo/api build
-      - name: Test e2e
-        run: pnpm -w -F @repo/api test:e2e
+      - name: Run TypeScript typecheck
+        run: pnpm -w exec tsc --noEmit --pretty false
+
+  summary:
+    name: ✅ CI Summary
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck, api, web]
+    steps:
+      - name: CI Completed
+        run: echo "✅ All checks passed successfully!"
+
+  env:
+  NEXT_PUBLIC_ORG_ID: ${{ secrets.NEXT_PUBLIC_ORG_ID }}

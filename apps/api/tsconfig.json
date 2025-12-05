@@ -1,5 +1,8 @@
 {
   "compilerOptions": {
+    /* ---------------------------
+     * Core compilation settings
+     * --------------------------- */
     "module": "CommonJS",
     "target": "ES2022",
     "lib": ["ES2022"],
@@ -7,42 +10,67 @@
     "outDir": "./dist",
     "baseUrl": ".",
     "moduleResolution": "node",
+
+    /* ---------------------------
+     * Path aliases
+     * --------------------------- */
     "paths": {
       "@/*": ["src/*"]
     },
 
+    /* ---------------------------
+     * Type safety & performance
+     * --------------------------- */
     "strict": true,
     "skipLibCheck": true,
-
     "noEmit": false,
     "declaration": false,
     "sourceMap": true,
     "removeComments": true,
 
+    /* ---------------------------
+     * Decorators & metadata
+     * --------------------------- */
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "useDefineForClassFields": false,
 
+    /* ---------------------------
+     * Interop & module support
+     * --------------------------- */
     "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
     "resolveJsonModule": true,
 
+    /* ---------------------------
+     * Incremental build cache
+     * --------------------------- */
     "incremental": true,
     "tsBuildInfoFile": "./dist/.tsbuildinfo",
 
-    "types": ["node", "jest"]
+    /* ---------------------------
+     * Types
+     * --------------------------- */
+    "types": ["node", "jest"],
+    "typeRoots": ["./src/types", "./node_modules/@types"]
   },
+
+  /* ---------------------------
+   * Include relevant files
+   * --------------------------- */
   "include": [
     "src/**/*.ts",
+    "src/**/*.d.ts",
     "prisma/**/*.ts",
     "scripts/**/*.ts",
-    "jest.config.ts",
-    "jest.setup.ts"
+    "jest.config.cjs",
+    "jest-e2e.config.cjs",
+    "jest.setup.ts",
+    "test/**/*.ts"
   ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "test",
-    "**/*.spec.ts",
-    "**/*.e2e-spec.ts"
-  ]
+
+  /* ---------------------------
+   * Exclude build outputs
+   * --------------------------- */
+  "exclude": ["node_modules", "dist"]
 }

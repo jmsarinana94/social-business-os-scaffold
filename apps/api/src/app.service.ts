@@ -3,6 +3,10 @@ import { Injectable } from '@nestjs/common';
 @Injectable()
 export class AppService {
   health() {
-    return { ok: true };
+    return {
+      status: 'ok',
+      service: 'api',
+      timestamp: new Date().toISOString(),
+    };
   }
 }
