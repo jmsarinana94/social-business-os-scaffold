@@ -2,12 +2,11 @@ name: API Smoke (remote)
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '0 * * * *' # hourly; adjust or remove
 
 jobs:
   smoke:
     runs-on: ubuntu-latest
+
     env:
       API_BASE: ${{ secrets.API_BASE }}
       API_EMAIL: ${{ secrets.API_EMAIL }}
